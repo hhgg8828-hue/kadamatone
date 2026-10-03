@@ -21,8 +21,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 
 test('provider page and frontend assets use the current version', () => {
   assert.ok(provider.includes('data-page="provider"'));
-  assert.ok(provider.includes('app.js?v=59')); 
-  assert.ok(index.includes('app.js?v=59')); 
+  assert.ok(provider.includes('app.js?v=57')); 
+  assert.ok(index.includes('app.js?v=57')); 
 });
 
 

@@ -67,6 +67,10 @@ export function createAssignmentService(app: App): AssignmentService {
         const now = app.clock.now(); const nowIso = iso(now);
         if (Date.parse(a.expires_at) <= now) { db.run(`UPDATE order_assignments SET status='EXPIRED', responded_at=? WHERE id=?`, nowIso, a.id); throw E.conflict('انتهت مهلة هذا العرض', 'OFFER_EXPIRED'); }
         const o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', a.order_id)!;
+        const trip = db.get<{service_slug:string}>('SELECT s.slug service_slug FROM services s WHERE s.id=?', o.service_id);
+        if (trip?.service_slug === 'motorcycle-trips' && !db.get('SELECT 1 FROM provider_vehicles WHERE provider_id=? AND status=\'VERIFIED\' AND is_active=1', providerId)) {
+          throw E.forbidden('لا يمكن قبول مشوار بالدباب قبل اعتماد مركبة صالحة', 'VERIFIED_VEHICLE_REQUIRED');
+        }
         const existingQuote = db.get<{ status: string }>(`SELECT status FROM quotes WHERE order_id=? AND provider_id=? ORDER BY created_at DESC LIMIT 1`, o.id, providerId);
         if (existingQuote?.status === 'SUBMITTED') throw E.conflict('تم تقديم عرض سعر لهذا الطلب بالفعل، اختر قرار العميل على العرض.', 'QUOTE_ALREADY_SUBMITTED');
         const res = db.run(`UPDATE orders SET status='ACCEPTED', provider_id=?, agreed_price=price_snapshot, accepted_at=?, updated_at=?, version=version+1

@@ -45,8 +45,11 @@ export function registerChatRoutes(app, r) {
             if (p && p.user_id !== ctx.user.id)
                 targets.add(p.user_id);
         }
-        for (const uid of targets)
-            app.notifications.notify(uid, 'CHAT_MESSAGE', { code: (app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '') }, { orderId: o.id });
+        for (const uid of targets) {
+            const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
+            app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id });
+            app.sse.send(uid, 'chat_message', { orderId: o.id, message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) });
+        }
         ctx.status = 201;
         return { message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) };
     });

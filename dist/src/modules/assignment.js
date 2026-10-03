@@ -64,6 +64,10 @@ export function createAssignmentService(app) {
                     throw E.conflict('انتهت مهلة هذا العرض', 'OFFER_EXPIRED');
                 }
                 const o = db.get('SELECT * FROM orders WHERE id = ?', a.order_id);
+                const trip = db.get('SELECT s.slug service_slug FROM services s WHERE s.id=?', o.service_id);
+                if (trip?.service_slug === 'motorcycle-trips' && !db.get('SELECT 1 FROM provider_vehicles WHERE provider_id=? AND status=\'VERIFIED\' AND is_active=1', providerId)) {
+                    throw E.forbidden('لا يمكن قبول مشوار بالدباب قبل اعتماد مركبة صالحة', 'VERIFIED_VEHICLE_REQUIRED');
+                }
                 const existingQuote = db.get(`SELECT status FROM quotes WHERE order_id=? AND provider_id=? ORDER BY created_at DESC LIMIT 1`, o.id, providerId);
                 if (existingQuote?.status === 'SUBMITTED')
                     throw E.conflict('تم تقديم عرض سعر لهذا الطلب بالفعل، اختر قرار العميل على العرض.', 'QUOTE_ALREADY_SUBMITTED');
