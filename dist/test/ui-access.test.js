@@ -17,8 +17,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 });
 test('provider page and frontend assets use the current version', () => {
     assert.ok(provider.includes('data-page="provider"'));
-    assert.ok(provider.includes('app.js?v=57'));
-    assert.ok(index.includes('app.js?v=57'));
+    assert.ok(provider.includes('app.js?v=59'));
+    assert.ok(index.includes('app.js?v=59'));
 });
 test('provider order action is not nested inside the clickable order detail button', () => {
     assert.match(app, /class=\"order-card-main\"/);
@@ -177,15 +177,5 @@ test('V49: provider can choose direct acceptance or quote, and admin complaint U
     assert.ok(app.includes('إغلاق الشكوى وحفظ القرار'));
     assert.ok(app.includes('حل المشكلة وإبقاء الطلب مكتملًا'));
     assert.ok(!app.includes('RESTORE_COMPLETED أو CANCEL_ORDER أو WARN_PROVIDER'));
-});
-test('V57: واجهة المشاوير بالدباب تحتوي خرائط الانطلاق والوجهة وعداد الأجرة', () => {
-    const app = fs.readFileSync(path.join(root, 'app.ts'), 'utf8');
-    assert.ok(app.includes("s.slug==='motorcycle-trips'"));
-    assert.ok(app.includes('tripOriginMap'));
-    assert.ok(app.includes('tripDestinationMap'));
-    assert.ok(app.includes('/trips/estimate'));
-    assert.ok(app.includes('/trips'));
-    assert.ok(app.includes('tripDistance'));
-    assert.ok(app.includes('tripFare'));
 });
 //# sourceMappingURL=ui-access.test.js.map

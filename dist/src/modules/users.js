@@ -21,9 +21,7 @@ export function registerUserRoutes(app, r) {
             if (b.avatarFileId && !db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'avatar'`, b.avatarFileId, ctx.user.id))
                 throw E.unprocessable('ملف الصورة غير صالح', 'INVALID_FILE');
             db.run(`UPDATE users SET full_name = COALESCE(?, full_name), email = COALESCE(?, email), locale = COALESCE(?, locale), avatar_file_id = COALESCE(?, avatar_file_id), updated_at = ? WHERE id = ?`, b.fullName ?? null, b.email ?? null, b.locale ?? null, b.avatarFileId ?? null, iso(app.clock.now()), ctx.user.id);
-            const out = { user: serializeUser(app.authService.loadUser('u.id = ?', ctx.user.id)) };
-            app.sse.send(ctx.user.id, 'sync', { scope: 'users' });
-            return out;
+            return { user: serializeUser(app.authService.loadUser('u.id = ?', ctx.user.id)) };
         });
     });
     const addrRow = (a, locale) => ({ id: a.id, label: a.label, isDefault: !!a.is_default, location: app.locations.serialize(db.get('SELECT * FROM locations WHERE id = ?', a.location_id), locale) });
@@ -43,9 +41,7 @@ export function registerUserRoutes(app, r) {
                 db.run('UPDATE addresses SET is_default = 0 WHERE user_id = ?', ctx.user.id);
             db.run('INSERT INTO addresses(id,user_id,label,location_id,is_default,created_at) VALUES (?,?,?,?,?,?)', id, ctx.user.id, b.label, loc.id, b.isDefault || first ? 1 : 0, iso(app.clock.now()));
             ctx.status = 201;
-            const out = { address: addrRow(db.get('SELECT * FROM addresses WHERE id = ?', id), ctx.locale) };
-            app.sse.send(ctx.user.id, 'sync', { scope: 'addresses' });
-            return out;
+            return { address: addrRow(db.get('SELECT * FROM addresses WHERE id = ?', id), ctx.locale) };
         });
     });
     const addrUpdateSchema = s.obj({ label: s.str({ min: 1, max: 40, optional: true }), isDefault: s.bool({ optional: true }), location: { ...locationSchema, optional: true } });
@@ -65,16 +61,13 @@ export function registerUserRoutes(app, r) {
                 db.run('UPDATE addresses SET is_default = 0 WHERE user_id = ?', ctx.user.id);
                 db.run('UPDATE addresses SET is_default = 1 WHERE id = ?', a.id);
             }
-            const out = { address: addrRow(db.get('SELECT * FROM addresses WHERE id = ?', a.id), ctx.locale) };
-            app.sse.send(ctx.user.id, 'sync', { scope: 'addresses' });
-            return out;
+            return { address: addrRow(db.get('SELECT * FROM addresses WHERE id = ?', a.id), ctx.locale) };
         });
     });
     r.delete('/me/addresses/:id', auth, roles('CUSTOMER'), (ctx) => {
         const res = db.run('DELETE FROM addresses WHERE id = ? AND user_id = ?', ctx.params['id'], ctx.user.id);
         if (!res.changes)
             throw E.notFound('العنوان غير موجود');
-        app.sse.send(ctx.user.id, 'sync', { scope: 'addresses' });
         return undefined;
     });
 }

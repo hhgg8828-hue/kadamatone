@@ -10,7 +10,7 @@ after(async () => { await t.close(); });
 const jpeg1x1 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Aqf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IY//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8Qf//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8Qf//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8Qf//Z';
 
 async function registerProvider() {
-  const body = { fullName: 'مقدم وثائق', phone: uniquePhone(), password: 'Passw0rd123', role: 'PROVIDER', locale: 'ar', provider: { providerType: 'DRIVER', displayName: 'مقدم اختبار', bio: 'اختبار' } };
+  const body = { fullName: 'مقدم وثائق', phone: uniquePhone(), email: `provider-doc-${Date.now()}@test.local`, password: 'Passw0rd123', role: 'PROVIDER', locale: 'ar', provider: { providerType: 'DRIVER', displayName: 'مقدم اختبار', bio: 'اختبار' } };
   const r = await t.api('POST', '/api/v1/auth/register', { body });
   assert.equal(r.status, 201);
   return r.body.accessToken as string;

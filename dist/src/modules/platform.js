@@ -21,7 +21,6 @@ export function registerPlatformRoutes(app, r) {
         const b = parse(s.obj({ value: s.any() }), ctx.body);
         return db.tx(() => {
             const value = settings.set(key, b.value, ctx.user.id);
-            app.sse.broadcast('sync', { scope: 'settings' });
             app.audit.log({ ctx, action: 'settings.update', entityType: 'setting', entityId: key, before: { value: before.value }, after: { value } });
             return { key, value };
         });
@@ -56,7 +55,6 @@ export function registerPlatformRoutes(app, r) {
             db.run(`UPDATE service_areas SET name_i18n = COALESCE(?, name_i18n), is_active = COALESCE(?, is_active), center_lat = COALESCE(?, center_lat),
               center_lng = COALESCE(?, center_lng), radius_km = COALESCE(?, radius_km), updated_at = ? WHERE id = ?`, b.name ? JSON.stringify(b.name) : null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.centerLat ?? null, b.centerLng ?? null, b.radiusKm ?? null, iso(app.clock.now()), a.id);
             catalog.invalidate();
-            app.sse.broadcast('sync', { scope: 'catalog' });
             app.audit.log({ ctx, action: 'area.update', entityType: 'area', entityId: a.id, before: { isActive: !!a.is_active, radiusKm: a.radius_km }, after: b });
             return { area: areaOut(a.id, ctx.locale) };
         });

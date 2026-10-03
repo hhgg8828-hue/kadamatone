@@ -1,6 +1,6 @@
 {
   "name": "khadamat",
-  "version": "0.5.15",
+  "version": "0.5.9",
   "description": "خدمات (Khadamat) — منصة خدمات متعددة متكاملة (MVP operational)",
   "private": true,
   "type": "module",

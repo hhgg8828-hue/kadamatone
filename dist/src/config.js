@@ -58,7 +58,7 @@ export function loadConfig(overrides = {}) {
             name: env.ADMIN_NAME || 'مدير النظام',
             phone: env.ADMIN_PHONE || '+967700000000',
             email: env.ADMIN_EMAIL || 'admin@khadamat.local',
-            password: env.ADMIN_PASSWORD || 'Khadamat@Admin2026!',
+            password: env.ADMIN_PASSWORD || '',
         },
         publicDir: path.join(ROOT, 'public'),
         sharedDir: path.join(ROOT, 'shared'),

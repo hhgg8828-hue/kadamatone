@@ -12,7 +12,7 @@ import type { OrderRow, OrderStatus, Priority, ActorRole, LocationRow } from '..
 import { serializeTrip } from './trips.js';
 
 export interface CreateOrderInput {
-  serviceId: string; description?: string; location: LocationInput; addressId?: string; contactPhone?: string;
+  serviceId: string; description: string; location: LocationInput; addressId?: string; contactPhone: string;
   scheduledAt?: string; priority?: Priority; formData?: Record<string, unknown>; notes?: string; attachmentFileIds?: string[];
 }
 const createOrderSchema: Schema = s.obj({
@@ -20,7 +20,7 @@ const createOrderSchema: Schema = s.obj({
   description: s.str({ min: 0, max: 1000, optional: true, default: '' }),
   location: { ...locationSchema, optional: true } as Schema,
   addressId: s.str({ max: 64, optional: true }),
-  contactPhone: s.str({ min: 0, max: 24, optional: true, default: '' }),
+  contactPhone: s.str({ min: 8, max: 24 }),
   scheduledAt: s.date({ optional: true }),
   priority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true }),
   formData: s.any({ optional: true }),
@@ -74,12 +74,12 @@ export function createOrders(app: App): Orders {
         attachments: (parseJson<string[]>(o.attachments, []) ?? []).map((id) => `/api/v1/files/${id}`), wave: o.wave,
         createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason,
       };
+      const trip = serializeTrip(app, o.id, ctx.locale);
+      if (trip) out.trip = trip;
       if (ctx.user?.role === 'PROVIDER' || ctx.user?.role === 'ADMIN') {
         const cu = db.get<{ id: string; full_name: string; phone: string }>('SELECT id, full_name, phone FROM users WHERE id = ?', o.customer_id)!;
         out.customer = { id: cu.id, fullName: cu.full_name, phone: approx ? null : cu.phone };
       }
-      const trip = serializeTrip(app, o.id, ctx.locale);
-      if (trip) out.trip = trip;
       if (o.provider_id) {
         const p = app.providers.summary(o.provider_id, ctx.locale);
         out.provider = { id: p.id, displayName: p.displayName, avatarUrl: p.avatarUrl, rating: p.rating.avg };
@@ -128,7 +128,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
     const svc = catalog.getActiveService(b.serviceId);
     if (!svc) throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
     const fields = parseJson<FormField[]>(svc.form_schema, []) ?? [];
-    const formData = validateFormData(fields, b.formData);
+    const formData = validateFormData(fields, b.formData, { relaxed: true });
     const idemKey = String(ctx.req.headers['idempotency-key'] || '') || null;
 
     return db.tx(() => {

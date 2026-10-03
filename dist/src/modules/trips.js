@@ -19,7 +19,7 @@ const tripInputSchema = s.obj({
     purpose: purposeSchema,
     purposeNote: s.str({ max: 500, optional: true }),
     description: s.str({ min: 0, max: 1000, optional: true, default: '' }),
-    contactPhone: s.str({ min: 0, max: 24, optional: true, default: '' }),
+    contactPhone: s.str({ min: 8, max: 24 }),
     notes: s.str({ max: 500, optional: true }),
 });
 async function drivingDistance(app, origin, destination) {

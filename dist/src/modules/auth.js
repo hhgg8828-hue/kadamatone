@@ -15,7 +15,7 @@ function cleanPhone(raw) {
     return p;
 }
 export function serializeUser(u) {
-    return { id: u.id, fullName: u.full_name, phone: u.phone?.startsWith('email:') ? '' : u.phone, email: u.email || null, role: u.role, locale: u.locale, status: u.status,
+    return { id: u.id, fullName: u.full_name, phone: u.phone, email: u.email || null, role: u.role, locale: u.locale, status: u.status,
         avatarUrl: u.avatar_file_id ? `/api/v1/files/${u.avatar_file_id}` : null, adminLevel: u.admin_level ?? null };
 }
 export function createAuthService(app) {
@@ -40,7 +40,7 @@ export function createAuthService(app) {
 }
 const registerSchema = s.obj({
     fullName: s.str({ min: 2, max: 80 }),
-    phone: s.str({ min: 8, max: 24, optional: true }),
+    phone: PHONE,
     email: EMAIL,
     password: PASSWORD,
     role: s.oneOf(['CUSTOMER', 'PROVIDER']),
@@ -57,25 +57,22 @@ export function registerAuthRoutes(app, r) {
     const svc = app.authService;
     r.post('/auth/register', limit('register', { max: 10, windowMs: 3600_000 }), async (ctx) => {
         const b = parse(registerSchema, ctx.body);
-        const email = b.email?.trim().toLowerCase() || '';
-        if (!b.phone && !email)
-            throw E.unprocessable('أدخل رقم الهاتف أو البريد الإلكتروني', 'CONTACT_REQUIRED', [{ path: 'contact', message: 'أدخل أحدهما على الأقل' }]);
-        const phone = b.phone ? cleanPhone(b.phone) : `email:${sha256(email).slice(0, 20)}`;
-        if (b.phone && !PHONE_RE.test(phone))
-            throw E.unprocessable('رقم هاتف غير صالح', 'VALIDATION_ERROR', [{ path: 'phone', message: 'رقم هاتف غير صالح' }]);
+        const phone = cleanPhone(b.phone);
         if (b.role === 'PROVIDER' && !b.provider)
             throw E.unprocessable('بيانات مقدم الخدمة مطلوبة', 'VALIDATION_ERROR', [{ path: 'provider', message: 'هذا الحقل مطلوب' }]);
+        if (b.role === 'PROVIDER' && !b.email)
+            throw E.unprocessable('البريد الإلكتروني مطلوب لمقدم الخدمة', 'PROVIDER_EMAIL_REQUIRED', [{ path: 'email', message: 'هذا الحقل مطلوب لمقدم الخدمة' }]);
         const companyName = b.provider?.providerType === 'COMPANY' ? (b.provider.companyName || b.provider.displayName) : b.provider?.companyName;
         if (b.provider?.providerType === 'COMPANY' && !companyName)
             throw E.unprocessable('اسم الشركة مطلوب', 'VALIDATION_ERROR', [{ path: 'provider.companyName', message: 'هذا الحقل مطلوب' }]);
         const hash = await hashPassword(b.password);
         const userRow = db.tx(() => {
-            if (b.phone && db.get('SELECT 1 FROM users WHERE phone = ?', phone))
+            if (db.get('SELECT 1 FROM users WHERE phone = ?', phone))
                 throw E.conflict('رقم الهاتف مسجل مسبقًا', 'PHONE_TAKEN');
-            if (email && db.get('SELECT 1 FROM users WHERE email = ?', email))
+            if (b.email && db.get('SELECT 1 FROM users WHERE email = ?', b.email))
                 throw E.conflict('البريد الإلكتروني مسجل مسبقًا', 'EMAIL_TAKEN');
             const id = uuid(), now = iso(app.clock.now());
-            db.run('INSERT INTO users(id,role_id,full_name,phone,email,password_hash,locale,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', id, b.role === 'PROVIDER' ? 2 : 1, b.fullName, phone, email || null, hash, b.locale, now, now);
+            db.run('INSERT INTO users(id,role_id,full_name,phone,email,password_hash,locale,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', id, b.role === 'PROVIDER' ? 2 : 1, b.fullName, phone, b.email || null, hash, b.locale, now, now);
             if (b.role === 'PROVIDER' && b.provider) {
                 db.run('INSERT INTO service_providers(id,user_id,provider_type,display_name,bio,company_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)', uuid(), id, b.provider.providerType, b.provider.displayName || b.provider.companyName || b.fullName, b.provider.bio || null, companyName || null, now, now);
                 app.notifications.notifyAdmins('PROVIDER_PENDING_ADMIN', { provider: b.provider.displayName || b.fullName }, { userId: id });

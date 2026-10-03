@@ -159,42 +159,5 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 
 .order-card[role="button"]{cursor:pointer}.order-card:focus-visible{outline:3px solid rgba(124,58,237,.35);outline-offset:2px}.order-rating-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:12px;border:1px solid rgba(124,58,237,.16);border-radius:14px;background:linear-gradient(135deg,rgba(124,58,237,.07),rgba(245,158,11,.07))}.order-rating-inline p{margin:4px 0 0}.order-rating-inline .btn{flex:none}@media(max-width:640px){.order-rating-inline{align-items:stretch;flex-direction:column}.order-rating-inline .btn{width:100%}}
 
-/* V55 — shared About the App surface for customer, provider, and admin portals */
-.about-btn{background:linear-gradient(145deg,#fff,#f5f8ff)!important;border-color:#d8e3f4!important;color:#284b7a!important}
-.about-app{direction:rtl}
-.about-app-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}
-.about-app-head h2{margin:3px 0 2px}
-.about-app-mark{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(145deg,#eef4ff,#f7faff);border:1px solid #d9e5f7;color:var(--primary);font-size:30px;font-weight:900;flex:none}
-.about-app-section{padding:17px 0;border-bottom:1px solid #edf0f4}
-.about-app-section:last-of-type{border-bottom:0}
-.about-app-section h3,.about-app-contact h3{margin:0 0 9px;font-size:17px}
-.about-app-section p{margin:0 0 10px;line-height:1.85}
-.about-app-section p:last-child{margin-bottom:0}
-.about-app-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
-.about-app-services span{display:flex;align-items:center;gap:8px;padding:11px 12px;border:1px solid #e3e8f0;border-radius:13px;background:#fafcff}
-.about-app-slogan{margin-top:13px!important;padding:12px 14px;border-radius:13px;background:#f4f7fc;color:var(--primary);font-weight:900;text-align:center}
-.about-app-contact{padding:17px 0 4px}
-.about-contact-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed #e4e8ef}
-.about-contact-row:last-child{border-bottom:0}
-.about-contact-row a{direction:ltr;text-align:left;font-weight:800;color:var(--primary);text-decoration:none;unicode-bidi:plaintext}
-.about-app-footer{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);text-align:center}
-.about-app-footer strong{font-size:18px}
-.about-app-footer small{color:#7a8699}
-@media(max-width:600px){.about-app-head{align-items:flex-start}.about-app-mark{width:48px;height:48px;border-radius:15px;font-size:24px}.about-app-services{grid-template-columns:1fr}.about-contact-row{align-items:flex-start;flex-direction:column;gap:5px}.about-contact-row a{max-width:100%;overflow-wrap:anywhere}.top-actions .about-btn{display:inline-flex}}
-
-/* V56 — unified admin visual hierarchy + strict viewport containment */
-.admin-page,.admin-shell{max-width:100%;overflow-x:hidden}.admin-shell *{box-sizing:border-box}.admin-tabs{background:linear-gradient(135deg,#e9e6f5,#f7f2e7);border:1px solid #d9d2e8}.admin-tabs .section-tab{color:#40385a}.admin-tabs .section-tab.active{background:linear-gradient(135deg,#ddd6ff,#fff0c9);color:#33236f}
-.admin-table-wrap{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border-radius:16px}.admin-table-wrap .table{min-width:720px;margin:0}.admin-table-wrap::-webkit-scrollbar{height:8px}.admin-table-wrap::-webkit-scrollbar-thumb{background:#c8c0da;border-radius:99px}
-.admin-user-card,.admin-manager-card{background:linear-gradient(145deg,#fbfaff,#f5f8fc);border:1px solid #dcd7e8;box-shadow:0 8px 24px rgba(43,34,75,.07);border-radius:18px}.admin-user-meta{color:#697386}.admin-user-actions{display:flex;flex-wrap:wrap;gap:7px}.admin-account-modal{max-width:680px}
-.admin-page .card{background:linear-gradient(145deg,#fbfaff,#f5f8fc);border-color:#d9d4e5;box-shadow:0 8px 24px rgba(43,34,75,.06)}.admin-page .card:nth-of-type(3n){background:linear-gradient(145deg,#fffdf7,#f8f4eb)}.admin-page input,.admin-page select,.admin-page textarea{max-width:100%}.admin-page .row{max-width:100%}
-@media(max-width:700px){.admin-page{width:100%;max-width:100vw}.admin-page .card{overflow:hidden}.admin-page .row{flex-wrap:wrap}.admin-table-wrap{margin-inline:0;width:100%}.admin-table-wrap .table{min-width:680px}.admin-user-actions{display:grid;grid-template-columns:1fr 1fr}.admin-user-actions .btn{width:100%;min-width:0}.admin-manager-head{align-items:flex-start;flex-direction:column}.admin-account-modal{width:100%;max-width:100%}}
-@media(max-width:430px){.admin-page .row>.btn,.admin-page .row>select{max-width:100%}.admin-user-actions{grid-template-columns:1fr}.admin-table-wrap .table{min-width:620px}}
-
-/* V56.1 mobile touch reliability */
-.btn{position:relative;z-index:2;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
-.hero .row{position:relative;z-index:2;}
-@media (max-width:700px){.hero .row{width:100%;}.hero .row .btn{min-height:44px;flex:1;min-width:180px;}}
-.trip-modal{max-width:900px;margin:auto}.trip-head{margin-bottom:12px}.trip-location-card{margin-top:14px;padding:14px;border:1px solid #dfe5ef;border-radius:18px;background:linear-gradient(145deg,#fbfcff,#f7f4ff)}.trip-location-head{justify-content:space-between;margin-bottom:9px}.trip-map{height:260px;width:100%;border-radius:14px;overflow:hidden;margin:10px 0;border:1px solid #d9dfeb}.trip-location-card textarea{min-height:70px}.trip-meter{margin-top:16px;text-align:center;background:linear-gradient(145deg,#171b29,#30265d);color:#fff;border:0;box-shadow:0 15px 30px rgba(35,25,85,.2)}.trip-meter-label{font-size:12px;opacity:.72;letter-spacing:.5px}.trip-meter-main{display:flex;justify-content:center;align-items:baseline;gap:8px;margin-top:3px}.trip-meter-main span{font-size:42px;font-weight:900;letter-spacing:-1px}.trip-meter-main small,.trip-meter-fare small{font-size:13px;opacity:.75}.trip-meter-fare{display:flex;justify-content:center;align-items:baseline;gap:7px;font-weight:800}.trip-meter-fare span{font-size:23px}.trip-summary{margin:12px 0;background:linear-gradient(145deg,#f5f1ff,#fff8e9);border-color:#ded5f5}.trip-summary p{margin:6px 0}.admin-page .trip-summary{overflow-wrap:anywhere}
-@media(max-width:600px){.trip-map{height:230px}.trip-meter-main span{font-size:36px}.trip-location-head .btn{font-size:12px;padding:8px 10px}}
-/* V57 mobile touch reliability */
-#online,[data-action],button{touch-action:manipulation}
+/* V59 additions: motorcycle trip UI */
+.trip-modal{max-width:900px;margin:auto}.trip-head{margin-bottom:12px}.trip-location-card{margin-top:14px;padding:14px;border:1px solid #dfe5ef;border-radius:18px;background:linear-gradient(145deg,#fbfcff,#f7f4ff)}.trip-location-head{justify-content:space-between;margin-bottom:9px}.trip-map{height:260px;width:100%;border-radius:14px;overflow:hidden;margin:10px 0;border:1px solid #d9dfeb}.trip-location-card textarea{min-height:70px}.trip-meter{margin-top:16px;text-align:center;background:linear-gradient(145deg,#171b29,#30265d);color:#fff;border:0;box-shadow:0 15px 30px rgba(35,25,85,.2)}.trip-meter-label{font-size:12px;opacity:.72;letter-spacing:.5px}.trip-meter-main{display:flex;justify-content:center;align-items:baseline;gap:8px;margin-top:3px}.trip-meter-main span{font-size:42px;font-weight:900;letter-spacing:-1px}.trip-meter-main small,.trip-meter-fare small{font-size:13px;opacity:.75}.trip-meter-fare{display:flex;justify-content:center;align-items:baseline;gap:7px;font-weight:800}.trip-meter-fare span{font-size:23px}.trip-summary{margin:12px 0;background:linear-gradient(145deg,#f5f1ff,#fff8e9);border-color:#ded5f5}.trip-summary p{margin:6px 0}.admin-page .trip-summary{overflow-wrap:anywhere}@media(max-width:600px){.trip-map{height:230px}.trip-meter-main span{font-size:36px}.trip-location-head .btn{font-size:12px;padding:8px 10px}}

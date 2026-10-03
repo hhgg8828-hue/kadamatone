@@ -123,9 +123,7 @@ export function registerProviderRoutes(app, r) {
             db.run('DELETE FROM provider_services WHERE provider_id = ?', pid(ctx));
             for (const x of new Map(b.services.map((y) => [y.serviceId, y])).values())
                 db.run('INSERT INTO provider_services(provider_id,service_id,custom_price,experience_years) VALUES (?,?,?,?)', pid(ctx), x.serviceId, x.customPrice ?? null, x.experienceYears ?? 0);
-            const out = { provider: app.providers.summary(pid(ctx), ctx.locale) };
-            app.sse.send(ctx.user.id, 'sync', { scope: 'provider' });
-            return out;
+            return { provider: app.providers.summary(pid(ctx), ctx.locale) };
         });
     });
     r.put('/provider/areas', ...isProvider, (ctx) => {
@@ -164,7 +162,6 @@ export function registerProviderRoutes(app, r) {
         if (online && serviceCount < 1)
             throw E.unprocessable('اختر خدمة واحدة على الأقل قبل بدء استقبال الطلبات', 'PROVIDER_SERVICES_REQUIRED');
         db.run('UPDATE service_providers SET is_online = ?, updated_at = ? WHERE id = ?', online ? 1 : 0, iso(app.clock.now()), pid(ctx));
-        app.sse.send(ctx.user.id, 'sync', { scope: 'provider' });
         return { isOnline: online };
     });
     // إدارة توثيق مقدمي الخدمات من لوحة الإدارة

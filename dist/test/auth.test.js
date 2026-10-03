@@ -267,42 +267,4 @@ describe('Rate limiting', () => {
         }
     });
 });
-describe('إدارة فريق الإدارة وحساب المدير', () => {
-    test('SUPER_ADMIN يقرأ ويضيف ويعدل ويوقف حساب مشرف مستقل', async () => {
-        const admin = await loginAdmin(api);
-        const listed = await api('GET', '/api/v1/admin/admins', { token: admin });
-        assert.equal(listed.status, 200);
-        assert.ok(listed.body.admins.some((x) => x.adminLevel === 'SUPER_ADMIN'));
-        const email = `mod${Date.now()}@test.local`;
-        const phone = uniquePhone();
-        const created = await api('POST', '/api/v1/admin/admins', { token: admin, body: { fullName: 'مشرف مستقل', phone, email, password: 'ModPass1234', adminLevel: 'SUPPORT' } });
-        assert.equal(created.status, 201);
-        const createdId = created.body.user.id;
-        const edited = await api('PATCH', `/api/v1/admin/admins/${createdId}`, { token: admin, body: { fullName: 'مشرف محدث', email: `mod2${Date.now()}@test.local`, password: 'ModPass5678', adminLevel: 'ADMIN' } });
-        assert.equal(edited.status, 200);
-        assert.equal((await api('POST', '/api/v1/auth/login', { body: { identifier: email, password: 'ModPass1234' } })).status, 401);
-        const newEmail = edited.body.user.email;
-        assert.equal((await api('POST', '/api/v1/auth/login', { body: { identifier: newEmail, password: 'ModPass5678' } })).status, 200);
-        assert.equal((await api('PATCH', `/api/v1/admin/admins/${createdId}`, { token: admin, body: { status: 'SUSPENDED' } })).status, 200);
-        assert.equal((await api('POST', '/api/v1/auth/login', { body: { identifier: newEmail, password: 'ModPass5678' } })).status, 403);
-    });
-    test('SUPPORT لا يستطيع إدارة المديرين', async () => {
-        const admin = await loginAdmin(api);
-        const email = `sup${Date.now()}@test.local`;
-        await api('POST', '/api/v1/admin/admins', { token: admin, body: { fullName: 'مشرف صلاحيات', phone: uniquePhone(), email, password: 'SupportPass123', adminLevel: 'SUPPORT' } });
-        const sup = await api('POST', '/api/v1/auth/login', { body: { identifier: email, password: 'SupportPass123' } });
-        assert.equal((await api('GET', '/api/v1/admin/admins', { token: sup.body.accessToken })).status, 403);
-    });
-    test('تعديل حساب المدير الحالي يتحقق من كلمة المرور ويصدر جلسة جديدة', async () => {
-        const admin = await loginAdmin(api);
-        const bad = await api('PATCH', '/api/v1/admin/account', { token: admin, body: { newPassword: 'ChangedPass123' } });
-        assert.equal(bad.status, 422);
-        const ok = await api('PATCH', '/api/v1/admin/account', { token: admin, body: { currentPassword: 'AdminPass123', newPassword: 'ChangedPass123' } });
-        assert.equal(ok.status, 200);
-        assert.ok(ok.body.accessToken);
-        assert.equal((await api('GET', '/api/v1/auth/me', { token: admin })).status, 401);
-        assert.equal((await api('POST', '/api/v1/auth/login', { body: { identifier: 'admin@test.local', password: 'AdminPass123' } })).status, 401);
-        assert.equal((await api('POST', '/api/v1/auth/login', { body: { identifier: 'admin@test.local', password: 'ChangedPass123' } })).status, 200);
-    });
-});
 //# sourceMappingURL=auth.test.js.map
