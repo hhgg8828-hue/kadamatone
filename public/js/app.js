@@ -1,0 +1,1748 @@
+"use strict";
+const root = document.getElementById('app');
+const page = root.dataset.page || 'customer';
+const state = { token: null, user: null, cats: [], orders: [], services: [] };
+const SESSION_KEY = 'khadamat_session_v7';
+let customerPollTimer;
+let providerPollTimer;
+const acceptingOffers = new Set();
+let eventSource;
+let liveRefreshTimer;
+const stopPollers = () => { if (customerPollTimer !== undefined) {
+    clearInterval(customerPollTimer);
+    customerPollTimer = undefined;
+} if (providerPollTimer !== undefined) {
+    clearInterval(providerPollTimer);
+    providerPollTimer = undefined;
+} if (liveRefreshTimer !== undefined) {
+    clearTimeout(liveRefreshTimer);
+    liveRefreshTimer = undefined;
+} if (eventSource) {
+    eventSource.close();
+    eventSource = undefined;
+} if (offerCountdownTimer !== undefined) {
+    clearInterval(offerCountdownTimer);
+    offerCountdownTimer = undefined;
+} };
+let realtime;
+let realtimeRetry;
+let offerCountdownTimer;
+let notificationModalTimer;
+let notificationModalRefreshing = false;
+const stopRealtime = () => { if (realtime) {
+    realtime.close();
+    realtime = undefined;
+} if (realtimeRetry !== undefined) {
+    clearTimeout(realtimeRetry);
+    realtimeRetry = undefined;
+} };
+function toast(title, body) { let box = document.getElementById('liveToasts'); if (!box) {
+    box = document.createElement('div');
+    box.id = 'liveToasts';
+    box.style.cssText = 'position:fixed;top:16px;left:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px));';
+    document.body.appendChild(box);
+} const el = document.createElement('div'); el.style.cssText = 'background:#fff;border:1px solid #d9e1ea;border-radius:14px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.14);font-family:Arial,sans-serif;cursor:pointer'; el.innerHTML = `<b>${esc(title)}</b><div style="margin-top:4px;color:#667085;font-size:13px">${esc(body)}</div>`; el.onclick = () => el.remove(); box.appendChild(el); setTimeout(() => el.remove(), 7000); }
+async function startRealtime() {
+    stopRealtime();
+    if (!state.user || !state.token)
+        return;
+    try {
+        const j = await api('/events/ticket', { method: 'POST', body: '{}' });
+        const es = new EventSource('/api/v1/events?ticket=' + encodeURIComponent(j.ticket));
+        realtime = es;
+        es.addEventListener('notification', async (ev) => {
+            try {
+                const n = JSON.parse(ev.data || '{}');
+                toast(n.title || 'إشعار جديد', n.body || '');
+                if (document.getElementById('notificationList'))
+                    await refreshOpenNotifications();
+                if (n.type === 'CHAT_MESSAGE' && n.orderId && document.getElementById('chatMessages')) {
+                    window.dispatchEvent(new CustomEvent('khadamat:chat', { detail: { orderId: n.orderId } }));
+                }
+                if (page === 'provider') {
+                    if (['NEW_OFFER', 'PROVIDER_VERIFIED', 'PROVIDER_REJECTED', 'PROVIDER_SUSPENDED', 'PROVIDER_REACTIVATED', 'NEW_RATING', 'COMPLAINT_OPENED', 'COMPLAINT_REPLIED', 'COMPLAINT_CLOSED', 'CHAT_MESSAGE'].includes(n.type))
+                        await provider();
+                }
+                else if (page === 'customer') {
+                    if (['ORDER_RECEIVED', 'ORDER_ACCEPTED', 'PROVIDER_ON_THE_WAY', 'SERVICE_STARTED', 'ORDER_COMPLETED', 'ORDER_CANCELLED', 'NO_PROVIDER_FOUND', 'NEW_QUOTE', 'QUOTE_ACCEPTED', 'COMPLAINT_OPENED', 'COMPLAINT_REPLIED', 'COMPLAINT_CLOSED', 'CHAT_MESSAGE'].includes(n.type))
+                        await customer();
+                }
+            }
+            catch { }
+        });
+        es.addEventListener('sync', async (ev) => { try {
+            const data = JSON.parse(ev.data || '{}');
+            if (data?.scope === 'catalog' || data?.scope === 'settings' || data?.scope === 'users' || data?.scope === 'provider' || data?.scope === 'addresses' || data?.scope === 'orders' || data?.scope === 'admin') {
+                if (page === 'provider')
+                    await provider();
+                else if (page === 'customer')
+                    await customer();
+                else if (page === 'admin')
+                    await admin();
+            }
+        }
+        catch { } });
+        es.onerror = () => { es.close(); realtime = undefined; if (state.user && state.token) {
+            realtimeRetry = window.setTimeout(() => { startRealtime().catch(() => { }); }, 4000);
+        } };
+    }
+    catch {
+        realtimeRetry = window.setTimeout(() => { startRealtime().catch(() => { }); }, 5000);
+    }
+}
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const newIdempotencyKey = () => { try {
+    return crypto.randomUUID();
+}
+catch {
+    return 'order-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+} };
+const uniqueOrders = (items) => { const seen = new Set(); return items.filter(x => { const id = String(x?.id || ''); if (!id || seen.has(id))
+    return false; seen.add(id); return true; }); };
+const uniqueBy = (items, key) => { const seen = new Set(); return items.filter(x => { const k = key(x); if (!k || seen.has(k))
+    return false; seen.add(k); return true; }); };
+async function api(path, opts = {}, retry = true) { const h = new Headers(opts.headers || {}); h.set('Content-Type', 'application/json'); if (state.token)
+    h.set('Authorization', `Bearer ${state.token}`); const r = await fetch('/api/v1' + path, { ...opts, headers: h }); const j = await r.json().catch(() => ({})); if (r.status === 401 && retry && path !== '/auth/refresh' && sessionStorage.getItem(SESSION_KEY)) {
+    try {
+        const refreshed = await fetch('/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'khadamat' }, body: '{}' });
+        const rj = await refreshed.json().catch(() => ({}));
+        if (refreshed.ok && rj.accessToken) {
+            saveSession(rj);
+            return api(path, opts, false);
+        }
+    }
+    catch { }
+    sessionStorage.removeItem(SESSION_KEY);
+    state.token = null;
+    state.user = null;
+    throw new Error('انتهت الجلسة، يرجى تسجيل الدخول من جديد');
+} if (!r.ok)
+    throw new Error(j?.error?.message || 'حدث خطأ'); return j; }
+function saveSession(j) { state.token = j.accessToken; state.user = j.user; sessionStorage.setItem(SESSION_KEY, JSON.stringify({ accessToken: j.accessToken, user: j.user })); }
+async function openPrivateFile(path) {
+    const win = window.open('about:blank', '_blank');
+    if (!win) {
+        alert('اسمح بفتح النوافذ المنبثقة لعرض الملف.');
+        return;
+    }
+    win.document.write('<p style="font-family:Arial;padding:24px">جارٍ فتح الملف...</p>');
+    try {
+        let r = await fetch(path, { headers: state.token ? { Authorization: `Bearer ${state.token}` } : {} });
+        if (r.status === 401) {
+            try {
+                const refreshed = await fetch('/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'khadamat' }, body: '{}' });
+                const j = await refreshed.json().catch(() => ({}));
+                if (refreshed.ok && j.accessToken) {
+                    saveSession(j);
+                    r = await fetch(path, { headers: { Authorization: `Bearer ${state.token}` } });
+                }
+            }
+            catch { }
+        }
+        if (!r.ok)
+            throw new Error(r.status === 401 ? 'انتهت الجلسة، يرجى تسجيل الدخول من جديد' : 'تعذر فتح الملف');
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        win.location.href = url;
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+    catch (e) {
+        win.document.body.innerHTML = `<div style="font-family:Arial;padding:24px"><h3>تعذر فتح الملف</h3><p>${esc(e.message)}</p></div>`;
+    }
+}
+function restoreSession() { try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw)
+        return false;
+    const j = JSON.parse(raw);
+    if (!j?.accessToken || !j?.user) {
+        sessionStorage.removeItem(SESSION_KEY);
+        return false;
+    }
+    state.token = j.accessToken;
+    state.user = j.user;
+    return true;
+}
+catch {
+    sessionStorage.removeItem(SESSION_KEY);
+    return false;
+} }
+async function logout() { stopRealtime(); try {
+    if (state.token)
+        await api('/auth/logout', { method: 'POST', body: '{}' });
+}
+catch { } state.token = null; state.user = null; sessionStorage.removeItem(SESSION_KEY); location.replace('/'); }
+const STATUS_AR = { PENDING: 'قيد المراجعة', SEARCHING: 'جارٍ البحث عن مقدم خدمة', ASSIGNED: 'تم ترشيح مقدم خدمة', ACCEPTED: 'تم قبول الطلب', ON_THE_WAY: 'مقدم الخدمة في الطريق', IN_PROGRESS: 'الخدمة قيد التنفيذ', COMPLETED: 'مكتمل', CANCELLED: 'ملغي', DISPUTED: 'متنازع عليه' };
+const statusAr = (s) => STATUS_AR[String(s)] || String(s || 'غير محدد');
+const VERIFY_AR = { PENDING: 'قيد التحقق', VERIFIED: 'موثق', REJECTED: 'مرفوض', SUSPENDED: 'موقوف' };
+const verifyAr = (s) => VERIFY_AR[String(s)] || String(s || 'غير محدد');
+const docTypeAr = (v) => ({ ID: 'الهوية', LICENSE: 'الترخيص', COMMERCIAL_REG: 'السجل التجاري', CERTIFICATE: 'الشهادة', PHOTO_WORK: 'صور الأعمال' }[v] || v);
+const docStatusAr = (v) => ({ PENDING: 'قيد المراجعة', APPROVED: 'مقبول', REJECTED: 'مرفوض' }[v] || v);
+const formatDateTime = (v) => { if (!v)
+    return '—'; const d = new Date(v); if (Number.isNaN(d.getTime()))
+    return String(v); return new Intl.DateTimeFormat('ar-YE', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(d); };
+async function refreshNotificationBadge() { try {
+    const j = await api('/notifications?limit=1');
+    const el = document.getElementById('notificationCount');
+    if (el)
+        el.textContent = j.unreadCount ? `(${j.unreadCount})` : '';
+    const btn = document.getElementById('notificationsBtn');
+    if (btn) {
+        btn.classList.toggle('attention', Number(j.unreadCount || 0) > 0);
+        btn.title = j.unreadCount ? `لديك ${j.unreadCount} إشعار غير مقروء` : 'الإشعارات';
+    }
+}
+catch { } }
+function notificationAction(n) {
+    const d = n.data || {};
+    if (n.type === 'NEW_QUOTE' && d.orderId && d.quoteId) {
+        if (d.quoteStatus && d.quoteStatus !== 'SUBMITTED')
+            return `<div class="notification-action notification-action-done"><b>تم التعامل مع عرض السعر</b><span class="status">${esc(d.quoteStatusAr || d.quoteStatus)}</span><div class="notification-actions"><button class="btn secondary notification-view-quotes" data-order-id="${esc(d.orderId)}" type="button">عرض التفاصيل</button></div></div>`;
+        return `<div class="notification-action"><b>إجراء مطلوب منك</b><span>راجع عرض السعر ثم اختر قبول العرض أو رفضه.</span><div class="notification-actions"><button class="btn notification-accept-quote" data-order-id="${esc(d.orderId)}" data-quote-id="${esc(d.quoteId)}" type="button">قبول العرض</button><button class="btn danger notification-reject-quote" data-order-id="${esc(d.orderId)}" data-quote-id="${esc(d.quoteId)}" type="button">رفض العرض</button><button class="btn secondary notification-view-quotes" data-order-id="${esc(d.orderId)}" type="button">عرض التفاصيل</button></div></div>`;
+    }
+    if (['PROVIDER_VERIFIED', 'PROVIDER_REJECTED'].includes(n.type) && page === 'provider')
+        return `<div class="notification-action"><button class="btn secondary notification-provider-action" type="button">فتح لوحة مقدم الخدمة</button></div>`;
+    if (n.type === 'ORDER_COMPLETED' && page === 'customer' && d.orderId)
+        return `<div class="notification-action"><button class="btn notification-order-action" data-order-id="${esc(d.orderId)}" type="button">⭐ فتح التقييم</button><button class="btn secondary notification-view-order" data-order-id="${esc(d.orderId)}" type="button">عرض الطلب</button></div>`;
+    return '';
+}
+async function fetchNotifications() { const j = await api('/notifications?limit=30'); return j.notifications || []; }
+async function enrichQuoteNotifications(ns) {
+    if (page !== 'customer')
+        return ns;
+    const quoteNs = ns.filter((n) => n.type === 'NEW_QUOTE' && n.data?.orderId && n.data?.quoteId);
+    await Promise.all(quoteNs.map(async (n) => { try {
+        const j = await api('/orders/' + encodeURIComponent(n.data.orderId) + '/quotes');
+        const q = (j.quotes || []).find((x) => x.id === n.data.quoteId);
+        if (q) {
+            n.data.quoteStatus = q.status;
+            n.data.quoteStatusAr = { SUBMITTED: 'بانتظار قرارك', ACCEPTED: 'تم قبول العرض', REJECTED: 'تم رفض العرض', EXPIRED: 'انتهت صلاحية العرض', WITHDRAWN: 'سحب مقدم الخدمة العرض' }[q.status] || q.status;
+        }
+    }
+    catch { } }));
+    return ns;
+}
+async function renderNotificationList(ns) { const el = document.getElementById('notificationList'); if (!el)
+    return; await enrichQuoteNotifications(ns); el.innerHTML = ns.length ? ns.map((n) => `<div class="notification-card ${n.read ? 'is-read' : ''}" data-notification="${esc(n.id)}"><div class="notification-card-head"><span class="notification-dot ${n.read ? '' : 'unread'}"></span><b>${esc(n.title)}</b><small class="muted">${esc(formatDateTime(n.createdAt))}</small></div><p class="muted">${esc(n.body)}</p>${notificationAction(n)}</div>`).join('') : '<div class="card empty">لا توجد إشعارات.</div>'; bindNotificationActions(); }
+async function refreshOpenNotifications() { if (!document.getElementById('notificationList') || notificationModalRefreshing)
+    return; notificationModalRefreshing = true; try {
+    await renderNotificationList(await fetchNotifications());
+    await refreshNotificationBadge();
+}
+catch { }
+finally {
+    notificationModalRefreshing = false;
+} }
+function bindNotificationActions() {
+    document.querySelectorAll('[data-notification]').forEach(x => x.addEventListener('click', async (e) => { if (e.target.closest('button'))
+        return; try {
+        await api('/notifications/' + encodeURIComponent(x.dataset.notification || '') + '/read', { method: 'POST', body: '{}' });
+        x.classList.add('is-read');
+        x.querySelector('.notification-dot')?.classList.remove('unread');
+        await refreshNotificationBadge();
+    }
+    catch { } }));
+    document.querySelectorAll('.notification-accept-quote').forEach(x => x.addEventListener('click', async () => { const b = x; b.disabled = true; try {
+        await api('/orders/' + encodeURIComponent(b.dataset.orderId || '') + '/quotes/' + encodeURIComponent(b.dataset.quoteId || '') + '/accept', { method: 'POST', body: '{}' });
+        const row = b.closest('[data-notification]');
+        if (row)
+            row.innerHTML = '<div class="notification-success-state"><span>✓</span><div><b>تم قبول عرض السعر</b><small>تم تحديث الطلب وسيظهر أي تقدم جديد تلقائيًا.</small></div></div>';
+        await api('/notifications/' + encodeURIComponent(b.closest('[data-notification]')?.getAttribute('data-notification') || '') + '/read', { method: 'POST', body: '{}' });
+        await refreshNotificationBadge();
+        await customer();
+    }
+    catch (e) {
+        b.disabled = false;
+        alert(e.message);
+    } }));
+    document.querySelectorAll('.notification-reject-quote').forEach(x => x.addEventListener('click', async () => { const b = x; b.disabled = true; try {
+        await api('/orders/' + encodeURIComponent(b.dataset.orderId || '') + '/quotes/' + encodeURIComponent(b.dataset.quoteId || '') + '/reject', { method: 'POST', body: '{}' });
+        await api('/notifications/' + encodeURIComponent(b.closest('[data-notification]')?.getAttribute('data-notification') || '') + '/read', { method: 'POST', body: '{}' });
+        await refreshOpenNotifications();
+    }
+    catch (e) {
+        b.disabled = false;
+        alert(e.message);
+    } }));
+    document.querySelectorAll('.notification-view-quotes').forEach(x => x.addEventListener('click', async () => { const b = x; closeModal(); await openOrderQuotes(b.dataset.orderId || ''); }));
+    document.querySelectorAll('.notification-order-action').forEach(x => x.addEventListener('click', async () => { const b = x; const orderId = b.dataset.orderId || ''; if (!orderId)
+        return; closeModal(); try {
+        await openRating(orderId);
+    }
+    catch (e) {
+        alert(e.message);
+    } }));
+    document.querySelectorAll('.notification-view-order').forEach(x => x.addEventListener('click', async () => { const b = x; const orderId = b.dataset.orderId || ''; if (!orderId)
+        return; closeModal(); try {
+        await openOrder(orderId);
+    }
+    catch (e) {
+        alert(e.message);
+    } }));
+    document.querySelectorAll('.notification-provider-action').forEach(x => x.addEventListener('click', () => { closeModal(); provider(); }));
+}
+async function openNotifications() { try {
+    const ns = await fetchNotifications();
+    showModal(`<div class="service-picker-head notification-modal-head"><div><h2>الإشعارات</h2><p class="muted">تتحدث هذه النافذة تلقائيًا عند وصول أي تحديث جديد.</p></div><button class="btn secondary" id="readAllNotifications" type="button">✓ تحديد الكل كمقروء</button></div><div id="notificationLiveState" class="notification-live-state"><span class="live-pulse"></span> التحديث المباشر مفعل</div><div id="notificationList"></div>`);
+    await renderNotificationList(ns);
+    document.getElementById('readAllNotifications')?.addEventListener('click', async () => { await api('/notifications/read-all', { method: 'POST', body: '{}' }); await refreshOpenNotifications(); });
+    if (notificationModalTimer)
+        clearInterval(notificationModalTimer);
+    notificationModalTimer = window.setInterval(() => refreshOpenNotifications(), 3000);
+    await refreshNotificationBadge();
+}
+catch (e) {
+    alert(e.message);
+} }
+function openAbout() {
+    showModal(`<article class="about-app">
+    <div class="about-app-head"><div><span class="admin-shell-title">معلومات التطبيق</span><h2>حول تطبيق خدمات</h2><p class="muted">خدمات... كل خدمة تحتاجها في مكان واحد</p></div><span class="about-app-mark">خ</span></div>
+    <section class="about-app-section">
+      <p><strong>خدمات</strong> هو تطبيق يهدف إلى تسهيل وصولك إلى الخدمات التي تحتاجها بطريقة بسيطة وسريعة، بدلًا من البحث الطويل عن مقدم الخدمة أو التواصل مع أكثر من شخص.</p>
+      <p>من خلال التطبيق يمكنك طلب الخدمة التي تحتاجها، ومتابعة طلبك حتى إتمامه، والتواصل مع مقدم الخدمة، والاستفادة من مجموعة متنوعة من الخدمات في مكان واحد.</p>
+    </section>
+    <section class="about-app-section"><h3>من إنشاء المهندس هيثم القاضي</h3><p>هذا التطبيق من عمل وتطوير <strong>المهندس هيثم القاضي</strong>، وقد تم تصميمه ليكون منصة تجمع العملاء بمقدمي الخدمات وتساعد على تنظيم طلبات الخدمات بطريقة أسهل وأكثر وضوحًا.</p></section>
+    <section class="about-app-section"><h3>ماذا يوفر تطبيق خدمات؟</h3><p>يوفر التطبيق مجموعة متنوعة من الخدمات، منها:</p><div class="about-app-services"><span>🚗 <b>خدمات النقل</b></span><span>📦 <b>خدمات التوصيل</b></span><span>🏠 <b>خدمات المنزل</b></span><span>🔧 <b>خدمات الصيانة</b></span><span>🏛️ <b>المعاملات والخدمات</b></span><span>👷 <b>العمالة عند الطلب</b></span><span>🚘 <b>خدمات السيارات</b></span></div><p class="muted">كما يمكن تطوير وإضافة خدمات جديدة مستقبلًا بناءً على احتياجات المستخدمين ومقدمي الخدمات.</p></section>
+    <section class="about-app-section"><h3>كيف يعمل التطبيق؟</h3><p>بدلًا من أن تبحث بنفسك عن شخص يقدم الخدمة التي تحتاجها، كل ما عليك هو تحديد الخدمة وإرسال طلبك.</p><p>يقوم التطبيق بتنظيم الطلب وربطه بمقدم الخدمة المناسب، مع إمكانية متابعة حالة الطلب إلى أن يتم إنجازه.</p><p class="about-app-slogan">لا تبحث عن مقدم الخدمة... اطلب الخدمة فقط.</p></section>
+    <section class="about-app-section"><h3>هدفنا</h3><p>هدفنا هو <strong>خدمتكم وتسهيل حياتكم اليومية</strong> من خلال توفير طريقة أسهل للوصول إلى الخدمات، وربط العملاء بمقدمي الخدمات، وفتح المجال أمام أصحاب المهن والعمال ومقدمي الخدمات للوصول إلى عملاء جدد.</p><p>نسعى إلى تطوير التطبيق باستمرار وإضافة المزيد من الخدمات والمزايا، بما يلبي احتياجات المجتمع ويجعل طلب الخدمة أكثر سهولة وتنظيمًا.</p></section>
+    <section class="about-app-contact"><h3>للتواصل والاستفسارات</h3><div class="about-contact-row"><span>📧 <b>البريد الإلكتروني:</b></span><a dir="ltr" href="mailto:HaithamPro77@gmail.com">HaithamPro77@gmail.com</a></div><div class="about-contact-row"><span>📱 <b>واتساب:</b></span><a dir="ltr" href="https://wa.me/967711000121" target="_blank" rel="noopener">00967711000121</a></div><div class="about-contact-row"><span>☎️ <b>رقم التواصل:</b></span><a dir="ltr" href="tel:+967778100022">00967778100022</a></div></section>
+    <footer class="about-app-footer"><strong>تطبيق خدمات</strong><span>كل خدمة تحتاجها... في مكان واحد.</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
+  </article>`);
+}
+function shell(content, title = 'خدمات') { const portal = page === 'provider' ? `<a class="portal-link portal-customer" href="/" aria-label="الانتقال إلى واجهة العميل">↩ واجهة العميل</a>` : page === 'admin' ? `<a class="portal-link portal-customer" href="/" aria-label="الانتقال إلى واجهة العميل">↩ واجهة العميل</a>` : `<a class="portal-link portal-provider" href="/provider.html" data-provider-link aria-label="الانتقال إلى واجهة مقدم الخدمة">↗ واجهة مقدم الخدمة</a>`; const adminLink = state.user?.role === 'ADMIN' && page !== 'admin' ? `<a class="portal-link portal-admin" href="/admin" aria-label="الانتقال إلى لوحة الإدارة">⚙ لوحة الإدارة</a>` : ''; root.innerHTML = `<main class="shell"><div class="top app-topbar"><a class="brand brand-lockup" href="/" aria-label="خدمات"><span class="brand-mark">خ</span><span><strong>خدمات</strong><small>كل خدمة تحتاجها في مكان واحد</small></span></a><div class="row top-actions">${portal}${adminLink}<button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>${state.user ? `<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button><button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button">🔔 <span id="notificationCount"></span></button><button class="btn secondary small logout-btn" id="logout">خروج</button>` : ''}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
+    refreshNotificationBadge().catch(() => { }); document.querySelectorAll('[data-provider-link]').forEach(x => x.addEventListener('click', e => { e.preventDefault(); window.location.assign('/provider.html'); })); }
+async function openAccount() {
+    try {
+        const j = await api('/auth/me');
+        const u = j.user || state.user || {};
+        const isProvider = u.role === 'PROVIDER';
+        showModal(`<h2>حسابي</h2><form id="accountForm"><div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" disabled></div><div class="field"><label>الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form>`);
+        document.getElementById('accountForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const msg = document.getElementById('accountMsg'); try {
+            if (isProvider) {
+                await api('/provider/profile', { method: 'PATCH', body: JSON.stringify({ displayName: String(f.get('displayName') || ''), bio: String(f.get('bio') || '') }) });
+            }
+            else {
+                await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ fullName: String(f.get('fullName') || '') }) });
+            }
+            msg.textContent = 'تم حفظ التغييرات بنجاح';
+            msg.className = 'success';
+        }
+        catch (x) {
+            msg.textContent = x.message;
+            msg.className = 'error';
+        } });
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+function authBox(next = page) {
+    const isProvider = next === 'provider';
+    const isAdmin = next === 'admin';
+    shell(`<div class="hero"><h1>${isAdmin ? 'دخول لوحة الإدارة' : isProvider ? 'منصة مقدم الخدمة' : 'كل خدمة تحتاجها... في مكان واحد.'}</h1><p class="muted">${isAdmin ? 'هذه الصفحة مخصصة لحسابات الإدارة المعتمدة فقط.' : 'لا تبحث عن مقدم الخدمة، اطلب الخدمة فقط.'}</p></div><div class="card"><div class="nav">${isAdmin ? '' : '<button class="btn" id="tabLogin">دخول</button><button class="btn secondary" id="tabReg">حساب جديد</button>'}</div><div id="authForm"></div><div class="auth-switch">${isAdmin ? '<span class="muted">لا يوجد إنشاء حساب مدير من هذه الصفحة.</span>' : `<span class="muted">${isProvider ? 'تريد طلب خدمة بدل تقديمها؟' : 'هل تريد تقديم خدمة للعملاء؟'}</span> <a class="choose-link" href="${isProvider ? '/' : '/provider.html'}">${isProvider ? 'العودة لواجهة العميل' : 'الدخول إلى منصة مقدم الخدمة'}</a>`}</div></div>`);
+    let mode = 'login';
+    const draw = () => {
+        const providerReg = next === 'provider';
+        const registration = providerReg ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني <span class="muted">(اختياري)</span></label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email"></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div><div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>نبذة مختصرة <span class="muted">(اختياري)</span></label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div><button class="btn">إنشاء حساب مقدم خدمة</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>طريقة التسجيل</label><select id="customerContactType"><option value="phone">رقم الهاتف</option><option value="email">البريد الإلكتروني</option></select></div><div class="field" id="customerPhoneField"><label>رقم الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+967..."></div><div class="field hide-section" id="customerEmailField"><label>البريد الإلكتروني</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email"></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div><button class="btn">إنشاء حساب عميل</button><p id="msg"></p></form>`;
+        document.getElementById('authForm').innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" value="${isAdmin ? 'admin@khadamat.local' : ''}" required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn">دخول</button><p id="msg"></p></form>` : registration;
+        const form = document.getElementById('form');
+        const contactType = document.getElementById('customerContactType');
+        if (contactType) {
+            const phoneField = document.getElementById('customerPhoneField');
+            const emailField = document.getElementById('customerEmailField');
+            const sync = () => { const byEmail = contactType.value === 'email'; phoneField.classList.toggle('hide-section', byEmail); emailField.classList.toggle('hide-section', !byEmail); form.elements.namedItem('phone').required = !byEmail; form.elements.namedItem('email').required = byEmail; };
+            contactType.addEventListener('change', sync);
+            sync();
+        }
+        form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); const b = {}; f.forEach((v, k) => b[k] = v); try {
+            const payload = { ...b, role: providerReg ? 'PROVIDER' : 'CUSTOMER', locale: 'ar' };
+            if (!String(payload.phone || '').trim())
+                delete payload.phone;
+            if (!String(payload.email || '').trim())
+                delete payload.email;
+            if (providerReg) {
+                payload.provider = { providerType: b.providerType, displayName: b.displayName, bio: b.bio };
+                if (b.providerType === 'COMPANY') {
+                    payload.provider.companyName = b.displayName;
+                }
+                delete payload.providerType;
+                delete payload.displayName;
+                delete payload.bio;
+            }
+            const j = mode === 'login' ? await api('/auth/login', { method: 'POST', body: JSON.stringify(b) }) : await api('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
+            saveSession(j);
+            startRealtime().catch(() => { });
+            location.href = next === 'provider' ? '/provider.html' : next === 'admin' ? '/admin' : '/';
+        }
+        catch (x) {
+            document.getElementById('msg').textContent = x.message;
+            document.getElementById('msg').className = 'error';
+        } });
+    };
+    document.getElementById('tabLogin')?.addEventListener('click', () => { mode = 'login'; draw(); });
+    document.getElementById('tabReg')?.addEventListener('click', () => { mode = 'reg'; draw(); });
+    draw();
+}
+async function customer() {
+    if (!state.user) {
+        authBox();
+        return;
+    }
+    if (state.user.role !== 'CUSTOMER') {
+        shell(`<div class="notice">هذا الحساب ليس حساب عميل. <button class="btn" id="go">فتح الواجهة المناسبة</button></div>`);
+        document.getElementById('go').onclick = () => location.href = state.user.role === 'PROVIDER' ? '/provider.html' : '/admin';
+        return;
+    }
+    try {
+        const [c, o] = await Promise.all([api('/categories'), api('/orders')]);
+        state.cats = c.categories || [];
+        state.orders = uniqueOrders((o.orders || []).filter((x) => x.status !== 'CANCELLED'));
+        state.services = [];
+        for (const cat of state.cats) {
+            try {
+                const j = await api('/categories/' + encodeURIComponent(cat.slug) + '/services');
+                state.services.push(...(j.services || []).map((svc) => ({ ...svc, categorySlug: cat.slug, categoryName: cat.name, categoryIcon: cat.icon })));
+            }
+            catch { }
+        }
+        renderCustomer();
+        stopPollers();
+        customerPollTimer = window.setInterval(async () => { try {
+            const o = await api('/orders');
+            state.orders = uniqueOrders((o.orders || []).filter((x) => x.status !== 'CANCELLED'));
+            const box = document.getElementById('orders');
+            if (box)
+                box.innerHTML = state.orders.length ? state.orders.map(orderCard).join('') : '<div class="card empty">لا توجد طلبات حتى الآن<br><span class="muted">ابدأ باختيار خدمة من القائمة أعلاه</span></div>';
+            const count = document.querySelector('#ordersTab .count');
+            if (count)
+                count.textContent = String(state.orders.length);
+            document.querySelectorAll('[data-order]').forEach(x => { x.addEventListener('click', e => { if (e.target.closest('[data-rate-order]'))
+                return; openOrder(x.dataset.order); }); x.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openOrder(x.dataset.order);
+            } }); });
+            document.querySelectorAll('[data-rate-order]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); openRating(x.dataset.rateOrder); }));
+        }
+        catch { } }, 5000);
+    }
+    catch (e) {
+        shell(`<div class="card error">${esc(e.message)}</div>`);
+    }
+}
+function pickQuickServices(services, limit = 7) { const picked = []; const seenCats = new Set(); for (const s of services) {
+    const key = String(s.categoryId || s.categorySlug || '');
+    if (!seenCats.has(key)) {
+        seenCats.add(key);
+        picked.push(s);
+        if (picked.length >= limit)
+            return picked;
+    }
+} for (const s of services) {
+    if (!picked.some(x => x.id === s.id)) {
+        picked.push(s);
+        if (picked.length >= limit)
+            break;
+    }
+} return picked; }
+const DESCRIPTION_SUGGESTIONS = {
+    'car-with-driver': ['أحتاج سيارة مع سائق للمشوار ذهابًا وإيابًا', 'أحتاج سيارة مع سائق داخل المدينة', 'أحتاج سيارة مع سائق لمدة عدة ساعات'],
+    'passenger-transport': ['أحتاج توصيل أفراد إلى هذا الموقع', 'أحتاج نقل العائلة من الموقع الحالي إلى الوجهة', 'أحتاج مشوارًا إلى المطار'],
+    'freight-transport': ['أحتاج نقل بضاعة من هذا الموقع إلى الوجهة', 'لدي حمولة وأحتاج مركبة مناسبة للنقل', 'أحتاج نقل شحنة مع التحميل والتفريغ'],
+    'furniture-moving': ['أحتاج نقل أثاث من منزل إلى منزل', 'أحتاج نقل العفش مع التحميل والتنزيل', 'أحتاج نقل أثاث من طابق إلى طابق آخر'],
+    'parcel-delivery': ['أحتاج توصيل طرد إلى المستلم', 'لدي طرد جاهز للتوصيل إلى هذا العنوان', 'أحتاج مندوبًا لاستلام الطرد وتوصيله'],
+    'shopping-delivery': ['أحتاج شراء واستلام الطلب من المتجر وتوصيله', 'أحتاج توصيل مشتريات من متجر قريب', 'أحتاج مندوبًا لاستلام مشترياتي وتوصيلها'],
+    'mobile-car-wash': ['أحتاج غسيل السيارة في موقعي', 'أريد غسيل السيارة من الخارج والداخل', 'السيارة تحتاج غسيلًا متنقلًا'],
+    'car-interior-deep-cleaning': ['أحتاج تنظيفًا عميقًا للسيارة من الداخل', 'أحتاج تنظيف المقاعد والفرش', 'أريد تنظيف السيارة من الداخل بالكامل'],
+    'car-battery-service': ['السيارة لا تعمل وأحتاج فحص البطارية', 'أحتاج تشغيل السيارة بسبب ضعف البطارية', 'أحتاج استبدال بطارية السيارة'],
+    'cleaning': ['أحتاج تنظيف المنزل بالكامل', 'أحتاج تنظيف شقة أو منزل', 'أحتاج تنظيفًا للمكان مع ترتيب بسيط'],
+    'electricity': ['لدي عطل كهربائي وأحتاج فنيًا', 'هناك مشكلة في الكهرباء وأحتاج فحصها', 'أحتاج تركيب أو إصلاح كهربائي'],
+    'plumbing': ['لدي تسريب مياه وأحتاج سباكًا', 'هناك انسداد في الصرف وأحتاج إصلاحه', 'أحتاج إصلاح مشكلة في السباكة'],
+    'daily-worker': ['أحتاج عاملًا للعمل في هذا الموقع', 'أحتاج عمالة للمساعدة في إنجاز العمل', 'أحتاج عاملًا لعدة ساعات'],
+    'construction-worker': ['أحتاج عامل بناء في هذا الموقع', 'أحتاج عاملًا لأعمال البناء أو الترميم', 'أحتاج عامل بناء لإنجاز عمل محدد'],
+    'government-errands': ['أحتاج من ينهي معاملة حكومية نيابة عني', 'أحتاج متابعة معاملة في جهة حكومية', 'أحتاج مساعدة في إنجاز هذه المعاملة'],
+};
+function renderCustomer() {
+    shell(`<section class="hero">
+    <div class="row" style="justify-content:space-between;align-items:center"><div><h1>ماذا تحتاج اليوم؟</h1></div><button class="btn secondary small" id="myLocations" type="button">📍 مواقعي المحفوظة</button></div>
+    <div class="search-wrap">
+      <div class="row search-row">
+        <div class="search-box">
+          <span class="search-icon">⌕</span>
+          <input id="search" autocomplete="off" placeholder="ابحث عن خدمة...">
+          <button class="clear-search" id="clearSearch" type="button" aria-label="مسح">×</button>
+        </div>
+        <button class="btn" id="request">➕ اطلب خدمة</button>
+      </div>
+      <div id="suggestions" class="suggestions hide"></div>
+    </div>
+  </section>
+  <div id="customerPriority" class="priority-stack"></div>
+
+  <nav class="section-nav" aria-label="التنقل">
+    <button class="section-tab active" id="servicesTab">الخدمات</button>
+    <button class="section-tab" id="ordersTab">طلباتي <span class="count">${state.orders.length}</span></button>
+  </nav>
+
+  <section id="servicesSection">
+    <div class="section-heading"><div><h2>الخدمات</h2><p class="muted">اختر القسم ثم اختر الخدمة التي تحتاجها</p></div></div>
+    <div class="grid category-grid" id="cats">${state.cats.map(c => `<button class="card service category-card" data-cat="${esc(c.slug)}" type="button"><div class="icon">${esc(c.icon || '🛠️')}</div><b>${esc(c.name)}</b><p class="muted">اطلب الخدمة وسنبحث لك عن مقدم خدمة مناسب</p><span class="choose-link">عرض الخدمات ←</span></button>`).join('')}</div>
+    <div class="section-heading quick-heading"><div><h2>خدمات سريعة</h2><p class="muted">خدمات متاحة الآن ويمكنك طلبها مباشرة</p></div></div>
+    <div class="grid quick-services">${pickQuickServices(state.services).map(s => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join('')}</div>
+  </section>
+
+  <section id="ordersSection" class="hide-section">
+    <div class="section-heading"><div><h2>طلباتي</h2><p class="muted">تابع طلباتك وحالتها من هنا</p></div></div>
+    <div id="orders">${state.orders.length ? state.orders.map(orderCard).join('') : '<div class="card empty">لا توجد طلبات حتى الآن<br><span class="muted">ابدأ باختيار خدمة من القائمة أعلاه</span></div>'}</div>
+  </section>`);
+    const activeCustomerOrders = state.orders.filter((o) => ['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status));
+    const completedCustomerOrders = state.orders.filter((o) => o.status === 'COMPLETED');
+    const cp = document.getElementById('customerPriority');
+    if (cp) {
+        if (activeCustomerOrders.length) {
+            const first = activeCustomerOrders[0];
+            cp.innerHTML = `<div class="priority-card priority-primary"><div class="priority-icon">📦</div><div class="priority-body"><b>عندك طلب قيد المتابعة</b><p>${esc(first.service?.name || 'طلب خدمة')} · ${esc(statusAr(first.status))}</p></div><button class="btn" id="focusCurrentOrder" type="button">متابعة الطلب</button></div>`;
+            document.getElementById('focusCurrentOrder')?.addEventListener('click', () => openOrder(first.id));
+        }
+        else if (completedCustomerOrders.length) {
+            cp.innerHTML = `<div class="priority-card priority-gold"><div class="priority-icon">⭐</div><div class="priority-body"><b>عندك طلب مكتمل</b><p>إذا لم تقيّم مقدم الخدمة بعد، افتح الطلب من «طلباتي» وأرسل تقييمك.</p></div><button class="btn" id="focusOrders" type="button">فتح طلباتي</button></div>`;
+            document.getElementById('focusOrders')?.addEventListener('click', () => { document.getElementById('ordersTab')?.click(); document.getElementById('ordersSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+        }
+    }
+    document.getElementById('myLocations')?.addEventListener('click', openSavedLocations);
+    const search = document.getElementById('search');
+    const suggestions = document.getElementById('suggestions');
+    const clear = document.getElementById('clearSearch');
+    let timer;
+    const showSuggestions = (matches, q) => {
+        if (!q) {
+            suggestions.className = 'suggestions hide';
+            suggestions.innerHTML = '';
+            return;
+        }
+        if (!matches.length) {
+            suggestions.className = 'suggestions';
+            suggestions.innerHTML = '<div class="suggestion-empty">لم نجد خدمة مطابقة — جرّب كلمة أخرى أو اضغط «اطلب خدمة»</div>';
+            return;
+        }
+        suggestions.className = 'suggestions';
+        suggestions.innerHTML = matches.map(m => `<button class="suggestion" type="button" data-suggest-service="${esc(m.serviceId)}"><span class="suggestion-icon">${esc(m.icon || '🛠️')}</span><span class="suggestion-text"><b>${esc(m.serviceName)}</b><small>${esc(m.categoryName)}</small></span><span class="suggestion-arrow">←</span></button>`).join('');
+        suggestions.querySelectorAll('[data-suggest-service]').forEach(x => x.addEventListener('click', () => { suggestions.className = 'suggestions hide'; openOrderForm(x.dataset.suggestService); }));
+    };
+    search.addEventListener('input', () => {
+        clear.style.display = search.value ? 'block' : 'none';
+        window.clearTimeout(timer);
+        const q = search.value.trim();
+        if (q.length < 2) {
+            showSuggestions([], q);
+            return;
+        }
+        timer = window.setTimeout(async () => {
+            try {
+                const j = await api('/search/intent', { method: 'POST', body: JSON.stringify({ text: q }) });
+                showSuggestions(j.matches || [], q);
+            }
+            catch {
+                showSuggestions([], q);
+            }
+        }, 180);
+    });
+    search.addEventListener('focus', () => { if (search.value.trim().length >= 2)
+        search.dispatchEvent(new Event('input')); });
+    clear.style.display = search.value ? 'block' : 'none';
+    clear.addEventListener('click', () => { search.value = ''; clear.style.display = 'none'; showSuggestions([], ""); search.focus(); });
+    document.addEventListener('click', function outside(e) { if (!search.contains(e.target) && !suggestions.contains(e.target)) {
+        suggestions.className = 'suggestions hide';
+    } }, { once: false });
+    document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => openCategory(x.dataset.cat)));
+    document.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService)));
+    document.getElementById('request').onclick = () => openCategory('');
+    document.getElementById('servicesTab').onclick = () => switchCustomerSection('services');
+    document.getElementById('ordersTab').onclick = () => switchCustomerSection('orders');
+    document.querySelectorAll('[data-order]').forEach(x => { x.addEventListener('click', e => { if (e.target.closest('[data-rate-order]'))
+        return; openOrder(x.dataset.order); }); x.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openOrder(x.dataset.order);
+    } }); });
+    document.querySelectorAll('[data-rate-order]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); openRating(x.dataset.rateOrder); }));
+}
+function orderCard(o) { const active = ['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status); const completed = o.status === 'COMPLETED'; return `<div class="card order-card" data-order="${esc(o.id)}" role="button" tabindex="0"><div class="row"><b>${esc(o.code)}</b><span class="status status-${esc(String(o.status).toLowerCase())}">${esc(statusAr(o.status))}</span></div><p>${esc(o.service?.name)} — ${esc(o.description)}</p>${o.provider ? `<p class="muted">👤 ${esc(o.provider.displayName)} · ⭐ ${esc(o.provider.rating)}</p>` : ''}<div class="order-progress"><span class="${active ? 'active' : ''}"></span><span class="${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED'].includes(o.status) ? 'active' : ''}"></span><span class="${['ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED'].includes(o.status) ? 'active' : ''}"></span><span class="${['IN_PROGRESS', 'COMPLETED'].includes(o.status) ? 'active' : ''}"></span><span class="${completed ? 'active' : ''}"></span></div><small class="muted">${esc(formatDateTime(o.createdAt))} · اضغط لمتابعة الطلب</small>${completed ? `<div class="order-rating-inline"><div><b>⭐ ${o.rating ? 'تم تقييم مقدم الخدمة' : 'الطلب مكتمل — قيّم مقدم الخدمة'}</b>${o.rating ? `<p class="muted">تقييمك: ${esc(o.rating.score)} / 5${o.rating.comment ? ` · ${esc(o.rating.comment)}` : ''}</p>` : '<p class="muted">يمكنك إرسال تقييمك من هنا مباشرة.</p>'}</div><button class="btn ${o.rating ? 'secondary' : ''} small" data-rate-order="${esc(o.id)}" type="button">${o.rating ? 'عرض التقييم' : '⭐ تقييم الآن'}</button></div>` : ''}</div>`; }
+function switchCustomerSection(section) {
+    const services = document.getElementById('servicesSection');
+    const orders = document.getElementById('ordersSection');
+    const st = document.getElementById('servicesTab');
+    const ot = document.getElementById('ordersTab');
+    if (!services || !orders || !st || !ot)
+        return;
+    const isServices = section === 'services';
+    services.className = isServices ? '' : 'hide-section';
+    orders.className = isServices ? 'hide-section' : '';
+    st.classList.toggle('active', isServices);
+    ot.classList.toggle('active', !isServices);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function openCategory(slug) { let services = []; try {
+    if (slug) {
+        const j = await api('/categories/' + encodeURIComponent(slug) + '/services');
+        services = j.services || [];
+    }
+    else {
+        services = state.services;
+    }
+}
+catch (e) {
+    alert(e.message);
+    return;
+} if (!services.length) {
+    showModal('<div class="empty">لا توجد خدمات متاحة في هذا القسم حاليًا</div>');
+    return;
+} showModal(`<div class="service-picker-head"><div><h2>اختر الخدمة</h2><p class="muted">اختر الخدمة الفعلية التي تريد طلبها</p></div></div><div class="grid service-picker">${services.map(s => `<button class="card service service-option" data-service="${esc(s.id)}" type="button"><div class="service-option-icon">${esc(s.icon || '🛠️')}</div><div class="service-option-body"><b>${esc(s.name)}</b><p>${esc(s.description || 'اطلب هذه الخدمة وسيتم البحث عن مقدم خدمة مناسب')}</p><span class="choose-link">طلب الخدمة ←</span></div></button>`).join('')}</div>`); document.querySelectorAll('[data-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.service))); }
+async function openMotorcycleTripForm(service, savedAddresses) {
+    const purposeLabels = { PASSENGER: 'نقل شخص', ITEM_PURCHASE: 'شراء وإحضار غرض', MEDICINE: 'شراء دواء من صيدلية', PARCEL: 'توصيل غرض', OTHER: 'آخر' };
+    showModal(`<div class="trip-modal"><div class="trip-head"><div><h2>🛵 مشاوير بالدباب</h2><p class="muted">حدد نقطة الانطلاق والوجهة. يمكنك وضع العلامة على الخريطة حتى لو لم يكن للمكان اسم.</p></div></div><form id="tripForm">
+    <div class="field"><label>الغرض من المشوار</label><select id="tripPurpose" required>${Object.entries(purposeLabels).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+    <div class="trip-location-card"><div class="row trip-location-head"><b>📍 نقطة الانطلاق</b><button type="button" class="btn secondary small" id="tripOriginGps">استخدام موقعي</button></div><select id="tripOriginSaved"><option value="">تحديد نقطة جديدة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripOriginMap" class="trip-map"></div><p id="tripOriginText" class="muted">اضغط على الخريطة لتحديد نقطة الانطلاق.</p><textarea id="tripOriginNote" maxlength="300" placeholder="وصف إضافي: أنا في منطقة كذا، جوار كذا، شارع كذا"></textarea><input id="tripOriginLat" type="hidden"><input id="tripOriginLng" type="hidden"></div>
+    <div class="trip-location-card"><div class="row trip-location-head"><b>🎯 الوجهة</b><button type="button" class="btn secondary small" id="tripDestinationGps">استخدام موقعي الحالي</button></div><select id="tripDestinationSaved"><option value="">تحديد الوجهة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripDestinationMap" class="trip-map"></div><p id="tripDestinationText" class="muted">اضغط على الخريطة لتحديد الوجهة.</p><textarea id="tripDestinationNote" maxlength="300" placeholder="وصف إضافي لمكان الوصول: جوار كذا، شارع كذا..."></textarea><input id="tripDestinationLat" type="hidden"><input id="tripDestinationLng" type="hidden"></div>
+    <div class="trip-meter card"><div class="trip-meter-label">عداد المشوار</div><div class="trip-meter-main"><span id="tripDistance">—</span><small>كم</small></div><div class="trip-meter-fare"><span id="tripFare">—</span><small>ريال يمني</small></div><p id="tripEstimateNote" class="muted">حدد النقطتين لحساب الأجرة.</p></div>
+    <div class="field"><label>تفاصيل الغرض <span class="muted">(اختياري)</span></label><textarea id="tripDescription" maxlength="1000" placeholder="اكتب ما يحتاج معرفته مقدم الخدمة"></textarea></div><div class="field"><label>رقم التواصل <span class="muted">(اختياري)</span></label><input id="tripPhone" value="${esc(state.user.phone || '')}"></div><div class="field"><label>ملاحظات إضافية</label><textarea id="tripNotes" maxlength="500"></textarea></div><p id="tripMsg"></p><button class="btn submit-order-btn" id="tripSubmit" type="submit" disabled>إرسال طلب المشوار</button></form></div>`);
+    const L = window.L;
+    if (!L) {
+        alert('تعذر تحميل الخريطة. أعد المحاولة.');
+        return;
+    }
+    const maps = {};
+    const initMap = (kind, elId) => { const el = document.getElementById(elId); if (!el)
+        return; const map = L.map(el, { scrollWheelZoom: false }).setView([15.55, 48.52], 7); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map); const marker = L.marker([15.55, 48.52], { draggable: true }); maps[kind] = { map, marker, selected: false }; marker.on('dragend', () => setPoint(kind, marker.getLatLng().lat, marker.getLatLng().lng, 'map')); map.on('click', (e) => setPoint(kind, e.latlng.lat, e.latlng.lng, 'map')); setTimeout(() => map.invalidateSize(), 100); };
+    const setPoint = (kind, lat, lng, source, addressText) => { const m = maps[kind]; if (!m)
+        return; m.selected = true; m.marker.setLatLng([lat, lng]); const k = kind === 'origin' ? 'Origin' : 'Destination'; document.getElementById(`trip${k}Lat`).value = String(lat); document.getElementById(`trip${k}Lng`).value = String(lng); const txt = addressText || `إحداثيات محددة: ${lat.toFixed(6)} ، ${lng.toFixed(6)}`; document.getElementById(`trip${k}Text`).textContent = txt; updateEstimate(); };
+    const loadSaved = async (kind, id) => { if (!id)
+        return; const a = savedAddresses.find(x => x.id === id); if (!a)
+        return; maps[kind].map.setView([Number(a.location.lat), Number(a.location.lng)], 16); setPoint(kind, Number(a.location.lat), Number(a.location.lng), 'saved', `الموقع المحفوظ: ${a.label}`); };
+    initMap('origin', 'tripOriginMap');
+    initMap('destination', 'tripDestinationMap');
+    document.getElementById('tripOriginSaved').addEventListener('change', e => loadSaved('origin', e.target.value));
+    document.getElementById('tripDestinationSaved').addEventListener('change', e => loadSaved('destination', e.target.value));
+    const gps = async (kind) => { if (!navigator.geolocation) {
+        alert('المتصفح لا يدعم GPS');
+        return;
+    } navigator.geolocation.getCurrentPosition(pos => { maps[kind].map.setView([pos.coords.latitude, pos.coords.longitude], 17); setPoint(kind, pos.coords.latitude, pos.coords.longitude, 'gps', `تم تحديد الموقع عبر GPS — الدقة ${Math.round(pos.coords.accuracy)} متر`); }, err => alert(err.code === 1 ? 'اسمح للتطبيق باستخدام الموقع من إعدادات الهاتف.' : 'تعذر تحديد الموقع، اختر النقطة يدويًا من الخريطة.'), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }); };
+    document.getElementById('tripOriginGps').addEventListener('click', () => gps('origin'));
+    document.getElementById('tripDestinationGps').addEventListener('click', () => gps('destination'));
+    let estimate = null;
+    let estimateTimer;
+    const updateEstimate = async () => { const ol = Number(document.getElementById('tripOriginLat').value), og = Number(document.getElementById('tripOriginLng').value), dl = Number(document.getElementById('tripDestinationLat').value), dg = Number(document.getElementById('tripDestinationLng').value); if (![ol, og, dl, dg].every(Number.isFinite)) {
+        document.getElementById('tripSubmit').disabled = true;
+        return;
+    } clearTimeout(estimateTimer); estimateTimer = setTimeout(async () => { try {
+        estimate = await api('/trips/estimate', { method: 'POST', body: JSON.stringify({ origin: { lat: ol, lng: og }, destination: { lat: dl, lng: dg } }) });
+        document.getElementById('tripDistance').textContent = Number(estimate.distanceKm).toFixed(1);
+        document.getElementById('tripFare').textContent = Number(estimate.fare).toLocaleString('ar-YE');
+        document.getElementById('tripEstimateNote').textContent = 'المسافة محسوبة حسب مسار القيادة على الطرق، وليست خطًا مستقيمًا بين النقطتين.';
+        document.getElementById('tripSubmit').disabled = false;
+    }
+    catch (e) {
+        document.getElementById('tripEstimateNote').textContent = e.message;
+        document.getElementById('tripSubmit').disabled = true;
+    } }, 120); };
+    document.getElementById('tripForm').addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('tripSubmit'), msg = document.getElementById('tripMsg'); const body = { origin: { lat: Number(document.getElementById('tripOriginLat').value), lng: Number(document.getElementById('tripOriginLng').value), addressText: document.getElementById('tripOriginNote').value.trim(), source: 'map' }, destination: { lat: Number(document.getElementById('tripDestinationLat').value), lng: Number(document.getElementById('tripDestinationLng').value), addressText: document.getElementById('tripDestinationNote').value.trim(), source: 'map' }, purpose: document.getElementById('tripPurpose').value, purposeNote: '', description: document.getElementById('tripDescription').value.trim(), contactPhone: document.getElementById('tripPhone').value.trim(), notes: document.getElementById('tripNotes').value.trim() }; btn.disabled = true; btn.textContent = 'جارٍ إرسال الطلب...'; try {
+        const j = await api('/trips', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
+        closeModal();
+        await customer();
+        await openOrder(j.order.id);
+    }
+    catch (x) {
+        msg.textContent = x.message;
+        msg.className = 'error';
+        btn.disabled = false;
+        btn.textContent = 'إرسال طلب المشوار';
+    } });
+}
+async function openOrderForm(serviceId) {
+    const idempotencyKey = newIdempotencyKey();
+    const [j, addrPayload] = await Promise.all([api('/services/' + encodeURIComponent(serviceId)), api('/me/addresses')]);
+    const savedAddresses = addrPayload.addresses || [];
+    const s = j.service;
+    const fields = (s.formSchema || []).map((f) => `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب التفاصيل التي تساعد مقدم الخدمة')}"></textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`).join('');
+    const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
+    const suggestionHtml = descSuggestions.length ? `<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x => `<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : '';
+    if (s.slug === 'motorcycle-trips') {
+        await openMotorcycleTripForm(s, savedAddresses);
+        return;
+    }
+    showModal(`<h2>${esc(s.name)}</h2><form id="orderForm"><div class="field description-field"><label>وصف الطلب <span class="muted">(اختياري)</span></label><textarea id="orderDescription" name="description" placeholder="اكتب ما تحتاجه بالتفصيل"></textarea>${suggestionHtml}</div>${fields}<div class="field location-field"><label>موقع الخدمة</label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ اضغط الزر وسيحدد الجهاز موقعك تلقائيًا.</span></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل <span class="muted">(اختياري)</span></label><input name="contactPhone" value="${esc(state.user.phone || '')}"></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="order-submit-note"><b>قبل الإرسال</b><span>سنتحقق من الموقع والدقة ونحفظ الإحداثيات نفسها مع الطلب.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
+    document.querySelectorAll('[data-description-suggestion]').forEach(x => x.addEventListener('click', () => { const t = document.getElementById('orderDescription'); if (t) {
+        t.value = x.dataset.descriptionSuggestion || '';
+        t.focus();
+    } }));
+    const savedSelect = document.getElementById('savedAddress');
+    const addressIdInput = document.getElementById('addressId');
+    savedSelect.addEventListener('change', () => {
+        const id = savedSelect.value;
+        addressIdInput.value = id;
+        const status = document.getElementById('savedAddressStatus');
+        const btn = document.getElementById('useLocation');
+        const confirm = document.getElementById('locationConfirmed');
+        const preview = document.getElementById('locationPreview');
+        if (id) {
+            const a = savedAddresses.find((x) => x.id === id);
+            status.textContent = a ? `سيُستخدم الموقع المحفوظ: ${a.label}` : 'سيُستخدم العنوان المحفوظ.';
+            status.className = 'success';
+            preview.className = '';
+            preview.innerHTML = a ? `<div class="card"><b>${esc(a.label)}</b><p class="muted">الإحداثيات: ${Number(a.location.lat).toFixed(6)} — ${Number(a.location.lng).toFixed(6)}</p><p class="muted">هذا العنوان محفوظ في حسابك ولن نحتاج لتحديد GPS مرة أخرى.</p></div>` : '';
+            confirm.value = '1';
+            btn.disabled = true;
+            btn.textContent = '📍 اختر موقعًا جديدًا';
+        }
+        else {
+            status.textContent = 'اختر موقعًا جديدًا من GPS.';
+            status.className = 'muted';
+            preview.className = 'hide-section';
+            confirm.value = '0';
+            btn.disabled = false;
+            btn.textContent = '📍 تحديد موقعي الحقيقي من GPS';
+            addressIdInput.value = '';
+        }
+    });
+    document.getElementById('useLocation').addEventListener('click', () => {
+        const status = document.getElementById('locationStatus');
+        const preview = document.getElementById('locationPreview');
+        const locationBtn = document.getElementById('useLocation');
+        const latInput = document.getElementById('lat');
+        const lngInput = document.getElementById('lng');
+        const accuracyInput = document.getElementById('accuracy');
+        const confirmedInput = document.getElementById('locationConfirmed');
+        if (!navigator.geolocation) {
+            status.textContent = 'المتصفح لا يدعم تحديد الموقع';
+            status.className = 'error';
+            return;
+        }
+        const MIN_GOOD_ACCURACY = 100;
+        const MAX_WAIT_MS = 90000;
+        const started = Date.now();
+        let best = null;
+        let watchId;
+        let timer;
+        let map = null;
+        locationBtn.disabled = true;
+        locationBtn.textContent = '📍 جارٍ تحديد الموقع بدقة...';
+        status.textContent = 'جارٍ الحصول على موقع الجهاز الحقيقي. أبقِ GPS والموقع مفعّلين وانتظر حتى تتحسن الدقة.';
+        status.className = 'muted';
+        preview.className = 'hide-section';
+        confirmedInput.value = '0';
+        latInput.value = '';
+        lngInput.value = '';
+        accuracyInput.value = '';
+        const cleanup = () => {
+            if (watchId !== undefined) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = undefined;
+            }
+            if (timer !== undefined) {
+                window.clearInterval(timer);
+                timer = undefined;
+            }
+            locationBtn.disabled = false;
+            locationBtn.textContent = '📍 إعادة تحديد موقعي';
+        };
+        const render = async (pos) => {
+            const lat = pos.coords.latitude, lng = pos.coords.longitude, accuracy = pos.coords.accuracy;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy) || accuracy <= 0)
+                return;
+            if (best && best.coords.accuracy <= accuracy)
+                return;
+            best = pos;
+            latInput.value = String(lat);
+            lngInput.value = String(lng);
+            accuracyInput.value = String(accuracy);
+            confirmedInput.value = '0';
+            const age = Math.round((Date.now() - started) / 1000);
+            const quality = accuracy <= 20 ? 'ممتازة' : accuracy <= 50 ? 'جيدة جدًا' : accuracy <= 100 ? 'جيدة' : accuracy <= 500 ? 'متوسطة' : 'ضعيفة';
+            status.textContent = `أفضل قراءة حتى الآن: دقة تقريبية ${Math.round(accuracy)} متر — ${quality}. جارٍ البحث عن قراءة أدق (${age} ثانية).`;
+            status.className = accuracy <= 500 ? 'success' : 'muted';
+            preview.className = '';
+            preview.innerHTML = `<div class="card" style="margin-top:10px"><b>الموقع الذي سيُحفظ في الطلب</b><p class="muted">خط العرض: ${lat.toFixed(6)} — خط الطول: ${lng.toFixed(6)} — أفضل دقة: ${Math.round(accuracy)} متر</p><p class="muted">المصدر: موقع الجهاز عبر Geolocation API — لا يتم تخمين الموقع من اسم المدينة أو IP.</p><div id="captureMap" style="height:260px;width:100%;border-radius:12px;overflow:hidden;margin:10px 0"></div><button class="btn" id="confirmLocation" type="button" ${accuracy > 1000 ? 'disabled' : ''}>${accuracy > 1000 ? '⏳ انتظر دقة GPS أفضل' : '✅ تأكيد هذا الموقع وإرفاقه بالطلب'}</button></div>`;
+            const L = window.L, mapEl = document.getElementById('captureMap');
+            if (L && mapEl) {
+                if (map) {
+                    try {
+                        map.remove();
+                    }
+                    catch { }
+                }
+                map = L.map(mapEl, { scrollWheelZoom: false, zoomControl: true }).setView([lat, lng], accuracy > 500 ? 13 : 17);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+                const marker = L.marker([lat, lng]).addTo(map).bindPopup(`موقع الجهاز — دقة تقريبية ${Math.round(accuracy)} متر`).openPopup();
+                if (accuracy > 0 && accuracy < 10000)
+                    L.circle([lat, lng], { radius: accuracy }).addTo(map);
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+            document.getElementById('confirmLocation')?.addEventListener('click', () => {
+                if (!best)
+                    return;
+                const a = best.coords.accuracy;
+                if (a > 1000) {
+                    status.textContent = 'الدقة الحالية لا تكفي لحفظ موقع خدمة موثوق. استمر في انتظار GPS أو فعّل تحسين دقة الموقع في الهاتف.';
+                    status.className = 'error';
+                    return;
+                }
+                confirmedInput.value = '1';
+                status.textContent = `تم تأكيد الموقع. سيتم حفظ نفس الإحداثيات (${lat.toFixed(6)}, ${lng.toFixed(6)}) في الطلب.`;
+                status.className = 'success';
+                cleanup();
+            });
+            // Stop only after we have a reasonably accurate fix; otherwise keep searching.
+            if (accuracy <= MIN_GOOD_ACCURACY) {
+                cleanup();
+                status.textContent = `تم الحصول على قراءة GPS جيدة بدقة تقريبية ${Math.round(accuracy)} متر. راجع النقطة ثم أكّدها.`;
+                status.className = 'success';
+            }
+        };
+        const fail = (err) => {
+            if (best)
+                return;
+            const detail = err?.code === 1 ? 'اسمح للمتصفح بالوصول إلى الموقع من إعدادات الهاتف.' : err?.code === 2 ? 'لم يتمكن الجهاز من تحديد موقعه. فعّل GPS/الموقع وحاول في مكان مفتوح.' : 'انتهت محاولة تحديد الموقع دون قراءة صالحة.';
+            status.textContent = detail;
+            status.className = 'error';
+            cleanup();
+        };
+        try {
+            watchId = navigator.geolocation.watchPosition(render, fail, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+        }
+        catch (e) {
+            fail();
+            return;
+        }
+        timer = window.setInterval(() => {
+            const elapsed = Date.now() - started;
+            if (elapsed >= MAX_WAIT_MS) {
+                if (timer !== undefined) {
+                    window.clearInterval(timer);
+                    timer = undefined;
+                }
+                if (watchId !== undefined) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = undefined;
+                }
+                locationBtn.disabled = false;
+                locationBtn.textContent = '📍 إعادة تحديد موقعي';
+                if (best) {
+                    const a = best.coords.accuracy;
+                    status.textContent = `انتهى البحث بعد 90 ثانية. أفضل دقة وصلت إليها ${Math.round(a)} متر. ${a > 1000 ? 'الموقع غير كافٍ لإرسال طلب موثوق؛ فعّل تحسين دقة الموقع ثم أعد المحاولة.' : 'راجع النقطة ثم أكّدها.'}`;
+                    status.className = a > 1000 ? 'error' : 'success';
+                }
+                else
+                    fail();
+            }
+        }, 1000);
+    });
+    // تجربة تلقائية هادئة: إذا كان المستخدم قد سمح للموقع سابقًا، نلتقطه تلقائيًا
+    // بدون إظهار نافذة صلاحية جديدة. إذا لم يمنح الإذن، يبقى الزر واضحًا وبسيطًا.
+    try {
+        const permissions = navigator.permissions;
+        if (permissions?.query) {
+            const permission = await permissions.query({ name: 'geolocation' });
+            if (permission.state === 'granted') {
+                document.getElementById('useLocation')?.click();
+            }
+        }
+    }
+    catch {
+        // بعض المتصفحات لا تدعم Permissions API؛ الزر اليدوي هو البديل الطبيعي.
+    }
+    document.getElementById('orderForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const formData = {};
+        (s.formSchema || []).forEach((f) => { const v = fd.get(f.key); if (v !== null && v !== '')
+            formData[f.key] = f.type === 'number' ? Number(v) : v; });
+        const addressId = String(fd.get('addressId') || '');
+        const lat = Number(fd.get('lat')), lng = Number(fd.get('lng')), accuracy = Number(fd.get('accuracy')), confirmed = String(fd.get('locationConfirmed')) === '1';
+        const msg = document.getElementById('msg');
+        if (!addressId) {
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                msg.textContent = 'اختر عنوانًا محفوظًا أو حدّد موقعك الحقيقي من GPS أولًا';
+                msg.className = 'error';
+                return;
+            }
+            if (!Number.isFinite(accuracy)) {
+                msg.textContent = 'لم يتم الحصول على دقة GPS. أعد تحديد الموقع.';
+                msg.className = 'error';
+                return;
+            }
+            if (accuracy > 1000) {
+                msg.textContent = 'الموقع الحالي غير دقيق بما يكفي (' + Math.round(accuracy) + ' متر). فعّل دقة الموقع/GPS ثم أعد تحديد الموقع قبل إرسال الطلب.';
+                msg.className = 'error';
+                return;
+            }
+            if (!confirmed) {
+                msg.textContent = 'راجع النقطة على الخريطة ثم اضغط «تأكيد هذا الموقع» قبل إرسال الطلب';
+                msg.className = 'error';
+                return;
+            }
+        }
+        const b = { serviceId, description: String(fd.get('description')), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: s.defaultPriority || 'NORMAL' };
+        if (addressId)
+            b.addressId = addressId;
+        else
+            b.location = { lat, lng, accuracy, source: 'gps' };
+        const submitBtn = document.getElementById('submitOrderBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'جارٍ إرسال الطلب...';
+        }
+        try {
+            await api('/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(b) });
+            closeModal();
+            await customer();
+        }
+        catch (x) {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'إرسال الطلب';
+            }
+            msg.textContent = x.message;
+            msg.className = 'error';
+        }
+    });
+}
+function renderOrderTimeline(current) {
+    const steps = ['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED'];
+    const idx = steps.indexOf(current);
+    const parts = steps.map((step, i) => {
+        const done = idx >= i && idx >= 0;
+        const active = step === current;
+        return `<div class="timeline-step ${done ? 'done' : ''} ${active ? 'active' : ''}"><span class="timeline-dot">${done ? '✓' : ''}</span><div><b>${esc(statusAr(step))}</b>${active ? '<small>الحالة الحالية</small>' : ''}</div></div>`;
+    });
+    if (current === 'CANCELLED' || current === 'DISPUTED')
+        parts.push(`<div class="timeline-step active"><span class="timeline-dot">!</span><div><b>${esc(statusAr(current))}</b><small>توقفت رحلة الطلب</small></div></div>`);
+    return parts.join('');
+}
+async function openOrderChat(orderId) {
+    try {
+        const load = async () => { const j = await api('/orders/' + encodeURIComponent(orderId) + '/messages?limit=100'); return j.messages || []; };
+        const isProvider = state.user?.role === 'PROVIDER';
+        const quick = isProvider
+            ? ['أنا في الطريق', 'وصلت إلى الموقع', 'أحتاج موقعك بالضبط', 'سأتأخر قليلًا', 'أنا عندك الآن']
+            : ['أين وصلت؟', 'أنا بانتظارك', 'هل أنت قريب؟', 'هذا هو موقعي', 'سأتأخر قليلًا'];
+        const render = async () => {
+            const msgs = await load();
+            const box = document.getElementById('chatMessages');
+            if (box) {
+                box.innerHTML = msgs.length ? msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
+                box.scrollTop = box.scrollHeight;
+            }
+        };
+        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">تواصل مع ${isProvider ? 'العميل' : 'مقدم الخدمة'} بخصوص هذا الطلب فقط.</p></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" required placeholder="اكتب رسالتك هنا..."></textarea><button class="btn" id="sendChat">إرسال</button></form></div>`);
+        await render();
+        document.querySelectorAll('[data-chat-quick]').forEach(x => x.addEventListener('click', () => { const body = document.getElementById('chatBody'); if (body) {
+            body.value = x.dataset.chatQuick || '';
+            body.focus();
+        } }));
+        document.getElementById('chatForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('sendChat'); const body = document.getElementById('chatBody').value.trim(); if (!body)
+            return; btn.disabled = true; try {
+            await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', body: JSON.stringify({ body }) });
+            document.getElementById('chatBody').value = '';
+            await render();
+        }
+        catch (x) {
+            alert(x.message);
+        }
+        finally {
+            btn.disabled = false;
+        } });
+        const onLive = async (ev) => { const d = ev.detail; if (d?.orderId === orderId)
+            await render(); };
+        window.addEventListener('khadamat:chat', onLive);
+        const timer = window.setInterval(async () => { if (!document.getElementById('chatMessages')) {
+            clearInterval(timer);
+            window.removeEventListener('khadamat:chat', onLive);
+            return;
+        } try {
+            await render();
+        }
+        catch { } }, 7000);
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function openOrderQuotes(orderId) {
+    try {
+        const j = await api('/orders/' + encodeURIComponent(orderId) + '/quotes');
+        const qs = j.quotes || [];
+        showModal(`<h2>عروض الأسعار</h2><p class="muted">اختر العرض الذي يناسبك. قبول العرض يسند الطلب لمقدم الخدمة صاحب العرض.</p><div>${qs.length ? qs.map((q) => `<div class="card" style="margin-top:10px"><div class="row" style="justify-content:space-between"><div><b>${esc(q.providerName || 'مقدم خدمة')}</b><p class="muted">${esc(q.message || 'بدون ملاحظة')}</p></div><b>${esc(q.amount)} ريال</b></div><p class="muted">صالح حتى: ${esc(formatDateTime(q.validUntil))}</p>${q.status === 'SUBMITTED' ? `<button class="btn" data-accept-quote="${esc(q.id)}">قبول العرض</button>` : `<span class="status">${esc(q.status)}</span>`}</div>`).join('') : '<div class="card empty">لم تصل عروض أسعار بعد.</div>'}</div>`);
+        document.querySelectorAll('[data-accept-quote]').forEach(x => x.addEventListener('click', async () => { const b = x; b.disabled = true; try {
+            await api('/orders/' + encodeURIComponent(orderId) + '/quotes/' + encodeURIComponent(b.dataset.acceptQuote) + '/accept', { method: 'POST', body: '{}' });
+            closeModal();
+            await customer();
+        }
+        catch (e) {
+            b.disabled = false;
+            alert(e.message);
+        } }));
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function openRating(id) {
+    try {
+        const j = await api('/orders/' + encodeURIComponent(id) + '/rating');
+        const o = j.order;
+        const existing = j.rating;
+        if (o.status !== 'COMPLETED') {
+            alert('يمكن التقييم بعد اكتمال الخدمة.');
+            return;
+        }
+        if (existing) {
+            showModal(`<div class="rating-box card"><h2>⭐ تم تقييم الخدمة</h2><p><b>${esc(o.service?.name || 'الخدمة')}</b> — ${esc(o.code)}</p><div class="rating-stars rating-stars-readonly">${[5, 4, 3, 2, 1].map(n => `<span class="rating-star ${n <= Number(existing.score) ? 'selected' : ''}">★</span>`).join('')}</div><p class="success">تم إرسال تقييمك مسبقًا.</p>${existing.comment ? `<p class="muted">${esc(existing.comment)}</p>` : ''}</div>`);
+            return;
+        }
+        showModal(`<div class="rating-box card"><h2>⭐ قيّم مقدم الخدمة</h2><p class="muted">اختر عدد النجوم الذي يعبر عن تجربتك في ${esc(o.service?.name || 'الخدمة')}.</p><div class="rating-stars" id="ratingStars" role="radiogroup" aria-label="تقييم مقدم الخدمة">${[5, 4, 3, 2, 1].map(n => `<button type="button" class="rating-star" data-score="${n}" aria-label="${n} نجوم">★</button>`).join('')}</div><input type="hidden" id="score" value="5"><textarea id="comment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rate" type="button">إرسال التقييم</button></div>`);
+        const setScore = (score) => { const input = document.getElementById('score'); if (input)
+            input.value = String(score); document.querySelectorAll('.rating-star').forEach(st => st.classList.toggle('selected', Number(st.dataset.score || 0) <= score)); };
+        document.querySelectorAll('.rating-star').forEach(x => x.addEventListener('click', () => setScore(Number(x.dataset.score || 5))));
+        setScore(5);
+        document.getElementById('rate')?.addEventListener('click', async () => { const btn = document.getElementById('rate'); btn.disabled = true; try {
+            await api('/orders/' + encodeURIComponent(id) + '/rating', { method: 'POST', body: JSON.stringify({ score: Number(document.getElementById('score').value), comment: document.getElementById('comment').value }) });
+            showModal(`<div class="rating-box card"><h2>✓ شكرًا لك</h2><p class="success">تم إرسال تقييمك بنجاح.</p></div>`);
+            await customer();
+        }
+        catch (e) {
+            btn.disabled = false;
+            alert(e.message);
+        } });
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function openOrder(id) {
+    try {
+        const j = await api('/orders/' + id);
+        const o = j.order;
+        showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> <span class="status">${esc(statusAr(o.status))}</span></p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}<p class="muted">${esc(formatDateTime(o.createdAt))}</p>${o.provider ? `<div class="card" style="margin-top:12px"><div class="row" style="justify-content:space-between"><div><b>👤 ${esc(o.provider.displayName)}</b><p class="muted">⭐ ${esc(o.provider.rating)} · مقدم خدمة موثق</p></div><button class="btn secondary small" id="viewProviderProfile" type="button">عرض الملف</button></div></div>` : ''}${o.provider && ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="openChatBtn" type="button">💬 محادثة مع مقدم الخدمة</button>` : ''}${o.pricingType === 'QUOTE' && ['SEARCHING', 'ASSIGNED'].includes(o.status) ? `<button class="btn" id="openQuotesBtn" type="button">💰 مشاهدة عروض الأسعار</button>` : ''}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>${['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn danger" id="cancel">إلغاء الطلب</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="complaintBtn" type="button">⚠️ ${o.status === 'DISPUTED' ? 'متابعة الشكوى' : 'فتح شكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="rating-box card"><h3>⭐ التقييم</h3><p class="muted">الخدمة مكتملة. افتح شاشة التقييم لإرسال نجومك وتعليقك.</p><button class="btn" id="openRatingBtn" type="button">⭐ تقييم مقدم الخدمة</button></div>` : ''}</div>`);
+        document.getElementById('openChatBtn')?.addEventListener('click', () => openOrderChat(id));
+        document.getElementById('openQuotesBtn')?.addEventListener('click', () => openOrderQuotes(id));
+        document.getElementById('viewProviderProfile')?.addEventListener('click', async () => { try {
+            const pp = await api('/providers/' + encodeURIComponent(o.provider.id));
+            const p = pp.provider;
+            showModal(`<div class="card"><h2>${esc(p.displayName)}</h2><p>${esc(p.bio || 'مقدم خدمة موثق في منصة خدمات')}</p><p>⭐ ${esc(p.rating.avg)} (${esc(p.rating.count)} تقييم)</p><p>طلبات مكتملة: ${esc(p.completedOrders)}</p>${p.services?.length ? `<h3>الخدمات</h3><p>${p.services.map((x) => esc(x.name)).join(' · ')}</p>` : ''}</div>`);
+        }
+        catch (e) {
+            alert(e.message);
+        } });
+        document.getElementById('cancel')?.addEventListener('click', async () => { if (!confirm('هل أنت متأكد من إلغاء هذا الطلب؟'))
+            return; const btn = document.getElementById('cancel'); btn.disabled = true; btn.textContent = 'جارٍ الإلغاء...'; try {
+            await api('/orders/' + id + '/cancel', { method: 'POST', body: JSON.stringify({ reason: 'إلغاء من العميل' }) });
+            closeModal();
+            await customer();
+        }
+        catch (e) {
+            btn.disabled = false;
+            btn.textContent = 'إلغاء الطلب';
+            alert(e.message);
+        } });
+        document.getElementById('openRatingBtn')?.addEventListener('click', () => openRating(id));
+        document.getElementById('complaintBtn')?.addEventListener('click', () => openOrderComplaint(id, o.status === 'DISPUTED'));
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function openSavedLocations() {
+    try {
+        const j = await api('/me/addresses');
+        const addresses = j.addresses || [];
+        showModal(`<div class="service-picker-head"><div><h2>مواقعي المحفوظة</h2><p class="muted">احفظ مواقعك المتكررة لتختارها مباشرة عند طلب أي خدمة.</p></div><button class="btn" id="addAddress" type="button">+ إضافة موقع</button></div><div id="addressList">${addresses.length ? addresses.map((a) => `<div class="card" style="margin-top:10px"><div class="row" style="justify-content:space-between"><div><b>📍 ${esc(a.label)}</b>${a.isDefault ? ' <span class="status">افتراضي</span>' : ''}<p class="muted">${Number(a.location.lat).toFixed(6)} — ${Number(a.location.lng).toFixed(6)}</p>${a.location.areaName ? `<small class="muted">${esc(a.location.areaName)}</small>` : ''}</div><div class="row"><button class="btn secondary small" data-edit-address="${esc(a.id)}" type="button">تعديل</button><button class="btn secondary small" data-default-address="${esc(a.id)}" type="button">${a.isDefault ? 'الافتراضي' : 'تعيين افتراضي'}</button><button class="btn secondary small" data-delete-address="${esc(a.id)}" type="button">حذف</button></div></div></div>`).join('') : '<div class="card empty">لا توجد مواقع محفوظة بعد.</div>'}</div>`);
+        document.getElementById('addAddress').onclick = () => addSavedAddress();
+        document.querySelectorAll('[data-delete-address]').forEach(x => x.addEventListener('click', async () => { if (!confirm('هل تريد حذف هذا الموقع؟'))
+            return; try {
+            await api('/me/addresses/' + encodeURIComponent(x.dataset.deleteAddress), { method: 'DELETE' });
+            await openSavedLocations();
+        }
+        catch (e) {
+            alert(e.message);
+        } }));
+        document.querySelectorAll('[data-edit-address]').forEach(x => x.addEventListener('click', () => { const id = x.dataset.editAddress; const a = addresses.find((z) => z.id === id); if (a)
+            editSavedAddress(a); }));
+        document.querySelectorAll('[data-default-address]').forEach(x => x.addEventListener('click', async () => { const id = x.dataset.defaultAddress; try {
+            await api('/me/addresses/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ isDefault: true }) });
+            await openSavedLocations();
+        }
+        catch (e) {
+            alert(e.message);
+        } }));
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function editSavedAddress(a) {
+    showModal(`<h2>تعديل الموقع المحفوظ</h2><form id="editAddressForm"><div class="field"><label>اسم الموقع</label><input name="label" maxlength="40" required value="${esc(a.label)}"></div><div class="field"><label>الموقع الحالي</label><p class="muted">${Number(a.location.lat).toFixed(6)} — ${Number(a.location.lng).toFixed(6)}</p><button class="btn secondary" id="editAddressGps" type="button">📍 إعادة تحديد الموقع من GPS</button><p id="editAddressGpsStatus" class="muted">سيبقى الموقع الحالي إذا لم تعِد تحديده.</p><input name="lat" id="editAddressLat" type="hidden"><input name="lng" id="editAddressLng" type="hidden"><input name="accuracy" id="editAddressAccuracy" type="hidden"></div><button class="btn">حفظ التعديل</button><p id="editAddressMsg"></p></form>`);
+    document.getElementById('editAddressGps').onclick = () => { const btn = document.getElementById('editAddressGps'), st = document.getElementById('editAddressGpsStatus'), la = document.getElementById('editAddressLat'), ln = document.getElementById('editAddressLng'), ac = document.getElementById('editAddressAccuracy'); if (!navigator.geolocation) {
+        st.textContent = 'المتصفح لا يدعم تحديد الموقع';
+        st.className = 'error';
+        return;
+    } btn.disabled = true; st.textContent = 'جارٍ تحديد أفضل موقع...'; let best = null; let watch; const started = Date.now(); const finish = () => { if (watch !== undefined)
+        navigator.geolocation.clearWatch(watch); btn.disabled = false; if (!best) {
+        st.textContent = 'تعذر تحديد الموقع';
+        st.className = 'error';
+        return;
+    } la.value = String(best.coords.latitude); ln.value = String(best.coords.longitude); ac.value = String(best.coords.accuracy); st.textContent = `تم تحديد موقع جديد بدقة تقريبية ${Math.round(best.coords.accuracy)} متر`; st.className = best.coords.accuracy <= 1000 ? 'success' : 'error'; }; watch = navigator.geolocation.watchPosition(pos => { if (!best || pos.coords.accuracy < best.coords.accuracy)
+        best = pos; if (best.coords.accuracy <= 100 || Date.now() - started > 45000)
+        finish(); }, () => { if (Date.now() - started > 45000)
+        finish(); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }); window.setTimeout(finish, 60000); };
+    document.getElementById('editAddressForm').addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const msg = document.getElementById('editAddressMsg'); const lat = f.get('lat'), lng = f.get('lng'), accuracy = f.get('accuracy'); const body = { label: String(f.get('label')) }; if (lat && lng && accuracy) {
+        const nlat = Number(lat), nlng = Number(lng), nac = Number(accuracy);
+        if (!Number.isFinite(nlat) || !Number.isFinite(nlng) || !Number.isFinite(nac) || nac > 1000) {
+            msg.textContent = 'دقة الموقع الجديد ضعيفة، أعد المحاولة';
+            msg.className = 'error';
+            return;
+        }
+        body.location = { lat: nlat, lng: nlng, accuracy: nac, source: 'gps' };
+    } try {
+        await api('/me/addresses/' + encodeURIComponent(a.id), { method: 'PATCH', body: JSON.stringify(body) });
+        await openSavedLocations();
+    }
+    catch (e) {
+        msg.textContent = e.message;
+        msg.className = 'error';
+    } });
+}
+async function addSavedAddress() {
+    showModal(`<h2>إضافة موقع محفوظ</h2><form id="addressForm"><div class="field"><label>اسم الموقع</label><input name="label" required maxlength="40" placeholder="البيت أو العمل أو المزرعة"></div><div class="field"><label>الموقع</label><button class="btn secondary" id="captureAddressGps" type="button">📍 تحديد الموقع من GPS</button><p id="addressGpsStatus" class="muted">لم يتم تحديد الموقع بعد</p><input name="lat" id="addressLat" type="hidden"><input name="lng" id="addressLng" type="hidden"><input name="accuracy" id="addressAccuracy" type="hidden"></div><button class="btn">حفظ الموقع</button><p id="addressMsg"></p></form>`);
+    document.getElementById('captureAddressGps').onclick = () => { const btn = document.getElementById('captureAddressGps'), st = document.getElementById('addressGpsStatus'), la = document.getElementById('addressLat'), ln = document.getElementById('addressLng'), ac = document.getElementById('addressAccuracy'); if (!navigator.geolocation) {
+        st.textContent = 'المتصفح لا يدعم تحديد الموقع';
+        st.className = 'error';
+        return;
+    } btn.disabled = true; st.textContent = 'جارٍ تحديد الموقع...'; navigator.geolocation.getCurrentPosition(pos => { la.value = String(pos.coords.latitude); ln.value = String(pos.coords.longitude); ac.value = String(pos.coords.accuracy); st.textContent = `تم تحديد الموقع بدقة تقريبية ${Math.round(pos.coords.accuracy)} متر`; st.className = pos.coords.accuracy <= 1000 ? 'success' : 'error'; btn.disabled = false; }, () => { st.textContent = 'تعذر تحديد الموقع. فعّل GPS/الموقع وحاول مرة أخرى.'; st.className = 'error'; btn.disabled = false; }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }); };
+    document.getElementById('addressForm').addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const lat = Number(f.get('lat')), lng = Number(f.get('lng')), accuracy = Number(f.get('accuracy')); const msg = document.getElementById('addressMsg'); if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)) {
+        msg.textContent = 'حدد الموقع من GPS أولًا';
+        msg.className = 'error';
+        return;
+    } if (accuracy > 1000) {
+        msg.textContent = 'دقة الموقع ضعيفة، أعد المحاولة من مكان مفتوح';
+        msg.className = 'error';
+        return;
+    } try {
+        await api('/me/addresses', { method: 'POST', body: JSON.stringify({ label: String(f.get('label')), location: { lat, lng, accuracy, source: 'gps' }, isDefault: false }) });
+        await openSavedLocations();
+    }
+    catch (x) {
+        msg.textContent = x.message;
+        msg.className = 'error';
+    } });
+}
+async function openOrderComplaint(orderId, followExisting = false) {
+    try {
+        const j = await api('/orders/' + encodeURIComponent(orderId) + '/complaint');
+        const c = j.complaint;
+        const msgs = j.messages || [];
+        if (c) {
+            showModal(`<h2>الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> ${esc(c.status)} · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>${esc(c.description)}</b></div><h3>المراسلات</h3>${msgs.map((m) => `<div class="card"><b>${esc(m.authorRole)}</b><p>${esc(m.body)}</p><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div>`).join('') || '<p class="muted">لا توجد ردود بعد.</p>'}${!['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status) ? `<form id="complaintReplyForm"><div class="field"><label>ردك</label><textarea name="body" minlength="1" maxlength="1000" required></textarea></div><button class="btn">إرسال الرد</button></form>` : ''}`);
+            document.getElementById('complaintReplyForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); try {
+                await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', body: JSON.stringify({ body: String(f.get('body')) }) });
+                await openOrderComplaint(orderId, true);
+            }
+            catch (e) {
+                alert(e.message);
+            } });
+            return;
+        }
+        if (followExisting)
+            return;
+        showModal(`<h2>فتح شكوى</h2><p class="muted">استخدم الشكوى فقط عند وجود مشكلة فعلية في تنفيذ الطلب.</p><form id="newComplaintForm"><div class="field"><label>نوع المشكلة</label><select name="category"><option value="QUALITY">جودة الخدمة</option><option value="BEHAVIOR">التعامل</option><option value="PRICE">السعر</option><option value="NO_SHOW">لم يحضر مقدم الخدمة</option><option value="DAMAGE">ضرر</option><option value="OTHER">أخرى</option></select></div><div class="field"><label>وصف المشكلة</label><textarea name="description" minlength="5" maxlength="1000" required></textarea></div><button class="btn">إرسال الشكوى</button></form>`);
+        document.getElementById('newComplaintForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const b = e.currentTarget.querySelector('button'); b.disabled = true; try {
+            await api('/orders/' + encodeURIComponent(orderId) + '/complaints', { method: 'POST', body: JSON.stringify({ category: String(f.get('category')), description: String(f.get('description')) }) });
+            await openOrderComplaint(orderId, true);
+        }
+        catch (e) {
+            b.disabled = false;
+            alert(e.message);
+        } });
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+function showModal(html) { closeModal(); const d = document.createElement('div'); d.id = 'modal'; d.className = 'modal'; d.innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><span></span><button class="btn secondary small" id="close">إغلاق</button></div>${html}</div>`; document.body.appendChild(d); document.getElementById('close').onclick = closeModal; }
+function closeModal() { if (notificationModalTimer) {
+    clearInterval(notificationModalTimer);
+    notificationModalTimer = undefined;
+} notificationModalRefreshing = false; document.getElementById('modal')?.remove(); }
+async function openProviderQuote(orderId) {
+    showModal(`<h2>تقديم عرض سعر</h2><p class="muted">أدخل السعر الذي ستنفذ به الخدمة. يمكن للعميل مقارنة العروض واختيار أحدها.</p><form id="quoteForm"><div class="field"><label>السعر</label><input id="quoteAmount" type="number" min="0" step="1" required></div><div class="field"><label>ملاحظة</label><textarea id="quoteMessage" maxlength="500" placeholder="ما الذي يشمله السعر؟"></textarea></div><div class="field"><label>صلاحية العرض بالساعات</label><input id="quoteHours" type="number" min="1" max="720" value="24"></div><button class="btn" id="sendQuote">إرسال العرض</button></form>`);
+    document.getElementById('quoteForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const b = document.getElementById('sendQuote'); b.disabled = true; try {
+        await api('/provider/orders/' + encodeURIComponent(orderId) + '/quote', { method: 'POST', body: JSON.stringify({ amount: Number(document.getElementById('quoteAmount').value), message: document.getElementById('quoteMessage').value, validHours: Number(document.getElementById('quoteHours').value) }) });
+        closeModal();
+        await provider();
+    }
+    catch (x) {
+        b.disabled = false;
+        alert(x.message);
+    } });
+}
+async function provider() {
+    if (!state.user) {
+        authBox('provider');
+        return;
+    }
+    if (state.user.role !== 'PROVIDER') {
+        authBox('provider');
+        const notice = document.createElement('div');
+        notice.className = 'notice';
+        notice.textContent = 'هذا الحساب حساب عميل. سجّل حساب مقدم خدمة مستقلًا للدخول إلى منصة مقدم الخدمة.';
+        document.getElementById('authForm')?.before(notice);
+        return;
+    }
+    try {
+        const [p, o, e, cats] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/earnings'), api('/categories')]);
+        const allServices = [];
+        for (const cat of (cats.categories || [])) {
+            try {
+                const j = await api('/categories/' + encodeURIComponent(cat.slug) + '/services');
+                allServices.push(...(j.services || []).map((s) => ({ ...s, categoryName: cat.name, categoryIcon: cat.icon })));
+            }
+            catch { }
+        }
+        const selected = new Set((p.provider.services || []).map((s) => s.serviceId));
+        shell(`<div class="hero"><h1>لوحة مقدم الخدمة</h1><p>${esc(p.provider.displayName)} — ${esc(verifyAr(p.provider.verificationStatus))}</p><div class="row"><span class="status">${p.provider.isOnline ? 'متصل ويستقبل الطلبات' : 'غير متصل'}</span><button class="btn" id="online" type="button">${p.provider.isOnline ? 'إيقاف الاستقبال' : 'بدء استقبال الطلبات'}</button>${p.provider.verificationStatus !== 'VERIFIED' ? '<button class="btn secondary" id="goVerification" type="button">🔐 توثيق الحساب</button>' : ''}</div>${p.provider.verificationStatus !== 'VERIFIED' ? '<div class="notice" style="margin-top:12px">لا يمكنك استقبال الطلبات قبل اعتماد الهوية والترخيص من الإدارة. ارفع الوثيقتين من قسم «توثيق الحساب» ثم انتظر المراجعة.</div>' : ''}</div>
+      <div id="providerPriority" class="priority-stack"></div>
+      <div class="grid"><div class="card"><div class="stat">${esc(e.completedOrders)}</div><div>طلبات مكتملة</div></div><div class="card"><div class="stat">${esc(e.net)} ${esc(e.currency)}</div><div>صافي تقديري</div></div><div class="card"><div class="stat">${esc(e.pendingOrders)}</div><div>طلبات قيد التنفيذ</div></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><div><h2>خدماتي</h2><p class="muted">هذه هي الخدمات التي اخترتها لتقديمها للعملاء.</p></div><button class="btn secondary" id="editServices" type="button">${selected.size ? 'إضافة أو تعديل الخدمات' : 'اختيار الخدمات'}</button></div>
+      <div id="myServicesList" class="grid provider-services">${selected.size ? allServices.filter((s) => selected.has(s.id)).map((s) => `<div class="card service-check"><span class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</span><span><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></span></div>`).join('') : '<div class="notice">لم تختر أي خدمة بعد. اختر الخدمات التي تستطيع تنفيذها فعليًا.</div>'}</div>
+      <div id="servicesEditor" style="display:none;margin-top:14px"><div class="grid provider-services">${allServices.map((s) => `<label class="card service-check"><input type="checkbox" data-service-check="${esc(s.id)}" ${selected.has(s.id) ? 'checked' : ''}> <span class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</span><span><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></span></label>`).join('')}</div><div class="row" style="margin-top:12px"><button class="btn" id="saveServices" type="button">حفظ الخدمات</button><button class="btn secondary" id="cancelServicesEdit" type="button">إلغاء</button></div></div><p id="servicesMsg" class="muted"></p></div>
+      <div class="card" id="verificationCard"><div class="row" style="justify-content:space-between"><div><h2>توثيق الحساب</h2><p class="muted">ارفع الهوية والترخيص. بعد اختيار الملف ستظهر لك معاينة بسيطة، ولن يُرسل للمراجعة حتى تضغط «رفع وإرسال للمراجعة».</p></div><span class="status">${esc(verifyAr(p.provider.verificationStatus))}</span></div><div id="providerDocs"></div><div class="row" style="margin-top:12px"><label class="btn secondary" for="docId">${p.documents?.find((d) => d.docType === 'ID') ? 'استبدال الهوية' : 'رفع الهوية'}</label><input id="docId" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><label class="btn secondary" for="docLicense">${p.documents?.find((d) => d.docType === 'LICENSE') ? 'استبدال الترخيص' : 'رفع الترخيص'}</label><input id="docLicense" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></div><div id="pendingDoc" class="notice" style="display:none;margin-top:12px"></div><p id="docMsg" class="muted"></p></div>
+    <div class="card"><div class="row" style="justify-content:space-between"><div><h2>موقعي كمقدم خدمة</h2><p id="providerLocationText" class="muted">${p.provider.baseLocation ? `محفوظ: ${Number(p.provider.baseLocation.lat).toFixed(6)} ، ${Number(p.provider.baseLocation.lng).toFixed(6)}` : 'لم يتم تحديد موقع أساسي بعد'}</p></div><button class="btn secondary" id="setProviderLocation">📍 تحديد موقعي</button></div><p id="providerLocationMsg" class="muted"></p></div>
+      <div class="card"><h2>التشغيل المتقدم</h2><p class="muted">حدد المناطق وأوقات العمل حتى يعرف النظام أين ومتى يستطيع إسناد الطلبات إليك.</p><div class="row"><button class="btn secondary" id="editProviderAreas" type="button">المناطق</button><button class="btn secondary" id="editProviderAvailability" type="button">أوقات العمل</button></div></div>
+      <h2>طلبات جديدة</h2><p class="muted">يمكنك قبول الطلب مباشرة، أو تقديم عرض سعر إذا كان السعر يحتاج اتفاقًا مع العميل، أو رفض الطلب.</p><div id="offers"></div><h2>طلباتي</h2><div id="myorders">${(o.orders || []).map(providerOrder).join('') || '<div class="card muted">لا توجد طلبات</div>'}</div>`);
+        const offers = await api('/provider/offers');
+        const priority = document.getElementById('providerPriority');
+        const pendingOffers = offers.offers || [];
+        if (priority) {
+            if (pendingOffers.length) {
+                priority.innerHTML = `<div class="priority-card priority-primary"><div class="priority-icon">🔔</div><div class="priority-body"><b>عندك ${pendingOffers.length} ${pendingOffers.length === 1 ? 'طلب جديد يحتاج ردك' : 'طلبات جديدة تحتاج ردك'}</b><p>راجع الطلب واختر «قبول مباشرة» أو «تقديم عرض سعر» أو «رفض». لا تحتاج تبحث عنها في الصفحة.</p></div><button class="btn" id="focusOffers" type="button">فتح الطلبات الجديدة</button></div>`;
+                document.getElementById('focusOffers')?.addEventListener('click', () => document.getElementById('offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            }
+            else if (p.provider.verificationStatus !== 'VERIFIED') {
+                priority.innerHTML = `<div class="priority-card priority-warning"><div class="priority-icon">🔐</div><div class="priority-body"><b>خطوتك المهمة الآن: توثيق الحساب</b><p>ارفع الهوية والترخيص ثم أرسلهما للمراجعة. بعد اعتماد الإدارة يمكنك بدء استقبال الطلبات.</p></div><button class="btn" id="focusVerification" type="button">ابدأ التوثيق</button></div>`;
+                document.getElementById('focusVerification')?.addEventListener('click', () => document.getElementById('verificationCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            }
+        }
+        document.getElementById('offers').innerHTML = uniqueBy((offers.offers || []), (x) => String(x.orderId)).map((x) => `<div class="card offer-card" data-offer-expiry="${esc(x.expiresAt)}"><div class="row"><b>${esc(x.orderCode)}</b><span class="status">${esc(x.priority)}</span></div><p>${esc(x.serviceName)}</p><p class="muted">${esc(x.areaName || 'الموقع غير مصنف')} · ${esc(x.distanceKm)} كم</p><p><b class="offer-countdown" data-expires="${esc(x.expiresAt)}">جاري حساب المهلة...</b></p>${x.pricingType === 'QUOTE' ? (x.quoteStatus === 'SUBMITTED' ? `<div class="quote-submitted"><b>✓ تم تقديم عرض السعر</b>${x.quoteAmount != null ? `<span>${esc(x.quoteAmount)} ريال</span>` : ''}</div>` : `<div class="row" style="margin-top:10px"><button class="btn" data-accept="${esc(x.id)}">✓ قبول الطلب مباشرة</button><button class="btn secondary" data-quote-offer="${esc(x.orderId)}">💰 تقديم عرض سعر</button></div>`) : `<button class="btn" data-accept="${esc(x.id)}">✓ قبول الطلب</button>`} <button class="btn secondary" data-reject="${esc(x.id)}">رفض</button></div>`).join('') || '<div class="card muted">لا توجد عروض حاليًا</div>';
+        bindProviderLiveActions();
+        startOfferCountdowns();
+        document.getElementById('goVerification')?.addEventListener('click', () => document.getElementById('verificationCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        document.getElementById('editProviderAreas')?.addEventListener('click', () => openProviderAreas(p.provider));
+        document.getElementById('editProviderAvailability')?.addEventListener('click', () => openProviderAvailability(p.provider));
+        document.getElementById('online').onclick = async () => { const btn = document.getElementById('online'); btn.disabled = true; try {
+            await api('/provider/online', { method: 'POST', body: JSON.stringify({ online: !p.provider.isOnline }) });
+            await provider();
+        }
+        catch (e) {
+            btn.disabled = false;
+            alert(e.message);
+        } };
+        document.getElementById('editServices').onclick = () => { const ed = document.getElementById('servicesEditor'); ed.style.display = ed.style.display === 'none' ? 'block' : 'none'; };
+        document.getElementById('cancelServicesEdit').onclick = () => { document.getElementById('servicesEditor').style.display = 'none'; };
+        document.getElementById('saveServices').onclick = async () => { const btn = document.getElementById('saveServices'); const msg = document.getElementById('servicesMsg'); const services = Array.from(document.querySelectorAll('[data-service-check]:checked')).map(x => ({ serviceId: x.dataset.serviceCheck, experienceYears: 0 })); if (!services.length) {
+            msg.textContent = 'اختر خدمة واحدة على الأقل حتى يستطيع النظام إسناد الطلبات إليك.';
+            msg.className = 'error';
+            return;
+        } btn.disabled = true; msg.textContent = 'جارٍ حفظ الخدمات...'; try {
+            await api('/provider/services', { method: 'PUT', body: JSON.stringify({ services }) });
+            await provider();
+            const savedMsg = document.getElementById('servicesMsg');
+            if (savedMsg) {
+                savedMsg.textContent = 'تم حفظ خدماتك بنجاح. تظهر الآن الخدمات التي اخترتها فقط.';
+                savedMsg.className = 'muted';
+            }
+        }
+        catch (e) {
+            msg.textContent = e.message;
+            msg.className = 'error';
+            btn.disabled = false;
+        } };
+        const renderDocs = () => { const docs = p.documents || []; const el = document.getElementById('providerDocs'); const card = (type, empty) => { const d = docs.find((x) => x.docType === type); return d ? `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(docTypeAr(d.docType))}</b><div class="muted">الحالة: ${esc(docStatusAr(d.status))}</div>${d.fileName ? `<div class="muted">${esc(d.fileName)} — ${Math.max(1, Math.round(d.fileSize / 1024))} KB</div>` : ''}${d.note ? `<div class="error" style="margin-top:6px">ملاحظة المراجعة: ${esc(d.note)}</div>` : ''}</div>${d.fileUrl ? `<button class="btn secondary small" type="button" data-view-file="${esc(d.fileUrl)}">عرض الملف</button>` : ''}</div></div>` : `<div class="card"><b>${empty}</b><div class="muted">لم يتم رفع هذه الوثيقة بعد.</div></div>`; }; el.innerHTML = card('ID', 'الهوية') + card('LICENSE', 'الترخيص'); };
+        renderDocs();
+        document.querySelectorAll('[data-view-file]').forEach(x => x.addEventListener('click', () => openPrivateFile(x.dataset.viewFile)));
+        let pending = null;
+        const showPending = () => { const box = document.getElementById('pendingDoc'); if (!pending) {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            return;
+        } box.style.display = 'block'; box.innerHTML = `<b>ملف جاهز للإرسال: ${esc(pending.file.name)}</b><div class="muted">${Math.max(1, Math.round(pending.file.size / 1024))} KB — لم يُرسل بعد</div><div class="row" style="margin-top:10px"><button class="btn" id="confirmDoc" type="button">رفع وإرسال للمراجعة</button><button class="btn secondary" id="cancelDoc" type="button">إلغاء</button></div>`; document.getElementById('cancelDoc').onclick = () => { pending = null; showPending(); }; document.getElementById('confirmDoc').onclick = () => uploadDoc(pending.docType, pending.file); };
+        const uploadDoc = async (docType, file) => { const msg = document.getElementById('docMsg'); if (file.size > 5 * 1024 * 1024) {
+            msg.textContent = 'حجم الملف يتجاوز 5MB.';
+            msg.className = 'error';
+            pending = null;
+            showPending();
+            return;
+        } const current = pending; pending = null; showPending(); msg.textContent = 'جارٍ رفع الوثيقة وإرسالها للمراجعة...'; msg.className = 'muted'; try {
+            const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الملف')); fr.readAsDataURL(file); });
+            const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'provider_document', name: file.name, dataBase64: data }) });
+            await api('/provider/documents', { method: 'POST', body: JSON.stringify({ docType, fileId: up.file.id }) });
+            msg.textContent = `تم حفظ ${docTypeAr(docType)} وإرسالها للمراجعة.`;
+            msg.className = 'muted';
+            const fresh = await api('/provider/profile');
+            p.documents = fresh.documents || [];
+            renderDocs();
+        }
+        catch (e) {
+            msg.textContent = e.message;
+            msg.className = 'error';
+            pending = current;
+            showPending();
+        } };
+        const chooseDoc = (inputId, docType) => { const input = document.getElementById(inputId); const file = input.files?.[0]; if (!file)
+            return; pending = { docType, file }; input.value = ''; showPending(); };
+        document.getElementById('docId').addEventListener('change', () => chooseDoc('docId', 'ID'));
+        document.getElementById('docLicense').addEventListener('change', () => chooseDoc('docLicense', 'LICENSE'));
+        document.getElementById('setProviderLocation').onclick = () => setProviderLocation();
+        stopPollers();
+        providerPollTimer = window.setInterval(async () => { try {
+            const [pp, oo, offers] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/offers')]);
+            const onlineBtn = document.getElementById('online');
+            const topStatus = document.querySelector('.hero .status');
+            if (topStatus)
+                topStatus.textContent = pp.provider.isOnline ? 'متصل ويستقبل الطلبات' : 'غير متصل';
+            if (onlineBtn) {
+                onlineBtn.textContent = pp.provider.isOnline ? 'إيقاف الاستقبال' : 'بدء استقبال الطلبات';
+                onlineBtn.disabled = false;
+            }
+            const off = document.getElementById('offers');
+            if (off) {
+                off.innerHTML = uniqueBy((offers.offers || []), (x) => String(x.orderId)).map((x) => `<div class="card"><div class="row"><b>${esc(x.orderCode)}</b><span class="status">${esc(x.priority)}</span></div><p>${esc(x.serviceName)}</p><p class="muted">${esc(x.areaName || 'الموقع غير مصنف')} · ${esc(x.distanceKm)} كم</p><p><b class="offer-countdown" data-expires="${esc(x.expiresAt)}">جاري حساب المهلة...</b></p>${x.pricingType === 'QUOTE' ? (x.quoteStatus === 'SUBMITTED' ? `<div class="quote-submitted"><b>✓ تم تقديم عرض السعر</b>${x.quoteAmount != null ? `<span>${esc(x.quoteAmount)} ريال</span>` : ''}</div>` : `<div class="row" style="margin-top:10px"><button class="btn" data-accept="${esc(x.id)}">✓ قبول الطلب مباشرة</button><button class="btn secondary" data-quote-offer="${esc(x.orderId)}">💰 تقديم عرض سعر</button></div>`) : `<button class="btn" data-accept="${esc(x.id)}">✓ قبول الطلب</button>`} <button class="btn secondary" data-reject="${esc(x.id)}">رفض</button></div>`).join('') || '<div class="card muted">لا توجد عروض حاليًا</div>';
+            }
+            const mo = document.getElementById('myorders');
+            if (mo)
+                mo.innerHTML = (oo.orders || []).map(providerOrder).join('') || '<div class="card muted">لا توجد طلبات</div>';
+            bindProviderLiveActions();
+            startOfferCountdowns();
+        }
+        catch { } }, 8000);
+        document.querySelectorAll('[data-provider-order]').forEach(x => x.addEventListener('click', () => openProviderOrder(x.dataset.providerOrder)));
+    }
+    catch (e) {
+        shell(`<div class="card error">${esc(e.message)}</div>`);
+    }
+}
+async function setProviderLocation() {
+    const msg = document.getElementById('providerLocationMsg');
+    const btn = document.getElementById('setProviderLocation');
+    if (!navigator.geolocation) {
+        if (msg)
+            msg.textContent = 'المتصفح لا يدعم تحديد الموقع';
+        return;
+    }
+    btn.disabled = true;
+    if (msg)
+        msg.textContent = 'جارٍ تحديد أفضل موقع للجهاز...';
+    let best = null;
+    let watch;
+    const started = Date.now();
+    const finish = async () => { if (watch !== undefined)
+        navigator.geolocation.clearWatch(watch); btn.disabled = false; if (!best) {
+        if (msg)
+            msg.textContent = 'تعذر الحصول على موقع الجهاز';
+        return;
+    } try {
+        await api('/provider/profile', { method: 'PATCH', body: JSON.stringify({ baseLocation: { lat: best.coords.latitude, lng: best.coords.longitude } }) });
+        if (msg)
+            msg.textContent = `تم حفظ الموقع بدقة تقريبية ${Math.round(best.coords.accuracy)} متر.`;
+        const t = document.getElementById('providerLocationText');
+        if (t)
+            t.textContent = `محفوظ: ${best.coords.latitude.toFixed(6)} ، ${best.coords.longitude.toFixed(6)}`;
+    }
+    catch (e) {
+        if (msg)
+            msg.textContent = e.message;
+    } };
+    watch = navigator.geolocation.watchPosition(pos => { if (!best || pos.coords.accuracy < best.coords.accuracy)
+        best = pos; if (best.coords.accuracy <= 100 || Date.now() - started > 45000)
+        finish(); }, err => { if (Date.now() - started > 45000)
+        finish();
+    else if (msg)
+        msg.textContent = 'فعّل GPS وخدمات الموقع ثم انتظر...'; }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    window.setTimeout(finish, 60000);
+}
+function startOfferCountdowns() { if (offerCountdownTimer !== undefined)
+    clearInterval(offerCountdownTimer); const tick = () => { document.querySelectorAll('[data-expires]').forEach(el => { const t = Date.parse(el.dataset.expires || ''); const left = Math.max(0, Math.ceil((t - Date.now()) / 1000)); const m = Math.floor(left / 60), s = left % 60; el.textContent = left ? `⏳ متبقٍ لقبول الطلب: ${m}:${String(s).padStart(2, '0')}` : 'انتهت مهلة العرض'; el.classList.toggle('error', left === 0); }); }; tick(); offerCountdownTimer = window.setInterval(tick, 1000); }
+function bindProviderLiveActions() {
+    document.querySelectorAll('[data-accept]').forEach(x => x.addEventListener('click', async () => { const b = x; const offerId = String(b.dataset.accept || ''); if (!offerId || acceptingOffers.has(offerId))
+        return; acceptingOffers.add(offerId); b.disabled = true; b.textContent = 'جارٍ قبول الطلب...'; try {
+        await api('/provider/offers/' + encodeURIComponent(offerId) + '/accept', { method: 'POST', body: '{}' });
+        acceptingOffers.delete(offerId);
+        await provider();
+    }
+    catch (e) {
+        acceptingOffers.delete(offerId);
+        b.disabled = false;
+        b.textContent = '✓ قبول الطلب';
+        alert(e.message);
+    } }));
+    document.querySelectorAll('[data-quote-offer]').forEach(x => x.addEventListener('click', () => openProviderQuote(x.dataset.quoteOffer)));
+    document.querySelectorAll('[data-reject]').forEach(x => x.addEventListener('click', async () => { const b = x; b.disabled = true; try {
+        await api('/provider/offers/' + b.dataset.reject + '/reject', { method: 'POST', body: '{}' });
+        await provider();
+    }
+    catch (e) {
+        b.disabled = false;
+        alert(e.message);
+    } }));
+    document.querySelectorAll('[data-status]').forEach(x => x.addEventListener('click', async () => { try {
+        await api('/provider/orders/' + x.dataset.id + '/status', { method: 'POST', body: JSON.stringify({ to: x.dataset.status }) });
+        await provider();
+    }
+    catch (e) {
+        alert(e.message);
+    } }));
+}
+function providerOrder(o) { const map = { ACCEPTED: 'ON_THE_WAY', ON_THE_WAY: 'IN_PROGRESS', IN_PROGRESS: 'COMPLETED' }; const next = map[o.status]; const label = next === 'ON_THE_WAY' ? 'في الطريق' : next === 'IN_PROGRESS' ? 'بدء الخدمة' : 'إكمال الطلب'; return `<div class="card order-card"><button class="order-card-main" data-provider-order="${esc(o.id)}" type="button"><div class="row"><b>${esc(o.code)}</b><span class="status status-${esc(String(o.status).toLowerCase())}">${esc(statusAr(o.status))}</span></div><p>${esc(o.service.name)} — ${esc(o.description)}</p>${o.location ? `<small class="muted">📍 موقع محفوظ مع الطلب</small>` : ''}</button>${next ? `<div style="margin-top:10px"><button class="btn" type="button" data-id="${esc(o.id)}" data-status="${next}">${label}</button></div>` : ''}</div>`; }
+async function openProviderOrder(id) { try {
+    const j = await api('/orders/' + id);
+    const o = j.order;
+    const loc = o.location || {};
+    const hasLoc = Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lng));
+    const lat = Number(loc.lat), lng = Number(loc.lng);
+    const mapUrl = hasLoc ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}` : '';
+    const g = hasLoc ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}&travelmode=driving` : '';
+    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}${o.customer?.phone ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">📞 ${esc(o.customer.phone)}</p><a class="btn secondary small" href="tel:${esc(o.customer.phone)}">اتصال</a></div>` : ''}${o.customer ? `<button class="btn secondary" id="providerChatBtn" type="button">💬 محادثة مع العميل</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ متابعة الشكوى</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
+    if (hasLoc) {
+        const el = document.getElementById('providerOrderMap');
+        const L = window.L;
+        if (el && L) {
+            const map = L.map(el, { scrollWheelZoom: false }).setView([lat, lng], 18);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+            L.marker([lat, lng]).addTo(map).bindPopup('موقع العميل').openPopup();
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+    }
+    document.getElementById('providerChatBtn')?.addEventListener('click', () => openOrderChat(id));
+    document.getElementById('providerComplaintBtn')?.addEventListener('click', () => openOrderComplaint(id, true));
+    document.getElementById('rateCustomer')?.addEventListener('click', async () => { const b = document.getElementById('rateCustomer'); b.disabled = true; try {
+        await api('/provider/orders/' + encodeURIComponent(id) + '/rate-customer', { method: 'POST', body: JSON.stringify({ score: Number(document.getElementById('customerScore').value), comment: document.getElementById('customerComment').value }) });
+        alert('تم تقييم العميل');
+        b.textContent = 'تم التقييم';
+    }
+    catch (e) {
+        b.disabled = false;
+        alert(e.message);
+    } });
+}
+catch (e) {
+    alert(e.message);
+} }
+async function openProviderAreas(providerData) {
+    try {
+        const j = await api('/areas');
+        const areas = j.areas || [];
+        const selected = new Set((providerData.serviceAreas || []).map((x) => x.id || x.areaId));
+        showModal(`<h2>مناطق الخدمة</h2><p class="muted">اختر المناطق التي تستطيع الوصول إليها. الإسناد يعتمد أيضًا على الإحداثيات الفعلية.</p><div class="grid">${areas.map((a) => `<label class="card"><input type="checkbox" data-area-check="${esc(a.id)}" ${selected.has(a.id) ? 'checked' : ''}> ${esc(a.name)} <small class="muted">${esc(a.type)}</small></label>`).join('')}</div><button class="btn" id="saveProviderAreas">حفظ المناطق</button><p id="providerAreasMsg"></p>`);
+        document.getElementById('saveProviderAreas')?.addEventListener('click', async () => { const ids = Array.from(document.querySelectorAll('[data-area-check]:checked')).map(x => x.dataset.areaCheck); try {
+            await api('/provider/areas', { method: 'PUT', body: JSON.stringify({ areaIds: ids }) });
+            closeModal();
+            await provider();
+        }
+        catch (e) {
+            alert(e.message);
+        } });
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function openProviderAvailability(providerData) {
+    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const slots = providerData.availability || [];
+    showModal(`<h2>أوقات العمل</h2><p class="muted">حدد الأيام والساعات التي تستقبل فيها الطلبات.</p><div class="availability-toolbar"><button class="btn secondary small" id="selectAllDays" type="button">✓ تحديد كل الأيام</button><button class="btn secondary small" id="clearAllDays" type="button">مسح التحديد</button></div><div id="availabilityRows">${days.map((d, i) => { const x = slots.find((z) => Number(z.weekday) === i); return `<div class="card availability-day" style="margin-top:8px"><label><input type="checkbox" data-day="${i}" ${x ? 'checked' : ''}> ${d}</label><div class="row" style="margin-top:8px"><input type="time" data-start="${i}" value="${esc(x?.start || '08:00')}"><input type="time" data-end="${i}" value="${esc(x?.end || '18:00')}"></div></div>`; }).join('')}</div><button class="btn availability-save" id="saveAvailability">حفظ أوقات العمل</button><p id="availabilityMsg" class="muted"></p>`);
+    document.getElementById('selectAllDays')?.addEventListener('click', () => document.querySelectorAll('[data-day]').forEach(x => x.checked = true));
+    document.getElementById('clearAllDays')?.addEventListener('click', () => document.querySelectorAll('[data-day]').forEach(x => x.checked = false));
+    document.getElementById('saveAvailability')?.addEventListener('click', async () => { const out = []; days.forEach((_, i) => { const c = document.querySelector(`[data-day="${i}"]`); if (c?.checked) {
+        const st = document.querySelector(`[data-start="${i}"]`).value;
+        const en = document.querySelector(`[data-end="${i}"]`).value;
+        if (st && en)
+            out.push({ weekday: i, start: st, end: en });
+    } }); const msg = document.getElementById('availabilityMsg'); try {
+        await api('/provider/availability', { method: 'PUT', body: JSON.stringify({ slots: out }) });
+        if (msg) {
+            msg.textContent = 'تم حفظ أوقات العمل بنجاح';
+            msg.className = 'success';
+        }
+        setTimeout(() => { closeModal(); provider(); }, 500);
+    }
+    catch (e) {
+        if (msg) {
+            msg.textContent = e.message;
+            msg.className = 'error';
+        }
+    } });
+}
+async function admin() {
+    if (!state.user) {
+        authBox('admin');
+        return;
+    }
+    if (state.user.role !== 'ADMIN') {
+        location.href = '/';
+        return;
+    }
+    let activeTab = (new URLSearchParams(location.search).get('tab') || 'overview'), orderStatus = '', providerStatus = 'PENDING';
+    const load = async () => {
+        const qs = (base, status) => status ? base + encodeURIComponent(status) : base;
+        const [d, u, o, c, ps, cat, areas, settings, audit, admins] = await Promise.all([
+            api('/admin/dashboard'), api('/admin/users?limit=50'), api(qs('/admin/orders?limit=50&status=', orderStatus)), api('/admin/complaints?limit=50'), api(qs('/admin/providers?status=', providerStatus)), api('/admin/catalog'), api('/admin/areas'), api('/admin/settings'), api('/admin/audit-logs?limit=100'), state.user.adminLevel === 'SUPER_ADMIN' ? api('/admin/admins') : Promise.resolve({ admins: [] })
+        ]);
+        return { d, u, o, c, ps, cat, areas, settings, audit, admins };
+    };
+    const draw = async () => {
+        try {
+            const { d, u, o, c, ps, cat, areas, settings, audit, admins } = await load();
+            const stats = d.stats || {};
+            const statusOptions = ['', 'PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'DISPUTED'];
+            const providerStatuses = ['PENDING', 'VERIFIED', 'REJECTED', 'SUSPENDED'];
+            const cats = cat.categories || [];
+            const allServices = cats.flatMap((x) => x.services || []);
+            shell(`<div class="hero"><div class="row" style="justify-content:space-between"><div><h1>لوحة إدارة خدمات</h1><p>إدارة التشغيل والكتالوج والمناطق والإعدادات من مكان واحد.</p></div><span class="status">${esc(state.user.adminLevel || 'ADMIN')}</span></div></div>
+      <div class="nav admin-tabs"><button class="btn ${activeTab === 'overview' ? '' : 'secondary'}" data-admin-tab="overview">نظرة عامة</button><button class="btn ${activeTab === 'providers' ? '' : 'secondary'}" data-admin-tab="providers">مقدمو الخدمات</button><button class="btn ${activeTab === 'verification' ? '' : 'secondary'}" data-admin-tab="verification">طلبات التوثيق</button><button class="btn ${activeTab === 'catalog' ? '' : 'secondary'}" data-admin-tab="catalog">الخدمات والكتالوج</button><button class="btn ${activeTab === 'areas' ? '' : 'secondary'}" data-admin-tab="areas">المناطق</button><button class="btn ${activeTab === 'settings' ? '' : 'secondary'}" data-admin-tab="settings">الإعدادات</button><button class="btn ${activeTab === 'account' ? '' : 'secondary'}" data-admin-tab="account">حسابي</button><button class="btn ${activeTab === 'orders' ? '' : 'secondary'}" data-admin-tab="orders">الطلبات</button><button class="btn ${activeTab === 'complaints' ? '' : 'secondary'}" data-admin-tab="complaints">الشكاوى</button><button class="btn ${activeTab === 'users' ? '' : 'secondary'}" data-admin-tab="users">المستخدمون</button>${state.user.adminLevel === 'SUPER_ADMIN' ? `<button class="btn ${activeTab === 'admins' ? '' : 'secondary'}" data-admin-tab="admins">المديرون والمشرفون</button>` : ''}<button class="btn ${activeTab === 'audit' ? '' : 'secondary'}" data-admin-tab="audit">سجل العمليات</button></div>
+      ${activeTab === 'overview' ? `<div class="card" style="border:2px solid #2563eb"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">🔐 طلبات التوثيق</h2><p class="muted">طلبات مقدمي الخدمات التي تنتظر مراجعة الإدارة</p></div><div class="stat">${esc(stats.pendingProviders)}</div></div><button class="btn" id="openVerificationQueue" type="button">فتح طلبات التوثيق والموافقة عليها</button></div><div class="grid"><div class="card"><div class="stat">${esc(stats.users)}</div><div>مستخدمون</div></div><div class="card"><div class="stat">${esc(stats.providers)}</div><div>مقدمو خدمات</div></div><div class="card"><div class="stat">${esc(stats.pendingProviders)}</div><div>بانتظار التوثيق</div></div><div class="card"><div class="stat">${esc(stats.activeOrders)}</div><div>طلبات نشطة</div></div><div class="card"><div class="stat">${esc(stats.completedOrders)}</div><div>طلبات مكتملة</div></div><div class="card"><div class="stat">${esc(stats.cancelledOrders)}</div><div>طلبات ملغاة</div></div><div class="card"><div class="stat">${esc(stats.complaints)}</div><div>شكاوى مفتوحة</div></div><div class="card"><div class="stat">${esc(cats.length)}</div><div>أقسام الكتالوج</div></div><div class="card"><div class="stat">${esc(allServices.length)}</div><div>خدمات الكتالوج</div></div></div><h2>طلبات التوثيق</h2><div>${(ps.providers || []).slice(0, 5).map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
+      ${activeTab === 'providers' ? `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">مقدمو الخدمات</h2><select id="providerStatusFilter">${providerStatuses.map(x => `<option value="${x}" ${providerStatus === x ? 'selected' : ''}>${esc(x === 'PENDING' ? 'بانتظار التوثيق' : x === 'VERIFIED' ? 'موثق' : x === 'REJECTED' ? 'مرفوض' : 'موقوف')}</option>`).join('')}</select></div></div><div>${(ps.providers || []).map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد نتائج.</div>'}</div>` : ''}
+      ${activeTab === 'verification' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">طلبات توثيق الحسابات</h2><p class="muted">راجع الهوية والترخيص ثم اعتمد الحساب أو ارفضه مع ذكر السبب.</p></div><span class="status">${esc(stats.pendingProviders)} بانتظار المراجعة</span></div></div><div>${(ps.providers || []).filter((p) => p.verificationStatus === 'PENDING').map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
+      ${activeTab === 'catalog' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">كتالوج الخدمات</h2><p class="muted">إدارة الأقسام والخدمات والأسعار والحالة ومخطط بيانات الطلب.</p></div><button class="btn" id="newCategory">+ قسم جديد</button></div></div><div>${cats.map((cat) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(cat.icon || '🛠️')} ${esc(cat.name)}</b><div class="muted">${esc(cat.slug)} · ${cat.isActive ? 'نشط' : 'معطل'} · ${esc(cat.moduleType || 'STANDARD')}</div></div><button class="btn secondary small" data-edit-category="${esc(cat.id)}">تعديل القسم</button></div><div class="row" style="margin-top:10px;flex-wrap:wrap">${(cat.services || []).map((sv) => `<button class="card" style="text-align:right;min-width:240px;flex:1" data-edit-service="${esc(sv.id)}"><b>${esc(sv.icon || '🛠️')} ${esc(sv.name)}</b><small class="muted">${esc(sv.pricingType === 'FIXED' ? 'سعر ثابت' : 'عرض سعر')} · ${sv.basePrice === null ? 'حسب العرض' : esc(sv.basePrice + ' ' + sv.currency)} · ${sv.isActive === false ? 'معطلة' : 'نشطة'}</small></button>`).join('') || '<span class="muted">لا توجد خدمات.</span>'}</div></div>`).join('')}</div>` : ''}
+      ${activeTab === 'areas' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">المناطق التشغيلية</h2><p class="muted">المناطق مساعدة للمطابقة وليست شرطًا لطلب العميل إذا كانت الإحداثيات صالحة.</p></div><button class="btn" id="newArea">+ منطقة جديدة</button></div></div><div class="card"><div class="admin-table-wrap"><table class="table"><thead><tr><th>الاسم</th><th>النوع</th><th>المركز</th><th>النطاق</th><th>الحالة</th><th></th></tr></thead><tbody>${(areas.areas || []).map((a) => `<tr><td>${esc(a.name)}</td><td>${esc(a.type)}</td><td>${Number(a.centerLat).toFixed(5)} , ${Number(a.centerLng).toFixed(5)}</td><td>${esc(a.radiusKm)} كم</td><td>${a.isActive ? 'نشطة' : 'معطلة'}</td><td><button class="btn secondary small" data-edit-area="${esc(a.id)}">تعديل</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا توجد مناطق.</td></tr>'}</tbody></table></div></div>` : ''}
+      ${activeTab === 'settings' ? `<div class="card"><h2>إعدادات المنصة</h2><p class="muted">تُحفظ الإعدادات في قاعدة البيانات. التعديل متاح لـ SUPER_ADMIN فقط.</p></div><div>${(settings.settings || []).map((x) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(x.key)}</b><p class="muted">${esc(x.description)}</p><small>القيمة الحالية: <code>${esc(JSON.stringify(x.value))}</code> · الافتراضي: <code>${esc(JSON.stringify(x.default))}</code></small></div>${state.user.adminLevel === 'SUPER_ADMIN' ? `<button class="btn secondary small" data-edit-setting="${esc(x.key)}">تعديل</button>` : ''}</div></div>`).join('')}</div>` : ''}
+      ${activeTab === 'account' ? `<div class="card"><h2>إعدادات حساب الإدارة</h2><p class="muted">يمكنك تغيير البريد الإلكتروني وكلمة المرور الخاصة بحسابك.</p><button class="btn" id="openAdminAccountSettings" type="button">فتح إعدادات الحساب</button></div>` : ''}
+      ${activeTab === 'orders' ? `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">الطلبات</h2><select id="orderStatusFilter">${statusOptions.map(x => `<option value="${x}" ${orderStatus === x ? 'selected' : ''}>${esc(x ? statusAr(x) : 'كل الحالات')}</option>`).join('')}</select></div></div><div class="card"><div class="admin-table-wrap"><table class="table"><thead><tr><th>الرقم</th><th>الخدمة</th><th>الحالة</th><th>العميل</th><th>المقدم</th><th>التاريخ</th><th></th></tr></thead><tbody>${(o.orders || []).map((x) => `<tr><td>${esc(x.code)}</td><td>${esc(x.service?.name || '—')}</td><td>${esc(statusAr(x.status))}</td><td>${esc(x.customer?.fullName || '—')}</td><td>${esc(x.provider?.displayName || 'غير مسند')}</td><td>${esc(formatDateTime(x.createdAt))}</td><td><button class="btn secondary small" data-admin-order="${esc(x.id)}">التفاصيل</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">لا توجد طلبات.</td></tr>'}</tbody></table></div></div>` : ''}
+      ${activeTab === 'complaints' ? `<div>${(c.complaints || []).map((x) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(x.code)}</b><div class="muted">الطلب: ${esc(x.orderId)}</div></div><span class="status">${esc(x.status)}</span></div><p><b>${esc(x.category)}</b> — ${esc(x.description)}</p><div class="row"><button class="btn secondary small" data-admin-complaint="${esc(x.id)}">عرض</button>${!['RESOLVED', 'REJECTED', 'CLOSED'].includes(x.status) ? `<button class="btn small" data-admin-complaint="${esc(x.id)}">فتح الشكوى والرد</button>` : ''}</div></div>`).join('') || '<div class="card muted">لا توجد شكاوى.</div>'}</div>` : ''}
+      ${activeTab === 'admins' && state.user.adminLevel === 'SUPER_ADMIN' ? `<div class="card admin-manager-head"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">المديرون والمشرفون</h2><p class="muted">أنشئ حسابات مستقلة لفريق الإدارة وحدد مستوى الصلاحية لكل حساب.</p></div><button class="btn" id="newAdminAccount" type="button">+ إضافة مشرف</button></div></div><div class="grid admin-users-grid">${(admins.admins || []).map((x) => `<div class="card admin-user-card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>${esc(x.fullName)}</b><div class="muted">${esc(x.email || 'بدون بريد')}</div><small class="muted">${esc(x.phone)}</small></div><span class="status">${esc(x.adminLevel === 'SUPER_ADMIN' ? 'مدير النظام الأعلى' : x.adminLevel === 'ADMIN' ? 'مدير' : 'مشرف')}</span></div><div class="admin-user-meta"><span>${x.status === 'ACTIVE' ? '🟢 نشط' : '🔴 موقوف'}</span><span>آخر دخول: ${x.lastLoginAt ? esc(formatDateTime(x.lastLoginAt)) : 'لم يسجل'}</span></div>${x.adminLevel !== 'SUPER_ADMIN' ? `<div class="row admin-user-actions"><button class="btn secondary small" data-edit-admin="${esc(x.id)}">تعديل</button><button class="btn secondary small" data-toggle-admin="${esc(x.id)}" data-next-admin-status="${x.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'}">${x.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}</button></div>` : ''}</div>`).join('') || '<div class="card muted">لا توجد حسابات إضافية.</div>'}</div>` : ''}
+      ${activeTab === 'audit' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">سجل العمليات</h2><p class="muted">سجل تدقيق لمراجعة الموافقات والتغييرات والإجراءات الإدارية.</p></div><span class="status">آخر 100 عملية</span></div></div><div class="card"><div class="admin-table-wrap"><table class="table"><thead><tr><th>الوقت</th><th>العملية</th><th>النوع</th><th>المعرّف</th><th>الدور</th></tr></thead><tbody>${(audit.logs || []).map((x) => `<tr><td>${esc(formatDateTime(x.createdAt))}</td><td>${esc(x.action)}</td><td>${esc(x.entityType || '—')}</td><td>${esc(x.entityId || '—')}</td><td>${esc(x.actorRole || '—')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد عمليات مسجلة.</td></tr>'}</tbody></table></div></div>` : ''}
+      ${activeTab === 'users' ? `<div class="card"><h2>المستخدمون</h2><table class="table"><thead><tr><th>الاسم</th><th>الهاتف</th><th>الدور</th><th>الحالة</th><th></th></tr></thead><tbody>${(u.users || []).map((x) => `<tr><td>${esc(x.fullName)}</td><td>${esc(x.phone)}</td><td>${esc(x.role)}</td><td>${esc(x.status)}</td><td>${x.id === state.user.id ? '<span class="muted">حسابك</span>' : `<button class="btn secondary small" data-user-status="${esc(x.id)}" data-next-status="${x.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'}">${x.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد نتائج.</td></tr>'}</tbody></table></div></div>` : ''}`);
+            document.querySelectorAll('[data-admin-tab]').forEach(x => x.addEventListener('click', () => { activeTab = x.dataset.adminTab; history.replaceState(null, '', activeTab === 'overview' ? '/admin' : '/admin?tab=' + encodeURIComponent(activeTab)); draw(); }));
+            document.getElementById('openVerificationQueue')?.addEventListener('click', () => { activeTab = 'verification'; history.replaceState(null, '', '/admin?tab=verification'); draw(); });
+            document.getElementById('openAdminAccountSettings')?.addEventListener('click', () => openAdminAccountEditor());
+            document.getElementById('providerStatusFilter')?.addEventListener('change', e => { providerStatus = e.target.value; draw(); });
+            document.getElementById('orderStatusFilter')?.addEventListener('change', e => { orderStatus = e.target.value; draw(); });
+            document.querySelectorAll('[data-verify]').forEach(x => x.addEventListener('click', async () => { const z = x; z.disabled = true; try {
+                await api('/admin/providers/' + z.dataset.verify + '/verification', { method: 'PATCH', body: JSON.stringify({ status: 'VERIFIED' }) });
+                await draw();
+            }
+            catch (e) {
+                z.disabled = false;
+                alert(e.message);
+            } }));
+            document.querySelectorAll('[data-reject-provider]').forEach(x => x.addEventListener('click', async () => { const z = x; const reason = prompt('سبب رفض التوثيق (اختياري):', 'الوثائق غير مكتملة'); if (reason === null)
+                return; try {
+                await api('/admin/providers/' + z.dataset.rejectProvider + '/verification', { method: 'PATCH', body: JSON.stringify({ status: 'REJECTED', reason }) });
+                await draw();
+            }
+            catch (e) {
+                alert(e.message);
+            } }));
+            document.querySelectorAll('[data-admin-order]').forEach(x => x.addEventListener('click', () => openAdminOrder(x.dataset.adminOrder)));
+            document.querySelectorAll('[data-admin-file]').forEach(x => x.addEventListener('click', () => openPrivateFile(x.dataset.adminFile)));
+            document.querySelectorAll('[data-admin-complaint]').forEach(x => x.addEventListener('click', () => openAdminComplaint(x.dataset.adminComplaint)));
+            document.querySelectorAll('[data-user-status]').forEach(x => x.addEventListener('click', async () => { const z = x; const reason = prompt(z.dataset.nextStatus === 'SUSPENDED' ? 'سبب تعليق الحساب (اختياري):' : 'ملاحظة التفعيل (اختيارية):', ''); if (reason === null)
+                return; try {
+                await api('/admin/users/' + z.dataset.userStatus + '/status', { method: 'PATCH', body: JSON.stringify({ status: z.dataset.nextStatus, reason }) });
+                await draw();
+            }
+            catch (e) {
+                alert(e.message);
+            } }));
+            document.getElementById('newAdminAccount')?.addEventListener('click', () => openAdminEditor(null, draw));
+            document.querySelectorAll('[data-edit-admin]').forEach(x => x.addEventListener('click', () => openAdminEditor((admins.admins || []).find((z) => z.id === x.dataset.editAdmin), draw)));
+            document.querySelectorAll('[data-toggle-admin]').forEach(x => x.addEventListener('click', async () => { const z = x; try {
+                await api('/admin/admins/' + z.dataset.toggleAdmin, { method: 'PATCH', body: JSON.stringify({ status: z.dataset.nextAdminStatus }) });
+                await draw();
+            }
+            catch (e) {
+                alert(e.message);
+            } }));
+            document.getElementById('newCategory')?.addEventListener('click', () => openCategoryEditor(null, draw));
+            document.querySelectorAll('[data-edit-category]').forEach(x => x.addEventListener('click', () => openCategoryEditor(cats.find((z) => z.id === x.dataset.editCategory), draw)));
+            document.querySelectorAll('[data-edit-service]').forEach(x => x.addEventListener('click', () => openServiceEditor(allServices.find((z) => z.id === x.dataset.editService), cats, draw)));
+            document.getElementById('newArea')?.addEventListener('click', () => openAreaEditor(null, areas.areas || [], draw));
+            document.querySelectorAll('[data-edit-area]').forEach(x => x.addEventListener('click', () => openAreaEditor((areas.areas || []).find((z) => z.id === x.dataset.editArea), areas.areas || [], draw)));
+            document.querySelectorAll('[data-edit-setting]').forEach(x => x.addEventListener('click', () => editSetting(x.dataset.editSetting, settings.settings || [], draw)));
+        }
+        catch (e) {
+            shell(`<div class="card error">${esc(e.message)}</div>`);
+        }
+    };
+    await draw();
+}
+function openAdminAccountEditor() {
+    showModal(`<div class="admin-account-modal"><h2>إعدادات حساب الإدارة</h2><p class="muted">تغيير البريد أو كلمة المرور يتطلب كلمة المرور الحالية. بعد الحفظ تُلغى الجلسات القديمة ويُنشأ تسجيل دخول جديد.</p><form id="adminAccountEditor"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(state.user?.fullName || '')}" minlength="2" maxlength="80"></div><div class="field"><label>البريد الإلكتروني الجديد</label><input name="email" type="email" value="${esc(state.user?.email || '')}" autocomplete="email"></div><div class="field"><label>كلمة المرور الحالية</label><input name="currentPassword" type="password" autocomplete="current-password"></div><div class="field"><label>كلمة المرور الجديدة</label><input name="newPassword" type="password" autocomplete="new-password" minlength="10"><small class="muted">10 أحرف على الأقل وتحتوي على حرف ورقم.</small></div><button class="btn">حفظ التغييرات</button><p id="adminAccountMsg"></p></form></div>`);
+    document.getElementById('adminAccountEditor').addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const btn = form.querySelector('button'); btn.disabled = true; const f = new FormData(form); const body = { fullName: String(f.get('fullName') || '').trim() }; const email = String(f.get('email') || '').trim(); const cp = String(f.get('currentPassword') || ''); const np = String(f.get('newPassword') || ''); if (email)
+        body.email = email; if (cp)
+        body.currentPassword = cp; if (np)
+        body.newPassword = np; try {
+        const j = await api('/admin/account', { method: 'PATCH', body: JSON.stringify(body) });
+        saveSession(j);
+        closeModal();
+        await admin();
+    }
+    catch (x) {
+        btn.disabled = false;
+        document.getElementById('adminAccountMsg').textContent = x.message;
+        document.getElementById('adminAccountMsg').className = 'error';
+    } });
+}
+function openAdminEditor(admin, refresh) {
+    const isEdit = !!admin;
+    showModal(`<div class="admin-account-modal"><h2>${isEdit ? 'تعديل حساب إداري' : 'إضافة مشرف أو مدير'}</h2><p class="muted">كل حساب مستقل ويمكن إيقافه دون مشاركة كلمة المرور مع بقية الفريق.</p><form id="adminEditor"><div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(admin?.fullName || '')}" required minlength="2" maxlength="80"></div><div class="field"><label>الهاتف</label><input name="phone" value="${esc(admin?.phone || '')}" required></div><div class="field"><label>البريد الإلكتروني</label><input name="email" type="email" value="${esc(admin?.email || '')}" required></div><div class="field"><label>${isEdit ? 'كلمة المرور الجديدة (اختياري)' : 'كلمة المرور'}</label><input name="password" type="password" ${isEdit ? '' : 'required'} minlength="10"><small class="muted">10 أحرف على الأقل وتحتوي على حرف ورقم.</small></div><div class="field"><label>الصلاحية</label><select name="adminLevel"><option value="SUPPORT" ${admin?.adminLevel === 'SUPPORT' ? 'selected' : ''}>مشرف</option><option value="ADMIN" ${!admin || admin?.adminLevel === 'ADMIN' ? 'selected' : ''}>مدير</option></select></div></div><button class="btn">${isEdit ? 'حفظ التعديلات' : 'إنشاء الحساب'}</button><p id="adminEditorMsg"></p></form></div>`);
+    document.getElementById('adminEditor').addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const btn = form.querySelector('button'); btn.disabled = true; const f = new FormData(form); const body = { fullName: String(f.get('fullName')), phone: String(f.get('phone')), email: String(f.get('email')), adminLevel: String(f.get('adminLevel')) }; const pw = String(f.get('password') || ''); if (pw)
+        body.password = pw; try {
+        await api(isEdit ? '/admin/admins/' + admin.id : '/admin/admins', { method: isEdit ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+        closeModal();
+        await refresh();
+    }
+    catch (x) {
+        btn.disabled = false;
+        document.getElementById('adminEditorMsg').textContent = x.message;
+        document.getElementById('adminEditorMsg').className = 'error';
+    } });
+}
+function openCategoryEditor(cat, refresh) {
+    showModal(`<h2>${cat ? 'تعديل القسم' : 'إضافة قسم'}</h2><form id="categoryEditor"><div class="grid"><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(cat?.nameI18n?.ar || cat?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(cat?.nameI18n?.en || '')}"></div><div class="field"><label>Slug</label><input name="slug" value="${esc(cat?.slug || '')}" ${cat ? 'disabled' : ''} required></div><div class="field"><label>الأيقونة</label><input name="icon" value="${esc(cat?.icon || '')}"></div><div class="field"><label>ترتيب العرض</label><input name="sortOrder" type="number" value="${esc(cat?.sortOrder ?? 0)}"></div>${cat ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${cat.isActive ? 'selected' : ''}>نشط</option><option value="false" ${!cat.isActive ? 'selected' : ''}>معطل</option></select></div>` : ''}</div><div class="field"><label>الوصف</label><textarea name="description">${esc(cat?.descriptionI18n?.ar || cat?.description || '')}</textarea></div><button class="btn">حفظ</button></form>`);
+    document.getElementById('categoryEditor').addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.target); const body = { name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, description: { ar: String(f.get('description') || '') }, icon: String(f.get('icon') || ''), sortOrder: Number(f.get('sortOrder') || 0) }; if (!cat) {
+        body.slug = String(f.get('slug'));
+    }
+    else
+        body.isActive = String(f.get('isActive')) === 'true'; try {
+        await api(cat ? '/admin/categories/' + cat.id : '/admin/categories', { method: cat ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+        document.querySelector('.modal-backdrop')?.remove();
+        await refresh();
+    }
+    catch (x) {
+        alert(x.message);
+    } });
+}
+function openServiceEditor(sv, cats, refresh) {
+    const formSchema = sv?.formSchema || [];
+    showModal(`<h2>${sv ? 'تعديل الخدمة' : 'إضافة خدمة'}</h2><form id="serviceEditor"><div class="grid"><div class="field"><label>القسم</label><select name="categoryId" required>${cats.map((c) => `<option value="${esc(c.id)}" ${sv?.categoryId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>Slug</label><input name="slug" value="${esc(sv?.slug || '')}" ${sv ? 'disabled' : ''} required></div><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(sv?.nameI18n?.ar || sv?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(sv?.nameI18n?.en || '')}"></div><div class="field"><label>الأيقونة</label><input name="icon" value="${esc(sv?.icon || '')}"></div><div class="field"><label>نوع التسعير</label><select name="pricingType"><option value="FIXED" ${sv?.pricingType === 'FIXED' ? 'selected' : ''}>سعر ثابت</option><option value="QUOTE" ${sv?.pricingType === 'QUOTE' ? 'selected' : ''}>عرض سعر</option></select></div><div class="field"><label>السعر الأساسي</label><input name="basePrice" type="number" min="0" step="0.01" value="${esc(sv?.basePrice ?? '')}"></div><div class="field"><label>الأولوية</label><select name="defaultPriority"><option value="LOW" ${sv?.defaultPriority === 'LOW' ? 'selected' : ''}>منخفضة</option><option value="NORMAL" ${!sv || sv?.defaultPriority === 'NORMAL' ? 'selected' : ''}>عادية</option><option value="URGENT" ${sv?.defaultPriority === 'URGENT' ? 'selected' : ''}>عاجلة</option></select></div>${sv ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${sv.isActive !== false ? 'selected' : ''}>نشطة</option><option value="false" ${sv.isActive === false ? 'selected' : ''}>معطلة</option></select></div>` : ''}</div><div class="field"><label>الوصف</label><textarea name="description">${esc(sv?.descriptionI18n?.ar || sv?.description || '')}</textarea></div><div class="field"><label>مخطط نموذج الطلب JSON</label><textarea name="formSchema" style="min-height:180px;font-family:monospace">${esc(JSON.stringify(formSchema, null, 2))}</textarea><small class="muted">يجب أن يكون مصفوفة حقول صحيحة حسب مخطط الخدمة.</small></div><button class="btn">حفظ الخدمة</button></form>`);
+    const form = document.getElementById('serviceEditor');
+    form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); let fs; try {
+        fs = JSON.parse(String(f.get('formSchema') || '[]'));
+    }
+    catch {
+        alert('مخطط JSON غير صالح');
+        return;
+    } const body = { categoryId: String(f.get('categoryId')), name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, description: { ar: String(f.get('description') || '') }, icon: String(f.get('icon') || ''), pricingType: String(f.get('pricingType')), defaultPriority: String(f.get('defaultPriority')), basePrice: String(f.get('basePrice') || '') === '' ? undefined : Number(f.get('basePrice')), formSchema: fs }; if (!sv)
+        body.slug = String(f.get('slug'));
+    else
+        body.isActive = String(f.get('isActive')) === 'true'; try {
+        await api(sv ? '/admin/services/' + sv.id : '/admin/services', { method: sv ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+        document.querySelector('.modal-backdrop')?.remove();
+        await refresh();
+    }
+    catch (x) {
+        alert(x.message);
+    } });
+}
+function openAreaEditor(area, areas, refresh) {
+    showModal(`<h2>${area ? 'تعديل المنطقة' : 'إضافة منطقة'}</h2><form id="areaEditor"><div class="grid"><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(area?.nameI18n?.ar || area?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(area?.nameI18n?.en || '')}"></div><div class="field"><label>النوع</label><select name="type" ${area ? 'disabled' : ''}><option value="COUNTRY" ${area?.type === 'COUNTRY' ? 'selected' : ''}>دولة</option><option value="CITY" ${area?.type === 'CITY' ? 'selected' : ''}>مدينة</option><option value="DISTRICT" ${area?.type === 'DISTRICT' ? 'selected' : ''}>حي</option></select></div><div class="field"><label>المنطقة الأم</label><select name="parentId"><option value="">بدون</option>${areas.filter((x) => x.id !== area?.id).map((x) => `<option value="${esc(x.id)}" ${area?.parentId === x.id ? 'selected' : ''}>${esc(x.name)} (${esc(x.type)})</option>`).join('')}</select></div><div class="field"><label>خط العرض</label><input name="centerLat" type="number" step="0.000001" value="${esc(area?.centerLat ?? '')}" required></div><div class="field"><label>خط الطول</label><input name="centerLng" type="number" step="0.000001" value="${esc(area?.centerLng ?? '')}" required></div><div class="field"><label>نصف القطر كم</label><input name="radiusKm" type="number" min="0.1" max="5000" step="0.1" value="${esc(area?.radiusKm ?? 25)}" required></div>${area ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${area.isActive ? 'selected' : ''}>نشطة</option><option value="false" ${!area.isActive ? 'selected' : ''}>معطلة</option></select></div>` : ''}</div><button class="btn">حفظ المنطقة</button></form>`);
+    document.getElementById('areaEditor').addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.target); const body = { name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, centerLat: Number(f.get('centerLat')), centerLng: Number(f.get('centerLng')), radiusKm: Number(f.get('radiusKm')) }; if (!area) {
+        body.type = String(f.get('type'));
+        body.parentId = String(f.get('parentId') || '') || undefined;
+    }
+    else
+        body.isActive = String(f.get('isActive')) === 'true'; try {
+        await api(area ? '/admin/areas/' + area.id : '/admin/areas', { method: area ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+        document.querySelector('.modal-backdrop')?.remove();
+        await refresh();
+    }
+    catch (x) {
+        alert(x.message);
+    } });
+}
+async function editSetting(key, settings, refresh) { const item = settings.find(x => x.key === key); if (!item)
+    return; const value = prompt(`القيمة الجديدة للإعداد ${key}\n${item.description}`, JSON.stringify(item.value)); if (value === null)
+    return; let parsed; try {
+    parsed = JSON.parse(value);
+}
+catch {
+    parsed = value;
+} try {
+    await api('/admin/settings/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify({ value: parsed }) });
+    await refresh();
+}
+catch (e) {
+    alert(e.message);
+} }
+function adminProviderCard(p) {
+    const docs = (p.documents || []).filter((x) => x.docType === 'ID' || x.docType === 'LICENSE');
+    const actions = p.verificationStatus === 'PENDING' ? `<button class="btn" data-verify="${esc(p.id)}">توثيق الحساب</button><button class="btn secondary" data-reject-provider="${esc(p.id)}">رفض</button>` : '';
+    return `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(p.displayName)}</b><div class="muted">${esc(p.fullName)} · ${esc(p.phone)}</div><div class="muted">${esc(p.providerType)} · ${esc(p.email || 'بدون بريد')}</div></div><span class="status">${esc(p.verificationStatus)}</span></div><div class="row" style="margin-top:10px">${docs.map((x) => x.fileUrl ? `<button class="btn secondary small" type="button" data-admin-file="${esc(x.fileUrl)}">${esc(docTypeAr(x.docType))}</button>` : `<span class="muted">${esc(docTypeAr(x.docType))}: لا يوجد ملف</span>`).join('') || '<span class="muted">لا توجد وثائق هوية/ترخيص.</span>'}</div><div class="row" style="margin-top:10px"><span class="muted">التقييم: ${esc(p.rating ?? 0)} · الطلبات المكتملة: ${esc(p.completedOrders ?? 0)}</span>${actions}</div></div>`;
+}
+async function openAdminOrder(id) {
+    try {
+        const [j, h] = await Promise.all([api('/orders/' + encodeURIComponent(id)), api('/orders/' + encodeURIComponent(id) + '/history')]);
+        const o = j.order;
+        const loc = o.location || {};
+        const hasLoc = Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lng));
+        const lat = Number(loc.lat), lng = Number(loc.lng);
+        const mapUrl = hasLoc ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}` : '';
+        showModal(`<h2>${esc(o.code)}</h2><div class="grid"><div class="card"><b>الخدمة</b><p>${esc(o.service?.name || '—')}</p></div><div class="card"><b>الحالة</b><p>${esc(statusAr(o.status))}</p></div><div class="card"><b>العميل</b><p>${esc(o.customer?.fullName || '—')}</p></div><div class="card"><b>مقدم الخدمة</b><p>${esc(o.provider?.displayName || 'غير مسند')}</p></div></div><div class="card"><b>الوصف</b><p>${esc(o.description)}</p><p class="muted">أُنشئ: ${esc(formatDateTime(o.createdAt))}</p>${hasLoc ? `<a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح موقع الطلب على الخريطة</a>` : ''}</div><h3>سجل حالة الطلب</h3><div class="order-timeline">${(h.history || []).map((x) => `<div class="timeline-step done"><span class="timeline-dot">✓</span><div><b>${esc(statusAr(x.toStatus))}</b><small>${esc(formatDateTime(x.createdAt))} · ${esc(x.actorRole || '')}</small></div></div>`).join('')}</div>`);
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function openAdminComplaint(id) {
+    try {
+        const j = await api('/complaints/' + encodeURIComponent(id));
+        const c = j.complaint;
+        const msgs = j.messages || [];
+        const closed = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status);
+        const statusMap = { OPEN: 'جديدة', PROVIDER_REPLIED: 'بانتظار مراجعة الإدارة', UNDER_REVIEW: 'قيد المتابعة', RESOLVED: 'تم الحل', REJECTED: 'مرفوضة', CLOSED: 'مغلقة' };
+        const roleMap = { CUSTOMER: 'العميل', PROVIDER: 'مقدم الخدمة', ADMIN: 'الإدارة' };
+        showModal(`<div class="complaint-modal"><h2>⚠️ الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> <span class="status">${esc(statusMap[c.status] || c.status)}</span> · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>وصف الشكوى</b><p>${esc(c.description)}</p></div><h3>المحادثة</h3><div class="complaint-thread">${msgs.map((m) => `<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(roleMap[m.authorRole] || m.authorRole)}</b><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') || '<p class="muted">لا توجد رسائل بعد.</p>'}</div>${!closed ? `<form id="adminComplaintReplyForm" class="card" style="margin-top:12px"><h3>الرد على العميل</h3><div class="field"><label>رسالة الرد</label><textarea name="body" minlength="1" maxlength="1000" required placeholder="اكتب رد الإدارة للعميل بوضوح..."></textarea></div><button class="btn" type="submit">إرسال الرد</button></form><div class="card" style="margin-top:12px"><h3>إنهاء الشكوى</h3><p class="muted">بعد مراجعة المحادثة، اختر القرار النهائي. لن تُغلق الشكوى بمجرد الرد فقط.</p><div class="field"><label>القرار</label><select id="adminComplaintAction"><option value="RESTORE_COMPLETED">حل المشكلة وإبقاء الطلب مكتملًا</option><option value="CANCEL_ORDER">إلغاء الطلب</option><option value="WARN_PROVIDER">تنبيه مقدم الخدمة</option><option value="SUSPEND_PROVIDER">إيقاف مقدم الخدمة مؤقتًا</option><option value="DISMISS">رفض الشكوى لعدم ثبوتها</option></select></div><div class="field"><label>ملاحظة القرار</label><textarea id="adminComplaintNote" maxlength="500" placeholder="سبب القرار أو ما تم التحقق منه..."></textarea></div><button class="btn danger" id="closeComplaintBtn" type="button">إغلاق الشكوى وحفظ القرار</button></div>` : `<div class="notice success">تم إنهاء هذه الشكوى. يمكنك مراجعة كامل المراسلات والقرار أعلاه.</div>`}</div>`);
+        document.getElementById('adminComplaintReplyForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const btn = form.querySelector('button');
+            const body = String(new FormData(form).get('body') || '').trim();
+            if (!body)
+                return;
+            btn.disabled = true;
+            try {
+                await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', body: JSON.stringify({ body }) });
+                await openAdminComplaint(id);
+            }
+            catch (e) {
+                btn.disabled = false;
+                alert(e.message);
+            }
+        });
+        document.getElementById('closeComplaintBtn')?.addEventListener('click', async () => {
+            const action = String(document.getElementById('adminComplaintAction').value);
+            const note = document.getElementById('adminComplaintNote').value.trim();
+            const btn = document.getElementById('closeComplaintBtn');
+            btn.disabled = true;
+            try {
+                await api('/admin/complaints/' + encodeURIComponent(id) + '/action', { method: 'POST', body: JSON.stringify({ action, note }) });
+                alert('تم حفظ القرار وإغلاق الشكوى');
+                closeModal();
+                await admin();
+            }
+            catch (e) {
+                btn.disabled = false;
+                alert(e.message);
+            }
+        });
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
+async function resolveAdminComplaint(id, refresh) { await openAdminComplaint(id); }
+const restored = restoreSession();
+if (restored)
+    startRealtime().catch(() => { });
+if (page === 'provider')
+    provider();
+else if (page === 'admin')
+    admin();
+else
+    customer();

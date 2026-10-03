@@ -1,0 +1,25 @@
+{
+  "name": "khadamat",
+  "version": "0.5.15",
+  "description": "خدمات (Khadamat) — منصة خدمات متعددة متكاملة (MVP operational)",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/postbuild.mjs && tsc -p web.tsconfig.json",
+    "start": "node dist/src/server.js",
+    "dev": "node --watch dist/src/server.js",
+    "migrate": "node dist/src/db/cli.js migrate",
+    "seed": "node dist/src/db/cli.js seed",
+    "seed:demo": "node dist/src/db/cli.js seed --demo",
+    "backup": "node dist/src/db/cli.js backup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test --test-concurrency=1 \"dist/test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  }
+}

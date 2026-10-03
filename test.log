@@ -1,0 +1,990 @@
+
+> khadamat@0.5.5 test
+> npm run build && node --test --test-concurrency=1 "dist/test/**/*.test.js"
+
+
+> khadamat@0.5.5 build
+> node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/postbuild.mjs && tsc -p web.tsconfig.json
+
+Cleaned dist.
+Build assets copied.
+TAP version 13
+# (node:1170) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: إدارة الكتالوج التشغيلية: قراءة وإنشاء وتعديل وتعطيل
+ok 1 - إدارة الكتالوج التشغيلية: قراءة وإنشاء وتعديل وتعطيل
+  ---
+  duration_ms: 186.501884
+  type: 'test'
+  ...
+# Subtest: إدارة المناطق والإعدادات: صلاحيات القراءة والتعديل محفوظة
+ok 2 - إدارة المناطق والإعدادات: صلاحيات القراءة والتعديل محفوظة
+  ---
+  duration_ms: 104.925937
+  type: 'test'
+  ...
+# (node:1184) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Registration
+    # Subtest: عميل جديد: 201 + توكن + لا يظهر password_hash
+    ok 1 - عميل جديد: 201 + توكن + لا يظهر password_hash
+      ---
+      duration_ms: 59.053296
+      type: 'test'
+      ...
+    # Subtest: كلمة المرور مخزنة مجزأة (scrypt) وليست نصًا صريحًا
+    ok 2 - كلمة المرور مخزنة مجزأة (scrypt) وليست نصًا صريحًا
+      ---
+      duration_ms: 47.400723
+      type: 'test'
+      ...
+    # Subtest: الكوكي HttpOnly + SameSite=Strict
+    ok 3 - الكوكي HttpOnly + SameSite=Strict
+      ---
+      duration_ms: 51.261292
+      type: 'test'
+      ...
+    # Subtest: هاتف مكرر → 409
+    ok 4 - هاتف مكرر → 409
+      ---
+      duration_ms: 89.111802
+      type: 'test'
+      ...
+    # Subtest: تطبيع الأرقام العربية في الهاتف (تكرار مكتشف)
+    ok 5 - تطبيع الأرقام العربية في الهاتف (تكرار مكتشف)
+      ---
+      duration_ms: 76.774321
+      type: 'test'
+      ...
+    # Subtest: كلمة مرور ضعيفة → 422
+    ok 6 - كلمة مرور ضعيفة → 422
+      ---
+      duration_ms: 6.340494
+      type: 'test'
+      ...
+    # Subtest: هاتف/بريد غير صالح → 422
+    ok 7 - هاتف/بريد غير صالح → 422
+      ---
+      duration_ms: 4.584667
+      type: 'test'
+      ...
+    # Subtest: لا يمكن التسجيل كمدير (تصعيد صلاحيات) → 422
+    ok 8 - لا يمكن التسجيل كمدير (تصعيد صلاحيات) → 422
+      ---
+      duration_ms: 1.762057
+      type: 'test'
+      ...
+    # Subtest: حقل role غير معروف/حقول زائدة تُتجاهل: لا يمكن حقن adminLevel
+    ok 9 - حقل role غير معروف/حقول زائدة تُتجاهل: لا يمكن حقن adminLevel
+      ---
+      duration_ms: 39.94785
+      type: 'test'
+      ...
+    # Subtest: مقدم خدمة: يتطلب بيانات provider وينشأ بحالة PENDING
+    ok 10 - مقدم خدمة: يتطلب بيانات provider وينشأ بحالة PENDING
+      ---
+      duration_ms: 43.161987
+      type: 'test'
+      ...
+    # Subtest: شركة باسم النشاط/الاسم الظاهر من الواجهة → تُقبل ويُحفظ اسم الشركة
+    ok 11 - شركة باسم النشاط/الاسم الظاهر من الواجهة → تُقبل ويُحفظ اسم الشركة
+      ---
+      duration_ms: 42.465561
+      type: 'test'
+      ...
+    # Subtest: شركة بدون اسم شركة → 422
+    ok 12 - شركة بدون اسم شركة → 422
+      ---
+      duration_ms: 1.8324
+      type: 'test'
+      ...
+    1..12
+ok 3 - Registration
+  ---
+  duration_ms: 504.599055
+  type: 'suite'
+  ...
+# Subtest: Login
+    # Subtest: دخول بالهاتف وبالبريد
+    ok 1 - دخول بالهاتف وبالبريد
+      ---
+      duration_ms: 117.587236
+      type: 'test'
+      ...
+    # Subtest: كلمة مرور خاطئة ومستخدم غير موجود → نفس الرسالة (لا تعداد حسابات)
+    ok 2 - كلمة مرور خاطئة ومستخدم غير موجود → نفس الرسالة (لا تعداد حسابات)
+      ---
+      duration_ms: 158.401192
+      type: 'test'
+      ...
+    # Subtest: حساب معلّق لا يستطيع الدخول
+    ok 3 - حساب معلّق لا يستطيع الدخول
+      ---
+      duration_ms: 77.157455
+      type: 'test'
+      ...
+    # Subtest: حقن SQL في identifier لا يكسر شيئًا
+    ok 4 - حقن SQL في identifier لا يكسر شيئًا
+      ---
+      duration_ms: 39.017839
+      type: 'test'
+      ...
+    1..4
+ok 4 - Login
+  ---
+  duration_ms: 392.591803
+  type: 'suite'
+  ...
+# Subtest: Tokens & Sessions
+    # Subtest: /auth/me بدون توكن → 401، بتوكن صحيح → 200
+    ok 1 - /auth/me بدون توكن → 401، بتوكن صحيح → 200
+      ---
+      duration_ms: 40.047336
+      type: 'test'
+      ...
+    # Subtest: توكن معبوث به (signature) مرفوض
+    ok 2 - توكن معبوث به (signature) مرفوض
+      ---
+      duration_ms: 42.468946
+      type: 'test'
+      ...
+    # Subtest: توكن alg=none مرفوض
+    ok 3 - توكن alg=none مرفوض
+      ---
+      duration_ms: 40.970938
+      type: 'test'
+      ...
+    # Subtest: توكن موقّع بمفتاح آخر مرفوض
+    ok 4 - توكن موقّع بمفتاح آخر مرفوض
+      ---
+      duration_ms: 40.003598
+      type: 'test'
+      ...
+    # Subtest: انتهاء صلاحية Access Token
+    ok 5 - انتهاء صلاحية Access Token
+      ---
+      duration_ms: 39.634709
+      type: 'test'
+      ...
+    # Subtest: Refresh: تدوير التوكن + رفض إعادة الاستخدام + إبطال العائلة
+    ok 6 - Refresh: تدوير التوكن + رفض إعادة الاستخدام + إبطال العائلة
+      ---
+      duration_ms: 47.211246
+      type: 'test'
+      ...
+    # Subtest: Refresh بدون ترويسة X-Requested-With → 403 (CSRF)
+    ok 7 - Refresh بدون ترويسة X-Requested-With → 403 (CSRF)
+      ---
+      duration_ms: 39.93915
+      type: 'test'
+      ...
+    # Subtest: Refresh منتهي الصلاحية → 401
+    ok 8 - Refresh منتهي الصلاحية → 401
+      ---
+      duration_ms: 39.886832
+      type: 'test'
+      ...
+    # Subtest: Logout يبطل الـRefresh
+    ok 9 - Logout يبطل الـRefresh
+      ---
+      duration_ms: 40.056839
+      type: 'test'
+      ...
+    # Subtest: تغيير كلمة المرور: يبطل التوكنات القديمة وكلمة المرور القديمة
+    ok 10 - تغيير كلمة المرور: يبطل التوكنات القديمة وكلمة المرور القديمة
+      ---
+      duration_ms: 235.375097
+      type: 'test'
+      ...
+    1..10
+ok 5 - Tokens & Sessions
+  ---
+  duration_ms: 606.292758
+  type: 'suite'
+  ...
+# Subtest: Roles & Permissions
+    # Subtest: عميل/مزود لا يصلان لمسارات الإدارة → 403، وبدون توكن → 401
+    ok 1 - عميل/مزود لا يصلان لمسارات الإدارة → 403، وبدون توكن → 401
+      ---
+      duration_ms: 79.128914
+      type: 'test'
+      ...
+    # Subtest: عميل لا يصل لمسارات المزود والعكس
+    ok 2 - عميل لا يصل لمسارات المزود والعكس
+      ---
+      duration_ms: 77.540863
+      type: 'test'
+      ...
+    # Subtest: المدير يصل لقائمة المستخدمين ولا تحتوي hash
+    ok 3 - المدير يصل لقائمة المستخدمين ولا تحتوي hash
+      ---
+      duration_ms: 42.935985
+      type: 'test'
+      ...
+    # Subtest: مستويات الإدارة: SUPER_ADMIN ينشئ ADMIN/SUPPORT، وSUPPORT لا يستطيع
+    ok 4 - مستويات الإدارة: SUPER_ADMIN ينشئ ADMIN/SUPPORT، وSUPPORT لا يستطيع
+      ---
+      duration_ms: 159.200126
+      type: 'test'
+      ...
+    # Subtest: تعليق مستخدم: يبطل توكنه فورًا + Audit Log + يمنع الدخول، وإعادة التفعيل
+    ok 5 - تعليق مستخدم: يبطل توكنه فورًا + Audit Log + يمنع الدخول، وإعادة التفعيل
+      ---
+      duration_ms: 165.500857
+      type: 'test'
+      ...
+    # Subtest: المدير لا يعلّق نفسه
+    ok 6 - المدير لا يعلّق نفسه
+      ---
+      duration_ms: 43.369334
+      type: 'test'
+      ...
+    1..6
+ok 6 - Roles & Permissions
+  ---
+  duration_ms: 568.480565
+  type: 'suite'
+  ...
+# Subtest: Rate limiting
+    # Subtest: تسجيل الدخول: بعد 8 محاولات فاشلة لنفس الحساب → 429
+    ok 1 - تسجيل الدخول: بعد 8 محاولات فاشلة لنفس الحساب → 429
+      ---
+      duration_ms: 404.4431
+      type: 'test'
+      ...
+    1..1
+ok 7 - Rate limiting
+  ---
+  duration_ms: 404.893414
+  type: 'suite'
+  ...
+# (node:1195) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# {"t":"2026-09-29T14:06:56.802Z","level":"info","msg":"migration applied: 001_init.sql"}
+# {"t":"2026-09-29T14:06:56.803Z","level":"info","msg":"migration applied: 002_dispatch.sql"}
+# {"t":"2026-09-29T14:06:56.803Z","level":"info","msg":"migration applied: 002_provider_documents_unique.sql"}
+# {"t":"2026-09-29T14:06:56.805Z","level":"info","msg":"migration applied: 003_order_chat.sql"}
+# {"t":"2026-09-29T14:06:56.822Z","level":"info","msg":"request","requestId":"c91f34a1-a793-43db-bfda-087f21f3a8ab","method":"GET","path":"/api/v1/orders/nope/messages","status":401,"ms":3}
+# Subtest: platform exposes payment and chat routes without cross-order access
+ok 8 - platform exposes payment and chat routes without cross-order access
+  ---
+  duration_ms: 30.869183
+  type: 'test'
+  ...
+# (node:1206) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: الإعدادات الافتراضية: اليمن / YER / Asia/Aden / العربية
+    # Subtest: سجل الإعدادات لا يحتوي USD أو UTC كقيم تشغيلية
+    ok 1 - سجل الإعدادات لا يحتوي USD أو UTC كقيم تشغيلية
+      ---
+      duration_ms: 0.627224
+      type: 'test'
+      ...
+    # Subtest: Seed يكتب الإعدادات في جدول system_settings (قابلة للتعديل من DB)
+    ok 2 - Seed يكتب الإعدادات في جدول system_settings (قابلة للتعديل من DB)
+      ---
+      duration_ms: 0.300733
+      type: 'test'
+      ...
+    # Subtest: GET /config: يمن، ريال، عدن، عربي RTL، الإنجليزية جاهزة
+    ok 3 - GET /config: يمن، ريال، عدن، عربي RTL، الإنجليزية جاهزة
+      ---
+      duration_ms: 18.661942
+      type: 'test'
+      ...
+    # Subtest: أسعار الخدمات تُعرض بعملة YER
+    ok 4 - أسعار الخدمات تُعرض بعملة YER
+      ---
+      duration_ms: 4.627901
+      type: 'test'
+      ...
+    # Subtest: لا قاهرة ولا مدن/عملات مبرمجة في الشيفرة
+    ok 5 - لا قاهرة ولا مدن/عملات مبرمجة في الشيفرة
+      ---
+      duration_ms: 1.261679
+      type: 'test'
+      ...
+    1..5
+ok 9 - الإعدادات الافتراضية: اليمن / YER / Asia/Aden / العربية
+  ---
+  duration_ms: 67.710596
+  type: 'suite'
+  ...
+# Subtest: تعديل الإعدادات من الإدارة
+    # Subtest: SUPER_ADMIN يعدّل الإعداد ويُسجَّل في Audit ويتغير /config فورًا
+    ok 1 - SUPER_ADMIN يعدّل الإعداد ويُسجَّل في Audit ويتغير /config فورًا
+      ---
+      duration_ms: 59.281675
+      type: 'test'
+      ...
+    # Subtest: قيمة غير صالحة → 422، وإعداد مجهول → 404
+    ok 2 - قيمة غير صالحة → 422، وإعداد مجهول → 404
+      ---
+      duration_ms: 49.573167
+      type: 'test'
+      ...
+    # Subtest: غير SUPER_ADMIN لا يعدّل الإعدادات (ADMIN يقرأ فقط، العميل ممنوع)
+    ok 3 - غير SUPER_ADMIN لا يعدّل الإعدادات (ADMIN يقرأ فقط، العميل ممنوع)
+      ---
+      duration_ms: 168.300387
+      type: 'test'
+      ...
+    1..3
+ok 10 - تعديل الإعدادات من الإدارة
+  ---
+  duration_ms: 277.747131
+  type: 'suite'
+  ...
+# Subtest: المناطق قابلة للتعديل من DB (بيانات يمنية للاختبار)
+    # Subtest: seed:demo ينشئ مناطق يمنية فقط بشجرة دولة ← مدينة ← مديرية، ويرفض الإنتاج
+    ok 1 - seed:demo ينشئ مناطق يمنية فقط بشجرة دولة ← مدينة ← مديرية، ويرفض الإنتاج
+      ---
+      duration_ms: 83.492795
+      type: 'test'
+      ...
+    # Subtest: المدير يضيف منطقة جديدة ويعطّلها بدون تعديل كود
+    ok 2 - المدير يضيف منطقة جديدة ويعطّلها بدون تعديل كود
+      ---
+      duration_ms: 55.842011
+      type: 'test'
+      ...
+    # Subtest: منطقة بإحداثيات أو أب غير صالح → 422، والعميل ممنوع
+    ok 3 - منطقة بإحداثيات أو أب غير صالح → 422، والعميل ممنوع
+      ---
+      duration_ms: 90.941157
+      type: 'test'
+      ...
+    1..3
+ok 11 - المناطق قابلة للتعديل من DB (بيانات يمنية للاختبار)
+  ---
+  duration_ms: 230.558889
+  type: 'suite'
+  ...
+# Subtest: المنطقة الزمنية Asia/Aden في حساب التوفر
+    # Subtest: الاثنين 09:00 بتوقيت عدن (UTC+3) = 06:00 UTC: متاح ضمن 09:00-17:00 وغير متاح 08:59
+    ok 1 - الاثنين 09:00 بتوقيت عدن (UTC+3) = 06:00 UTC: متاح ضمن 09:00-17:00 وغير متاح 08:59
+      ---
+      duration_ms: 69.927237
+      type: 'test'
+      ...
+    1..1
+ok 12 - المنطقة الزمنية Asia/Aden في حساب التوفر
+  ---
+  duration_ms: 70.188133
+  type: 'suite'
+  ...
+# Subtest: الواجهة النهائية: حسابي والإشعارات والتنقل موجودة في shell
+ok 13 - الواجهة النهائية: حسابي والإشعارات والتنقل موجودة في shell
+  ---
+  duration_ms: 0.693101
+  type: 'test'
+  ...
+# Subtest: مقدم الخدمة: إدارة المناطق وأوقات العمل مربوطة بالـAPI
+ok 14 - مقدم الخدمة: إدارة المناطق وأوقات العمل مربوطة بالـAPI
+  ---
+  duration_ms: 0.386389
+  type: 'test'
+  ...
+# Subtest: الملفات الخاصة: عرض وثائق الإدارة يمر عبر جلسة المصادقة
+ok 15 - الملفات الخاصة: عرض وثائق الإدارة يمر عبر جلسة المصادقة
+  ---
+  duration_ms: 0.390586
+  type: 'test'
+  ...
+# Subtest: Google Maps location URL must use api=1 and exact latitude/longitude
+ok 16 - Google Maps location URL must use api=1 and exact latitude/longitude
+  ---
+  duration_ms: 0.721904
+  type: 'test'
+  ...
+# Subtest: OpenStreetMap location URL must contain exact latitude/longitude
+ok 17 - OpenStreetMap location URL must contain exact latitude/longitude
+  ---
+  duration_ms: 0.205783
+  type: 'test'
+  ...
+# Subtest: Google Maps directions URL uses the exact saved destination coordinates
+ok 18 - Google Maps directions URL uses the exact saved destination coordinates
+  ---
+  duration_ms: 0.105816
+  type: 'test'
+  ...
+# Subtest: saved GPS coordinates are never replaced by an area name
+ok 19 - saved GPS coordinates are never replaced by an area name
+  ---
+  duration_ms: 0.17001
+  type: 'test'
+  ...
+# (node:1239) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: دورة الطلب الكاملة (Core Flow) — سعر ثابت
+    # Subtest: عميل ينشئ طلبًا → يصل لمزود موثق → يقبل ذرّيًا → ON_THE_WAY → IN_PROGRESS → COMPLETED → سجل كامل → إشعارات → تقييم
+    ok 1 - عميل ينشئ طلبًا → يصل لمزود موثق → يقبل ذرّيًا → ON_THE_WAY → IN_PROGRESS → COMPLETED → سجل كامل → إشعارات → تقييم
+      ---
+      duration_ms: 339.89891
+      type: 'test'
+      ...
+    # Subtest: الإسناد المباشر يختار أقرب مقدم خدمة أولًا
+    ok 2 - الإسناد المباشر يختار أقرب مقدم خدمة أولًا
+      ---
+      duration_ms: 172.562588
+      type: 'test'
+      ...
+    1..2
+ok 20 - دورة الطلب الكاملة (Core Flow) — سعر ثابت
+  ---
+  duration_ms: 555.759313
+  type: 'suite'
+  ...
+# Subtest: دورة الطلب — خدمة بعرض سعر (QUOTE)
+    # Subtest: عدة عروض أسعار → العميل يقبل واحدًا → يُسند الطلب لصاحبه وتُغلق بقية العروض
+    ok 1 - عدة عروض أسعار → العميل يقبل واحدًا → يُسند الطلب لصاحبه وتُغلق بقية العروض
+      ---
+      duration_ms: 204.852024
+      type: 'test'
+      ...
+    1..1
+ok 21 - دورة الطلب — خدمة بعرض سعر (QUOTE)
+  ---
+  duration_ms: 205.0936
+  type: 'suite'
+  ...
+# Subtest: الإلغاء
+    # Subtest: إلغاء قبل القبول لا رسوم؛ وبعده حسب سياسة الإلغاء + إشعار المزود
+    ok 1 - إلغاء قبل القبول لا رسوم؛ وبعده حسب سياسة الإلغاء + إشعار المزود
+      ---
+      duration_ms: 132.171854
+      type: 'test'
+      ...
+    # Subtest: مزود لا يستطيع إلغاء طلب مزود آخر
+    ok 2 - مزود لا يستطيع إلغاء طلب مزود آخر
+      ---
+      duration_ms: 182.76154
+      type: 'test'
+      ...
+    1..2
+ok 22 - الإلغاء
+  ---
+  duration_ms: 315.300885
+  type: 'suite'
+  ...
+# Subtest: الشكاوى
+    # Subtest: عميل يفتح شكوى على طلب قيد التنفيذ → DISPUTED → المزود يرد → الإدارة تحسم وتعيد الطلب COMPLETED
+    ok 1 - عميل يفتح شكوى على طلب قيد التنفيذ → DISPUTED → المزود يرد → الإدارة تحسم وتعيد الطلب COMPLETED
+      ---
+      duration_ms: 247.351005
+      type: 'test'
+      ...
+    # Subtest: شكوى نشطة واحدة كحد أقصى لكل طلب (409) — على طلب مكتمل لا يتغيّر وضعه بفتح الشكوى
+    ok 2 - شكوى نشطة واحدة كحد أقصى لكل طلب (409) — على طلب مكتمل لا يتغيّر وضعه بفتح الشكوى
+      ---
+      duration_ms: 134.908157
+      type: 'test'
+      ...
+    # Subtest: قرار SUSPEND_PROVIDER يعلّق المزود فعليًا في قاعدة البيانات
+    ok 3 - قرار SUSPEND_PROVIDER يعلّق المزود فعليًا في قاعدة البيانات
+      ---
+      duration_ms: 168.638361
+      type: 'test'
+      ...
+    1..3
+ok 23 - الشكاوى
+  ---
+  duration_ms: 551.4385
+  type: 'suite'
+  ...
+# Subtest: التحقق من نموذج الطلب الديناميكي (على الخادم)
+    # Subtest: حقل إلزامي مفقود في form_schema → 422، وحقول غير معرّفة تُحذف
+    ok 1 - حقل إلزامي مفقود في form_schema → 422، وحقول غير معرّفة تُحذف
+      ---
+      duration_ms: 80.187715
+      type: 'test'
+      ...
+    # Subtest: خدمة أو منطقة غير مخدومة → أخطاء واضحة
+    ok 2 - خدمة أو منطقة غير مخدومة → أخطاء واضحة
+      ---
+      duration_ms: 40.792267
+      type: 'test'
+      ...
+    1..2
+ok 24 - التحقق من نموذج الطلب الديناميكي (على الخادم)
+  ---
+  duration_ms: 121.160717
+  type: 'suite'
+  ...
+# Subtest: الجدولة: انتهاء مهلة العروض وتقدّم الموجات
+    # Subtest: انتهاء مهلة عرض المزود الأول يفتح موجة جديدة لمزود آخر لم يُستبعد بعد؛ واستنفاد كل المرشحين يُنبّه العميل والإدارة
+    ok 1 - انتهاء مهلة عرض المزود الأول يفتح موجة جديدة لمزود آخر لم يُستبعد بعد؛ واستنفاد كل المرشحين يُنبّه العميل والإدارة
+      ---
+      duration_ms: 211.445631
+      type: 'test'
+      ...
+    1..1
+ok 25 - الجدولة: انتهاء مهلة العروض وتقدّم الموجات
+  ---
+  duration_ms: 211.568943
+  type: 'suite'
+  ...
+# Subtest: حدود عدد الطلبات النشطة
+    # Subtest: تجاوز الحد الأقصى للطلبات النشطة للعميل يُرفض
+    ok 1 - تجاوز الحد الأقصى للطلبات النشطة للعميل يُرفض
+      ---
+      duration_ms: 166.388916
+      type: 'test'
+      ...
+    1..1
+ok 26 - حدود عدد الطلبات النشطة
+  ---
+  duration_ms: 166.512177
+  type: 'suite'
+  ...
+# Subtest: منع إنشاء طلب مكرر بالضغط/الإرسال المتكرر خلال دقيقة
+ok 27 - منع إنشاء طلب مكرر بالضغط/الإرسال المتكرر خلال دقيقة
+  ---
+  duration_ms: 82.578944
+  type: 'test'
+  ...
+# (node:1250) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Database & Seed
+    # Subtest: الجداول المطلوبة كلها موجودة
+    ok 1 - الجداول المطلوبة كلها موجودة
+      ---
+      duration_ms: 0.808782
+      type: 'test'
+      ...
+    # Subtest: المفاتيح الأجنبية مفعّلة والقيود تعمل (تقييم 6 مرفوض)
+    ok 2 - المفاتيح الأجنبية مفعّلة والقيود تعمل (تقييم 6 مرفوض)
+      ---
+      duration_ms: 0.446999
+      type: 'test'
+      ...
+    # Subtest: الأقسام الأساسية بأسمائها الصحيحة وبالترتيب
+    ok 3 - الأقسام الأساسية بأسمائها الصحيحة وبالترتيب
+      ---
+      duration_ms: 16.893937
+      type: 'test'
+      ...
+    # Subtest: خدمات المنزل تحتوي الخدمات المطلوبة
+    ok 4 - خدمات المنزل تحتوي الخدمات المطلوبة
+      ---
+      duration_ms: 5.053898
+      type: 'test'
+      ...
+    # Subtest: خدمات السيارات تحتوي خدمات النظافة والإنقاذ والبطارية والصيانة القابلة للتوسع
+    ok 5 - خدمات السيارات تحتوي خدمات النظافة والإنقاذ والبطارية والصيانة القابلة للتوسع
+      ---
+      duration_ms: 5.46933
+      type: 'test'
+      ...
+    # Subtest: النقل يحتوي الخدمات المطلوبة
+    ok 6 - النقل يحتوي الخدمات المطلوبة
+      ---
+      duration_ms: 1.79854
+      type: 'test'
+      ...
+    # Subtest: Seed قابل لإعادة التشغيل بدون تكرار
+    ok 7 - Seed قابل لإعادة التشغيل بدون تكرار
+      ---
+      duration_ms: 0.403244
+      type: 'test'
+      ...
+    # Subtest: نوعا التسعير موجودان: FIXED و QUOTE، وFIXED لا يُقبل بلا سعر (CHECK)
+    ok 8 - نوعا التسعير موجودان: FIXED و QUOTE، وFIXED لا يُقبل بلا سعر (CHECK)
+      ---
+      duration_ms: 0.326581
+      type: 'test'
+      ...
+    # Subtest: الكتالوج ديناميكي: إضافة خدمة/قسم في DB تظهر فورًا بدون تعديل كود
+    ok 9 - الكتالوج ديناميكي: إضافة خدمة/قسم في DB تظهر فورًا بدون تعديل كود
+      ---
+      duration_ms: 4.089106
+      type: 'test'
+      ...
+    # Subtest: GET /services/:id يعيد formSchema
+    ok 10 - GET /services/:id يعيد formSchema
+      ---
+      duration_ms: 4.380475
+      type: 'test'
+      ...
+    1..10
+ok 28 - Database & Seed
+  ---
+  duration_ms: 81.670079
+  type: 'suite'
+  ...
+# Subtest: Dynamic form validation (server-side)
+    # Subtest: يقبل بيانات صحيحة ويحذف الحقول غير المعرّفة
+    ok 1 - يقبل بيانات صحيحة ويحذف الحقول غير المعرّفة
+      ---
+      duration_ms: 0.298941
+      type: 'test'
+      ...
+    # Subtest: يرفض حقلًا إلزاميًا مفقودًا وقيمًا خارج النطاق وخيارًا غير مسموح
+    ok 2 - يرفض حقلًا إلزاميًا مفقودًا وقيمًا خارج النطاق وخيارًا غير مسموح
+      ---
+      duration_ms: 0.371277
+      type: 'test'
+      ...
+    1..2
+ok 29 - Dynamic form validation (server-side)
+  ---
+  duration_ms: 0.772439
+  type: 'suite'
+  ...
+# Subtest: Intent search (keyword)
+    # Subtest: «المكيف خربان وأحتاج شخص يصلحه اليوم» → تكييف + URGENT
+    ok 1 - «المكيف خربان وأحتاج شخص يصلحه اليوم» → تكييف + URGENT
+      ---
+      duration_ms: 8.16916
+      type: 'test'
+      ...
+    # Subtest: «أحتاج كهربائيًا يصل إلى منزلي» → كهرباء
+    ok 2 - «أحتاج كهربائيًا يصل إلى منزلي» → كهرباء
+      ---
+      duration_ms: 7.039194
+      type: 'test'
+      ...
+    # Subtest: «أحتاج تنظيف مبنى كامل» → تنظيف (QUOTE)
+    ok 3 - «أحتاج تنظيف مبنى كامل» → تنظيف (QUOTE)
+      ---
+      duration_ms: 2.617588
+      type: 'test'
+      ...
+    # Subtest: نص بلا تطابق → قائمة فارغة
+    ok 4 - نص بلا تطابق → قائمة فارغة
+      ---
+      duration_ms: 2.589937
+      type: 'test'
+      ...
+    1..4
+ok 30 - Intent search (keyword)
+  ---
+  duration_ms: 20.72323
+  type: 'suite'
+  ...
+# Subtest: Provider profile basics & privacy
+    # Subtest: مزود غير موثق: لا يستطيع Online، والملف العام 404 للغرباء ويظهر لصاحبه وللإدارة
+    ok 1 - مزود غير موثق: لا يستطيع Online، والملف العام 404 للغرباء ويظهر لصاحبه وللإدارة
+      ---
+      duration_ms: 110.425005
+      type: 'test'
+      ...
+    # Subtest: شارة «موثق» لا تظهر إلا بعد VERIFIED
+    ok 2 - شارة «موثق» لا تظهر إلا بعد VERIFIED
+      ---
+      duration_ms: 47.558303
+      type: 'test'
+      ...
+    # Subtest: مزود يحدد خدماته ومناطقه وأوقات عمله
+    ok 3 - مزود يحدد خدماته ومناطقه وأوقات عمله
+      ---
+      duration_ms: 52.949312
+      type: 'test'
+      ...
+    1..3
+ok 31 - Provider profile basics & privacy
+  ---
+  duration_ms: 211.257449
+  type: 'suite'
+  ...
+# Subtest: Addresses & profile
+    # Subtest: عميل: عنوان جديد يُحدَّد منطقته من الإحداثيات ويكون الافتراضي
+    ok 1 - عميل: عنوان جديد يُحدَّد منطقته من الإحداثيات ويكون الافتراضي
+      ---
+      duration_ms: 47.344293
+      type: 'test'
+      ...
+    # Subtest: عميل لا يعدّل/يحذف عنوان غيره (IDOR)
+    ok 2 - عميل لا يعدّل/يحذف عنوان غيره (IDOR)
+      ---
+      duration_ms: 82.530878
+      type: 'test'
+      ...
+    # Subtest: تعديل الملف الشخصي
+    ok 3 - تعديل الملف الشخصي
+      ---
+      duration_ms: 80.525121
+      type: 'test'
+      ...
+    1..3
+ok 32 - Addresses & profile
+  ---
+  duration_ms: 210.629338
+  type: 'suite'
+  ...
+# Subtest: Files
+    # Subtest: رفع صورة صحيحة، والملف الخاص لا يقرؤه غير مالكه
+    ok 1 - رفع صورة صحيحة، والملف الخاص لا يقرؤه غير مالكه
+      ---
+      duration_ms: 82.623434
+      type: 'test'
+      ...
+    # Subtest: ملف تنفيذي/نص متنكر بنوع صورة مرفوض (فحص التوقيع)
+    ok 2 - ملف تنفيذي/نص متنكر بنوع صورة مرفوض (فحص التوقيع)
+      ---
+      duration_ms: 41.898366
+      type: 'test'
+      ...
+    # Subtest: الصورة الشخصية عامة (تُعرض بدون توكن)
+    ok 3 - الصورة الشخصية عامة (تُعرض بدون توكن)
+      ---
+      duration_ms: 43.837604
+      type: 'test'
+      ...
+    1..3
+ok 33 - Files
+  ---
+  duration_ms: 168.611847
+  type: 'suite'
+  ...
+# Subtest: HTTP hardening
+    # Subtest: ترويسات الأمان موجودة
+    ok 1 - ترويسات الأمان موجودة
+      ---
+      duration_ms: 1.826181
+      type: 'test'
+      ...
+    # Subtest: JSON غير صالح → 400، محتوى غير JSON → 415
+    ok 2 - JSON غير صالح → 400، محتوى غير JSON → 415
+      ---
+      duration_ms: 2.520525
+      type: 'test'
+      ...
+    # Subtest: طلب ضخم → 413
+    ok 3 - طلب ضخم → 413
+      ---
+      duration_ms: 3.000411
+      type: 'test'
+      ...
+    # Subtest: مسار غير موجود 404، طريقة خاطئة 405
+    ok 4 - مسار غير موجود 404، طريقة خاطئة 405
+      ---
+      duration_ms: 2.445624
+      type: 'test'
+      ...
+    # Subtest: Path traversal على الملفات الثابتة لا يسرّب شيئًا
+    ok 5 - Path traversal على الملفات الثابتة لا يسرّب شيئًا
+      ---
+      duration_ms: 2.228394
+      type: 'test'
+      ...
+    # Subtest: أخطاء الخادم لا تسرّب تفاصيل داخلية
+    ok 6 - أخطاء الخادم لا تسرّب تفاصيل داخلية
+      ---
+      duration_ms: 1.208171
+      type: 'test'
+      ...
+    # Subtest: حالات الطلب: آلة الحالات تمنع القفزات
+    ok 7 - حالات الطلب: آلة الحالات تمنع القفزات
+      ---
+      duration_ms: 0.170781
+      type: 'test'
+      ...
+    1..7
+ok 34 - HTTP hardening
+  ---
+  duration_ms: 13.658659
+  type: 'suite'
+  ...
+# Subtest: customer portal link points directly to provider page
+ok 35 - customer portal link points directly to provider page
+  ---
+  duration_ms: 0.687033
+  type: 'test'
+  ...
+# (node:1261) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Provider document lifecycle
+    # Subtest: الهوية والترخيص لكل منهما وثيقة حالية واحدة فقط
+    ok 1 - الهوية والترخيص لكل منهما وثيقة حالية واحدة فقط
+      ---
+      duration_ms: 78.679311
+      type: 'test'
+      ...
+    # Subtest: عرض وثيقة خاصة يتطلب جلسة ويعمل مع جلسة مقدم الخدمة
+    ok 2 - عرض وثيقة خاصة يتطلب جلسة ويعمل مع جلسة مقدم الخدمة
+      ---
+      duration_ms: 54.117794
+      type: 'test'
+      ...
+    # Subtest: الإدارة لا تستطيع توثيق مقدم بدون الهوية والترخيص
+    ok 3 - الإدارة لا تستطيع توثيق مقدم بدون الهوية والترخيص
+      ---
+      duration_ms: 87.20766
+      type: 'test'
+      ...
+    # Subtest: التوثيق يوافق الوثيقتين والرفض يعيدهما إلى مرفوض مع السبب
+    ok 4 - التوثيق يوافق الوثيقتين والرفض يعيدهما إلى مرفوض مع السبب
+      ---
+      duration_ms: 96.584819
+      type: 'test'
+      ...
+    1..4
+ok 36 - Provider document lifecycle
+  ---
+  duration_ms: 360.884983
+  type: 'suite'
+  ...
+# (node:1272) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: جاهزية استقبال الطلبات لمقدم الخدمة
+    # Subtest: لا يبدأ الاستقبال قبل وجود التوثيق والموقع والخدمة
+    ok 1 - لا يبدأ الاستقبال قبل وجود التوثيق والموقع والخدمة
+      ---
+      duration_ms: 83.450392
+      type: 'test'
+      ...
+    1..1
+ok 37 - جاهزية استقبال الطلبات لمقدم الخدمة
+  ---
+  duration_ms: 124.981052
+  type: 'suite'
+  ...
+# Subtest: customer shell exposes the provider portal
+ok 38 - customer shell exposes the provider portal
+  ---
+  duration_ms: 0.74656
+  type: 'test'
+  ...
+# Subtest: provider auth exposes provider registration and customer switch
+ok 39 - provider auth exposes provider registration and customer switch
+  ---
+  duration_ms: 0.191352
+  type: 'test'
+  ...
+# Subtest: provider page and frontend assets use the current version
+ok 40 - provider page and frontend assets use the current version
+  ---
+  duration_ms: 0.08152
+  type: 'test'
+  ...
+# Subtest: provider order action is not nested inside the clickable order detail button
+ok 41 - provider order action is not nested inside the clickable order detail button
+  ---
+  duration_ms: 0.391487
+  type: 'test'
+  ...
+# Subtest: provider portal does not redirect an existing customer back to the customer home
+ok 42 - provider portal does not redirect an existing customer back to the customer home
+  ---
+  duration_ms: 0.253794
+  type: 'test'
+  ...
+# Subtest: provider route alias serves the provider page
+ok 43 - provider route alias serves the provider page
+  ---
+  duration_ms: 0.160887
+  type: 'test'
+  ...
+# Subtest: provider services UI shows only saved services and hides catalog until edit
+ok 44 - provider services UI shows only saved services and hides catalog until edit
+  ---
+  duration_ms: 0.227555
+  type: 'test'
+  ...
+# Subtest: admin dashboard exposes operational tabs and real actions
+ok 45 - admin dashboard exposes operational tabs and real actions
+  ---
+  duration_ms: 0.567767
+  type: 'test'
+  ...
+# Subtest: admin dashboard can inspect order history and complaint messages
+ok 46 - admin dashboard can inspect order history and complaint messages
+  ---
+  duration_ms: 0.378958
+  type: 'test'
+  ...
+# Subtest: customer location center uses real saved-address APIs and supports address-based orders
+ok 47 - customer location center uses real saved-address APIs and supports address-based orders
+  ---
+  duration_ms: 0.416273
+  type: 'test'
+  ...
+# Subtest: customer location flow is GPS-first and auto-uses a previously granted permission
+ok 48 - customer location flow is GPS-first and auto-uses a previously granted permission
+  ---
+  duration_ms: 0.171523
+  type: 'test'
+  ...
+# Subtest: provider navigation uses the exact customer coordinates
+ok 49 - provider navigation uses the exact customer coordinates
+  ---
+  duration_ms: 0.124844
+  type: 'test'
+  ...
+# Subtest: real-time SSE notifications are wired into customer/provider frontend
+ok 50 - real-time SSE notifications are wired into customer/provider frontend
+  ---
+  duration_ms: 0.071025
+  type: 'test'
+  ...
+# Subtest: V34 live operations: notification center, provider profile, and offer countdown
+ok 51 - V34 live operations: notification center, provider profile, and offer countdown
+  ---
+  duration_ms: 0.130071
+  type: 'test'
+  ...
+# Subtest: V34 customer order card shows live provider and stage progress
+ok 52 - V34 customer order card shows live provider and stage progress
+  ---
+  duration_ms: 0.076953
+  type: 'test'
+  ...
+# Subtest: V35 customer complaint flow and saved-location editing are wired
+ok 53 - V35 customer complaint flow and saved-location editing are wired
+  ---
+  duration_ms: 0.186755
+  type: 'test'
+  ...
+# Subtest: V35 provider completion tools are wired
+ok 54 - V35 provider completion tools are wired
+  ---
+  duration_ms: 0.242608
+  type: 'test'
+  ...
+# Subtest: V43: provider operational controls avoid shadowing the provider page function
+ok 55 - V43: provider operational controls avoid shadowing the provider page function
+  ---
+  duration_ms: 0.784145
+  type: 'test'
+  ...
+# Subtest: V43: notification modal has live refresh and actionable quote controls
+ok 56 - V43: notification modal has live refresh and actionable quote controls
+  ---
+  duration_ms: 0.616178
+  type: 'test'
+  ...
+# Subtest: V45: completed-order notification carries order context for the rating action
+ok 57 - V45: completed-order notification carries order context for the rating action
+  ---
+  duration_ms: 0.533857
+  type: 'test'
+  ...
+# Subtest: V46: provider offer accept uses assignment id, not order id, and deduplicates by order
+ok 58 - V46: provider offer accept uses assignment id, not order id, and deduplicates by order
+  ---
+  duration_ms: 1.082515
+  type: 'test'
+  ...
+# Subtest: V46: customer rating opens a real star-rating screen and can detect an existing rating
+ok 59 - V46: customer rating opens a real star-rating screen and can detect an existing rating
+  ---
+  duration_ms: 0.735224
+  type: 'test'
+  ...
+# Subtest: V47: order chat UI exposes quick replies and live chat refresh hook
+ok 60 - V47: order chat UI exposes quick replies and live chat refresh hook
+  ---
+  duration_ms: 0.741623
+  type: 'test'
+  ...
+1..60
+# tests 129
+# suites 25
+# pass 129
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7785.346753

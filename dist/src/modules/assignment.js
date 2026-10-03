@@ -1,0 +1,173 @@
+import { s, parse } from '../core/validate.js';
+import { E } from '../core/errors.js';
+import { uuid } from '../core/security.js';
+import { iso, tr } from '../core/util.js';
+import { auth, roles } from './auth.middleware.js';
+import { canTransition, PROVIDER_STEPS } from '../../shared/orderStateMachine.js';
+export function createAssignmentService(app) {
+    const { db, catalog } = app;
+    const notifiedExhausted = new Set(); // إزالة تكرار إشعار «لم نجد مقدم خدمة» لكل طلب — حالة عملية واحدة (تُعاد عند إعادة الإسناد يدويًا)
+    const svc = {
+        assignWave(orderId) {
+            return db.tx(() => {
+                const o = db.get('SELECT * FROM orders WHERE id = ?', orderId);
+                if (!['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id)
+                    return { offered: 0 };
+                const excludeProviderIds = db.all('SELECT DISTINCT provider_id FROM order_assignments WHERE order_id = ?', orderId).map((x) => x.provider_id);
+                // نرسل العرض إلى الأقرب فقط؛ عند الرفض/انتهاء المهلة ينتقل إلى التالي الأقرب.
+                const batch = o.pricing_type === 'QUOTE' ? app.settings.get('assignment.batch_size') : 1;
+                const candidates = app.matcher.findCandidates(o, { excludeProviderIds, limit: batch });
+                if (!candidates.length)
+                    return { offered: 0 };
+                const wave = o.wave + 1;
+                const ttlMs = app.settings.get('assignment.offer_ttl_sec') * 1000;
+                const now = app.clock.now();
+                const nowIso = iso(now);
+                const expiresAt = iso(now + ttlMs);
+                for (const c of candidates) {
+                    db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)', uuid(), o.id, c.providerId, 'OFFERED', wave, c.score, c.distanceKm, nowIso, expiresAt);
+                }
+                const wasSearching = o.status === 'SEARCHING';
+                db.run('UPDATE orders SET status=?, wave=?, updated_at=?, version=version+1 WHERE id=? AND version=?', 'ASSIGNED', wave, nowIso, o.id, o.version);
+                if (wasSearching)
+                    db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', o.id, 'SEARCHING', 'ASSIGNED', null, 'SYSTEM', `wave ${wave}`, nowIso);
+                const svcRow = catalog.all().byService.get(o.service_id);
+                const areaRow = catalog.all().areas.find((a) => a.id === o.area_id);
+                for (const c of candidates) {
+                    const p = db.get('SELECT user_id FROM service_providers WHERE id = ?', c.providerId);
+                    app.notifications.notify(p.user_id, 'NEW_OFFER', { service: tr(svcRow.name_i18n, 'ar'), area: areaRow ? tr(areaRow.name_i18n, 'ar') : '' }, { orderId: o.id });
+                }
+                notifiedExhausted.delete(o.id);
+                return { offered: candidates.length };
+            });
+        },
+        acceptOffer(assignmentId, ctx) {
+            const providerId = ctx.user.providerId;
+            return db.tx(() => {
+                const a = db.get('SELECT * FROM order_assignments WHERE id = ? AND provider_id = ?', assignmentId, providerId);
+                if (!a)
+                    throw E.notFound('العرض غير موجود');
+                // Idempotency: if the same provider already accepted this offer, return the accepted order
+                // instead of showing a false error after a duplicate/concurrent request.
+                if (a.status === 'ACCEPTED') {
+                    const already = db.get("SELECT * FROM orders WHERE id = ? AND provider_id = ? AND status = 'ACCEPTED'", a.order_id, providerId);
+                    if (already)
+                        return already;
+                    throw E.conflict('هذا العرض لم يعد متاحًا', 'OFFER_NOT_AVAILABLE');
+                }
+                if (a.status !== 'OFFERED')
+                    throw E.conflict('هذا العرض لم يعد متاحًا', 'OFFER_NOT_AVAILABLE');
+                const now = app.clock.now();
+                const nowIso = iso(now);
+                if (Date.parse(a.expires_at) <= now) {
+                    db.run(`UPDATE order_assignments SET status='EXPIRED', responded_at=? WHERE id=?`, nowIso, a.id);
+                    throw E.conflict('انتهت مهلة هذا العرض', 'OFFER_EXPIRED');
+                }
+                const o = db.get('SELECT * FROM orders WHERE id = ?', a.order_id);
+                const existingQuote = db.get(`SELECT status FROM quotes WHERE order_id=? AND provider_id=? ORDER BY created_at DESC LIMIT 1`, o.id, providerId);
+                if (existingQuote?.status === 'SUBMITTED')
+                    throw E.conflict('تم تقديم عرض سعر لهذا الطلب بالفعل، اختر قرار العميل على العرض.', 'QUOTE_ALREADY_SUBMITTED');
+                const res = db.run(`UPDATE orders SET status='ACCEPTED', provider_id=?, agreed_price=price_snapshot, accepted_at=?, updated_at=?, version=version+1
+                             WHERE id=? AND status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL`, providerId, nowIso, nowIso, o.id);
+                if (!res.changes) {
+                    db.run(`UPDATE order_assignments SET status='EXPIRED', responded_at=? WHERE id=?`, nowIso, a.id);
+                    throw E.conflict('سبقك مقدم خدمة آخر إلى هذا الطلب', 'ORDER_ALREADY_TAKEN');
+                }
+                db.run(`UPDATE order_assignments SET status='ACCEPTED', responded_at=? WHERE id=?`, nowIso, a.id);
+                db.run(`UPDATE order_assignments SET status='WITHDRAWN', responded_at=? WHERE order_id=? AND status='OFFERED' AND id != ?`, nowIso, o.id, a.id);
+                db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', o.id, o.status, 'ACCEPTED', ctx.user.id, 'PROVIDER', nowIso);
+                app.payment.onAccepted(db.get('SELECT * FROM orders WHERE id = ?', o.id));
+                const p = app.providers.summary(providerId);
+                app.notifications.notify(o.customer_id, 'ORDER_ACCEPTED', { code: o.code, provider: p.displayName }, { orderId: o.id });
+                return db.get('SELECT * FROM orders WHERE id = ?', o.id);
+            });
+        },
+        rejectOffer(assignmentId, ctx) {
+            const providerId = ctx.user.providerId;
+            const now = iso(app.clock.now());
+            const res = db.run(`UPDATE order_assignments SET status='REJECTED', responded_at=? WHERE id=? AND provider_id=? AND status='OFFERED'`, now, assignmentId, providerId);
+            if (!res.changes)
+                throw E.notFound('العرض غير موجود');
+            const assignment = db.get('SELECT order_id FROM order_assignments WHERE id = ?', assignmentId);
+            if (assignment)
+                svc.assignWave(assignment.order_id);
+        },
+        listOffers(providerId) {
+            const now = iso(app.clock.now());
+            return db.all(`SELECT a.*, o.code, o.service_id, o.area_id, o.priority FROM order_assignments a JOIN orders o ON o.id = a.order_id
+          WHERE a.provider_id = ? AND a.status = 'OFFERED' AND a.expires_at > ? ORDER BY a.offered_at`, providerId, now)
+                .map((a) => {
+                const svcRow = catalog.all().byService.get(a.service_id);
+                const areaRow = catalog.all().areas.find((x) => x.id === a.area_id);
+                return { ...a, orderCode: a.code, serviceName: svcRow ? tr(svcRow.name_i18n, 'ar') : '', areaName: areaRow ? tr(areaRow.name_i18n, 'ar') : '', priority: a.priority };
+            });
+        },
+        tick() {
+            const now = app.clock.now();
+            const nowIso = iso(now);
+            const expired = Number(db.run(`UPDATE order_assignments SET status='EXPIRED', responded_at=? WHERE status='OFFERED' AND expires_at <= ?`, nowIso, nowIso).changes);
+            const stuck = db.all(`SELECT o.id, o.wave FROM orders o WHERE o.status IN ('SEARCHING','ASSIGNED') AND o.provider_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id = o.id AND a.status = 'OFFERED')`);
+            let waved = 0, exhausted = 0;
+            const maxWaves = app.settings.get('assignment.max_waves');
+            for (const o of stuck) {
+                if (o.wave < maxWaves) {
+                    const r = svc.assignWave(o.id);
+                    if (r.offered > 0) {
+                        waved++;
+                        continue;
+                    }
+                }
+                if (!notifiedExhausted.has(o.id)) {
+                    const full = db.get('SELECT * FROM orders WHERE id = ?', o.id);
+                    app.notifications.notify(full.customer_id, 'NO_PROVIDER_FOUND', { code: full.code });
+                    app.notifications.notifyAdmins('NO_PROVIDER_FOUND_ADMIN', { code: full.code });
+                    notifiedExhausted.add(o.id);
+                    exhausted++;
+                }
+            }
+            return { expired, waved, exhausted };
+        },
+    };
+    return svc;
+}
+export function registerAssignmentRoutes(app, r) {
+    const { db, orders } = app;
+    const isProvider = [auth, roles('PROVIDER')];
+    r.get('/provider/offers', ...isProvider, (ctx) => ({
+        offers: app.assignment.listOffers(ctx.user.providerId).map((a) => {
+            const pricingType = app.db.get('SELECT pricing_type FROM orders WHERE id=?', a.order_id)?.pricing_type || 'FIXED';
+            const quote = pricingType === 'QUOTE' ? app.db.get('SELECT id, amount, status FROM quotes WHERE order_id=? AND provider_id=?', a.order_id, ctx.user.providerId) : undefined;
+            return { id: a.id, orderId: a.order_id, orderCode: a.orderCode, serviceName: a.serviceName, areaName: a.areaName, priority: a.priority, distanceKm: a.distance_km, offeredAt: a.offered_at, expiresAt: a.expires_at, pricingType, quoteStatus: quote?.status || null, quoteId: quote?.id || null, quoteAmount: quote?.amount ?? null };
+        })
+    }));
+    r.post('/provider/offers/:id/accept', ...isProvider, (ctx) => ({ order: orders.serialize(app.assignment.acceptOffer(ctx.params['id'], ctx), ctx) }));
+    r.post('/provider/offers/:id/reject', ...isProvider, (ctx) => { app.assignment.rejectOffer(ctx.params['id'], ctx); return { ok: true }; });
+    r.get('/provider/orders', ...isProvider, (ctx) => {
+        const where = ctx.query['status'] ? ' AND status = ?' : '';
+        const params = [ctx.user.providerId];
+        if (ctx.query['status'])
+            params.push(ctx.query['status']);
+        const rows = db.all(`SELECT * FROM orders WHERE provider_id = ?${where} ORDER BY created_at DESC LIMIT 100`, ...params);
+        return { orders: rows.map((o) => orders.serialize(o, ctx)) };
+    });
+    r.post('/provider/orders/:id/status', ...isProvider, (ctx) => {
+        const b = parse(s.obj({ to: s.oneOf(['ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED']) }), ctx.body);
+        return db.tx(() => {
+            const o = db.get('SELECT * FROM orders WHERE id = ? AND provider_id = ?', ctx.params['id'], ctx.user.providerId);
+            if (!o)
+                throw E.notFound('الطلب غير موجود');
+            if (PROVIDER_STEPS[o.status] !== b.to || !canTransition(o.status, b.to, 'PROVIDER'))
+                throw E.unprocessable(`لا يمكن الانتقال من ${o.status} إلى ${b.to}`, 'INVALID_TRANSITION');
+            const updated = orders.applyTransition(o, b.to, 'PROVIDER', ctx);
+            if (b.to === 'COMPLETED') {
+                db.run('UPDATE service_providers SET completed_orders_count = completed_orders_count + 1, updated_at = ? WHERE id = ?', iso(app.clock.now()), o.provider_id);
+                app.payment.onCompleted(updated);
+            }
+            const map = { ON_THE_WAY: 'PROVIDER_ON_THE_WAY', IN_PROGRESS: 'SERVICE_STARTED', COMPLETED: 'ORDER_COMPLETED' };
+            app.notifications.notify(o.customer_id, map[b.to], { code: o.code }, { orderId: o.id });
+            return { order: orders.serialize(updated, ctx) };
+        });
+    });
+}
+//# sourceMappingURL=assignment.js.map

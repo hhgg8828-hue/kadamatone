@@ -1,0 +1,69 @@
+/**
+ * بيانات أولية للكتالوج. تُدخل في قاعدة البيانات مرة واحدة ثم يديرها المدير من اللوحة.
+ * ليست منطقًا مبرمجًا: يمكن تعديل/حذف/إضافة أي قسم أو خدمة بدون تغيير الكود.
+ */
+const L = (ar: string, en: string) => ({ ar, en });
+const opt = (value: string, ar: string, en: string) => ({ value, label: L(ar, en) });
+const field = (key: string, type: string, ar: string, en: string, extra: Record<string, unknown> = {}) => ({ key, type, label: L(ar, en), required: false, ...extra });
+
+export const CATEGORIES = [
+  { slug: 'transport', name: L('النقل', 'Transportation'), icon: '🚗', keywords: ['نقل', 'مواصلات', 'سائق', 'توصيلة'], services: [
+    { slug: 'motorcycle-trips', name: L('مشاوير بالدباب', 'Motorcycle trips'), icon: '🛵', pricing: 'FIXED', price: 1000, keywords: ['مشوار بالدباب', 'دباب', 'دراجة نارية', 'موتوسيكل', 'توصيلة بالدباب'], form: [] },
+    { slug: 'car-with-driver', name: L('سيارة مع سائق', 'Car with driver'), icon: '🚘', pricing: 'FIXED', price: 10000, keywords: ['سائق', 'سيارة مع سائق', 'تاكسي', 'مشوار'], form: [field('hours', 'number', 'عدد الساعات', 'Hours', { min: 1, max: 24, required: true })] },
+    { slug: 'passenger-transport', name: L('نقل أفراد', 'Passenger transport'), icon: '🧍', pricing: 'FIXED', price: 6000, keywords: ['نقل ركاب', 'مشوار', 'رحلة', 'مطار', 'ركاب'], form: [field('passengers', 'number', 'عدد الركاب', 'Passengers', { min: 1, max: 20, required: true }), field('destination', 'text', 'وجهة الوصول', 'Destination', { required: true })] },
+    { slug: 'freight-transport', name: L('نقل بضائع', 'Freight transport'), icon: '🚚', pricing: 'QUOTE', keywords: ['بضائع', 'شحنة', 'نقل حمولة', 'حمولة'], form: [field('weight_kg', 'number', 'الوزن التقريبي (كجم)', 'Approx. weight (kg)', { min: 1 }), field('vehicle', 'select', 'نوع المركبة', 'Vehicle', { options: [opt('pickup', 'بيك أب', 'Pickup'), opt('van', 'فان', 'Van'), opt('truck', 'شاحنة', 'Truck')] })] },
+    { slug: 'furniture-moving', name: L('نقل أثاث', 'Furniture moving'), icon: '🛋️', pricing: 'QUOTE', keywords: ['اثاث', 'عفش', 'نقل عفش', 'فك وتركيب', 'ترحيل'], form: [field('rooms', 'number', 'عدد الغرف', 'Rooms', { min: 1, max: 20 }), field('floor', 'number', 'رقم الطابق', 'Floor', { min: 0, max: 100 }), field('has_elevator', 'boolean', 'يوجد مصعد', 'Elevator available')] },
+  ] },
+  { slug: 'delivery', name: L('التوصيل', 'Delivery'), icon: '📦', keywords: ['توصيل', 'طرد', 'شحن', 'مندوب'], services: [
+    { slug: 'parcel-delivery', name: L('توصيل طرود', 'Parcel delivery'), icon: '📦', pricing: 'FIXED', price: 2000, keywords: ['طرد', 'طرود', 'شحن', 'مندوب', 'توصيل طرد'], form: [field('recipient_name', 'text', 'اسم المستلم', 'Recipient name', { required: true }), field('recipient_phone', 'text', 'هاتف المستلم', 'Recipient phone', { required: true }), field('weight_kg', 'number', 'الوزن (كجم)', 'Weight (kg)', { min: 0.1, max: 100 })] },
+    { slug: 'shopping-delivery', name: L('توصيل مشتريات', 'Shopping delivery'), icon: '🛒', pricing: 'FIXED', price: 1500, keywords: ['بقالة', 'مشتريات', 'طلبات', 'سوبرماركت'], form: [field('store', 'text', 'اسم المتجر', 'Store')] },
+    { slug: 'document-delivery', name: L('توصيل مستندات', 'Document delivery'), icon: '📄', pricing: 'FIXED', price: 1200, keywords: ['مستندات', 'اوراق', 'وثائق', 'مظروف'], form: [] },
+  ] },
+  { slug: 'home-services', name: L('خدمات المنزل', 'Home services'), icon: '🏠', keywords: ['منزل', 'بيت', 'شقة', 'فيلا'], services: [
+    { slug: 'electricity', name: L('كهرباء', 'Electrical'), icon: '💡', pricing: 'FIXED', price: 3500, keywords: ['كهربائي', 'كهرباء', 'فيوز', 'ماس كهربائي', 'سلك', 'مفتاح كهرباء'], form: [field('issue', 'select', 'نوع المشكلة', 'Issue type', { required: true, options: [opt('outage', 'انقطاع التيار', 'Power outage'), opt('short', 'ماس كهربائي', 'Short circuit'), opt('install', 'تركيب', 'Installation'), opt('other', 'أخرى', 'Other')] })] },
+    { slug: 'plumbing', name: L('سباكة', 'Plumbing'), icon: '🚰', pricing: 'FIXED', price: 3500, keywords: ['سباك', 'سباكه', 'تسريب', 'ماسورة', 'حنفية', 'مواسير', 'صرف'], form: [field('issue', 'select', 'نوع المشكلة', 'Issue type', { options: [opt('leak', 'تسريب', 'Leak'), opt('clog', 'انسداد', 'Clog'), opt('install', 'تركيب', 'Installation'), opt('other', 'أخرى', 'Other')] })] },
+    { slug: 'cleaning', name: L('تنظيف', 'Cleaning'), icon: '🧹', pricing: 'QUOTE', keywords: ['تنظيف', 'نظافة', 'مبنى', 'تنظيف مبنى كامل', 'غسيل', 'تلميع'], form: [field('area_m2', 'number', 'المساحة (م²)', 'Area (m²)', { min: 1 }), field('rooms', 'number', 'عدد الغرف', 'Rooms', { min: 0, max: 100 })] },
+    { slug: 'air-conditioning', name: L('تكييف', 'Air conditioning'), icon: '❄️', pricing: 'FIXED', price: 5000, keywords: ['مكيف', 'تكييف', 'تبريد', 'تكيف', 'فريون', 'سبليت', 'شحن غاز'], form: [field('ac_type', 'select', 'نوع المكيف', 'AC type', { options: [opt('split', 'سبليت', 'Split'), opt('window', 'شباك', 'Window'), opt('central', 'مركزي', 'Central')] }), field('brand', 'text', 'الماركة', 'Brand')] },
+    { slug: 'carpentry', name: L('نجارة', 'Carpentry'), icon: '🪚', pricing: 'QUOTE', keywords: ['نجار', 'نجارة', 'خشب', 'باب', 'دولاب', 'مطبخ خشب'], form: [] },
+    { slug: 'appliance-repair', name: L('صيانة أجهزة', 'Appliance repair'), icon: '🔌', pricing: 'FIXED', price: 3500, keywords: ['غسالة', 'ثلاجة', 'فرن', 'سخان', 'جهاز', 'اجهزة منزلية', 'ديب فريزر'], form: [field('appliance', 'text', 'نوع الجهاز', 'Appliance', { required: true }), field('brand', 'text', 'الماركة', 'Brand')] },
+  ] },
+  { slug: 'car-services', name: L('خدمات السيارات', 'Car services'), icon: '🚘', keywords: ['سيارة', 'سيارات', 'غسيل سيارات', 'تنظيف سيارات', 'بطارية'], services: [
+    { slug: 'mobile-car-wash', name: L('غسيل سيارات متنقل', 'Mobile car wash'), icon: '🚿', pricing: 'QUOTE', keywords: ['غسيل سيارات', 'غسيل متنقل', 'مغسلة متنقلة', 'غسيل السيارة'], form: [field('car_type', 'select', 'نوع السيارة', 'Car type', { options: [opt('sedan', 'سيدان', 'Sedan'), opt('suv', 'دفع رباعي / SUV', 'SUV'), opt('pickup', 'بيك أب', 'Pickup'), opt('van', 'فان', 'Van'), opt('other', 'أخرى', 'Other')] }), field('wash_scope', 'select', 'نوع الغسيل', 'Wash scope', { required: true, options: [opt('exterior', 'غسيل خارجي', 'Exterior wash'), opt('interior', 'غسيل داخلي', 'Interior wash'), opt('both', 'داخلي وخارجي', 'Interior & exterior')] })] },
+    { slug: 'car-interior-deep-cleaning', name: L('تنظيف السيارات', 'Car cleaning'), icon: '🧽', pricing: 'QUOTE', keywords: ['تنظيف سيارات', 'تنظيف سيارة', 'تنظيف داخلي', 'تنظيف المقاعد', 'تنظيف فرش السيارة'], form: [field('car_type', 'select', 'نوع السيارة', 'Car type', { options: [opt('sedan', 'سيدان', 'Sedan'), opt('suv', 'دفع رباعي / SUV', 'SUV'), opt('pickup', 'بيك أب', 'Pickup'), opt('van', 'فان', 'Van'), opt('other', 'أخرى', 'Other')] }), field('needs_seat_cleaning', 'boolean', 'تنظيف المقاعد والفرش', 'Seat and upholstery cleaning')] },
+    { slug: 'car-battery-service', name: L('خدمة بطارية السيارة', 'Car battery service'), icon: '🔋', pricing: 'QUOTE', keywords: ['بطارية السيارة', 'بطارية', 'تشغيل السيارة', 'السيارة لا تشتغل'], form: [field('issue', 'select', 'المشكلة', 'Issue', { required: true, options: [opt('dead_battery', 'البطارية فارغة والسيارة لا تعمل', 'Dead battery'), opt('jump_start', 'أحتاج تشغيل البطارية', 'Jump start'), opt('battery_check', 'فحص البطارية', 'Battery check'), opt('replacement', 'استبدال البطارية', 'Battery replacement')] }), field('car_model', 'text', 'نوع / موديل السيارة', 'Car make / model')] },
+  ] },
+  { slug: 'maintenance', name: L('الصيانة', 'Maintenance'), icon: '🔧', keywords: ['صيانة', 'تصليح', 'اصلاح', 'عطل', 'خربان'], services: [
+    { slug: 'electronics-repair', name: L('صيانة إلكترونيات', 'Electronics repair'), icon: '📱', pricing: 'FIXED', price: 3000, keywords: ['موبايل', 'هاتف', 'جوال', 'كمبيوتر', 'لابتوب', 'شاشة', 'تلفزيون'], form: [field('device', 'text', 'نوع الجهاز', 'Device', { required: true })] },
+    { slug: 'building-maintenance', name: L('ترميم ودهان', 'Renovation & painting'), icon: '🎨', pricing: 'QUOTE', keywords: ['دهان', 'بوية', 'ترميم', 'بلاط', 'جبس', 'تشطيب'], form: [field('area_m2', 'number', 'المساحة (م²)', 'Area (m²)', { min: 1 })] },
+  ] },
+  { slug: 'transactions', name: L('المعاملات', 'Transactions'), icon: '🏛️', keywords: ['معاملة', 'معاملات', 'اوراق', 'تخليص', 'حكومي'], services: [
+    { slug: 'government-errands', name: L('إنجاز معاملات حكومية', 'Government errands'), icon: '🏛️', pricing: 'FIXED', price: 5000, keywords: ['معقب', 'معاملة حكومية', 'تجديد', 'رخصة', 'تخليص معاملة'], form: [field('transaction_type', 'text', 'نوع المعاملة', 'Transaction type', { required: true })] },
+    { slug: 'documents-issuance', name: L('استخراج أوراق رسمية', 'Official documents'), icon: '📑', pricing: 'FIXED', price: 3500, keywords: ['شهادة', 'استخراج', 'بطاقة', 'اوراق رسمية', 'وثيقة'], form: [field('document_type', 'text', 'نوع الوثيقة', 'Document type', { required: true })] },
+    { slug: 'certified-translation', name: L('ترجمة معتمدة', 'Certified translation'), icon: '🌐', pricing: 'QUOTE', keywords: ['ترجمة', 'مترجم', 'تصديق', 'ترجمه معتمده'], form: [field('from_lang', 'text', 'من لغة', 'From language'), field('to_lang', 'text', 'إلى لغة', 'To language'), field('pages', 'number', 'عدد الصفحات', 'Pages', { min: 1, max: 1000 })] },
+    { slug: 'legal-services', name: L('خدمات قانونية', 'Legal services'), icon: '⚖️', pricing: 'QUOTE', keywords: ['محامي', 'محاماة', 'عقد', 'استشارة قانونية', 'قضية'], form: [] },
+  ] },
+  { slug: 'on-demand-labor', name: L('العمالة عند الطلب', 'On-demand labor'), icon: '👷', keywords: ['عمالة', 'عامل', 'عمال', 'يومي'], services: [
+    { slug: 'daily-worker', name: L('عامل يومي', 'Daily worker'), icon: '👷', pricing: 'FIXED', price: 7500, keywords: ['عامل', 'عمالة', 'يومية', 'عامل يومي'], form: [field('workers_count', 'number', 'عدد العمال', 'Workers', { required: true, min: 1, max: 50 }), field('hours', 'number', 'عدد الساعات', 'Hours', { min: 1, max: 24 })] },
+    { slug: 'construction-worker', name: L('عامل بناء', 'Construction worker'), icon: '🧱', pricing: 'FIXED', price: 10000, keywords: ['بناء', 'مبيض', 'عامل بناء', 'مقاول'], form: [field('workers_count', 'number', 'عدد العمال', 'Workers', { required: true, min: 1, max: 50 })] },
+    { slug: 'loading-worker', name: L('عامل تحميل وتنزيل', 'Loading worker'), icon: '📥', pricing: 'FIXED', price: 6000, keywords: ['تحميل', 'تنزيل', 'حمال', 'شيل'], form: [field('workers_count', 'number', 'عدد العمال', 'Workers', { required: true, min: 1, max: 50 })] },
+    { slug: 'cleaning-worker', name: L('عامل نظافة', 'Cleaning worker'), icon: '🧽', pricing: 'FIXED', price: 6000, keywords: ['عامل نظافة', 'عاملة', 'خادمة', 'تنظيف بالساعة'], form: [field('hours', 'number', 'عدد الساعات', 'Hours', { min: 1, max: 24, required: true })] },
+  ] },
+];
+
+/**
+ * مناطق اختبار من اليمن للتطوير فقط (npm run seed:demo). الإحداثيات تقريبية لأغراض الاختبار.
+ * لا توجد مدن مبرمجة في المنطق: المدير يضيف/يعدّل/يعطّل المناطق من قاعدة البيانات (/admin/areas).
+ */
+export const DEMO_AREAS = [
+  { key: 'yemen', name: L('اليمن', 'Yemen'), type: 'COUNTRY', lat: 15.55, lng: 48.52, radius: 900, parent: null },
+  { key: 'sanaa', name: L('صنعاء', 'Sana\'a'), type: 'CITY', lat: 15.3694, lng: 44.191, radius: 25, parent: 'yemen' },
+  { key: 'aden', name: L('عدن', 'Aden'), type: 'CITY', lat: 12.7855, lng: 45.0187, radius: 30, parent: 'yemen' },
+  { key: 'taiz', name: L('تعز', 'Taiz'), type: 'CITY', lat: 13.5795, lng: 44.0209, radius: 20, parent: 'yemen' },
+  { key: 'hodeidah', name: L('الحديدة', 'Hodeidah'), type: 'CITY', lat: 14.7979, lng: 42.954, radius: 20, parent: 'yemen' },
+  { key: 'ibb', name: L('إب', 'Ibb'), type: 'CITY', lat: 13.9759, lng: 44.1709, radius: 15, parent: 'yemen' },
+  { key: 'mukalla', name: L('المكلا', 'Mukalla'), type: 'CITY', lat: 14.5425, lng: 49.1242, radius: 20, parent: 'yemen' },
+  { key: 'crater', name: L('كريتر', 'Crater'), type: 'DISTRICT', lat: 12.7797, lng: 45.0367, radius: 4, parent: 'aden' },
+  { key: 'khormaksar', name: L('خور مكسر', 'Khormaksar'), type: 'DISTRICT', lat: 12.8206, lng: 45.0331, radius: 5, parent: 'aden' },
+  { key: 'maala', name: L('المعلا', 'Al-Mualla'), type: 'DISTRICT', lat: 12.7889, lng: 44.9922, radius: 4, parent: 'aden' },
+  { key: 'tawahi', name: L('التواهي', 'Tawahi'), type: 'DISTRICT', lat: 12.7847, lng: 44.9789, radius: 4, parent: 'aden' },
+];
