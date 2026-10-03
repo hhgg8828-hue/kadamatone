@@ -28,7 +28,7 @@ export function registerUserRoutes(app: App, r: Router): void {
       if (b.avatarFileId && !db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'avatar'`, b.avatarFileId, ctx.user!.id)) throw E.unprocessable('ملف الصورة غير صالح', 'INVALID_FILE');
       db.run(`UPDATE users SET full_name = COALESCE(?, full_name), email = COALESCE(?, email), locale = COALESCE(?, locale), avatar_file_id = COALESCE(?, avatar_file_id), updated_at = ? WHERE id = ?`,
         b.fullName ?? null, b.email ?? null, b.locale ?? null, b.avatarFileId ?? null, iso(app.clock.now()), ctx.user!.id);
-      return { user: serializeUser(app.authService.loadUser('u.id = ?', ctx.user!.id)) };
+      const out = { user: serializeUser(app.authService.loadUser('u.id = ?', ctx.user!.id)) }; app.sse.send(ctx.user!.id, 'sync', { scope: 'users' }); return out;
     });
   });
 
@@ -48,7 +48,7 @@ export function registerUserRoutes(app: App, r: Router): void {
       if (b.isDefault || first) db.run('UPDATE addresses SET is_default = 0 WHERE user_id = ?', ctx.user!.id);
       db.run('INSERT INTO addresses(id,user_id,label,location_id,is_default,created_at) VALUES (?,?,?,?,?,?)', id, ctx.user!.id, b.label, loc.id, b.isDefault || first ? 1 : 0, iso(app.clock.now()));
       ctx.status = 201;
-      return { address: addrRow(db.get<AddressRow>('SELECT * FROM addresses WHERE id = ?', id)!, ctx.locale) };
+      const out = { address: addrRow(db.get<AddressRow>('SELECT * FROM addresses WHERE id = ?', id)!, ctx.locale) }; app.sse.send(ctx.user!.id, 'sync', { scope: 'addresses' }); return out;
     });
   });
 
@@ -61,13 +61,13 @@ export function registerUserRoutes(app: App, r: Router): void {
       if (b.location) { const loc = app.locations.create(b.location); db.run('UPDATE addresses SET location_id = ? WHERE id = ?', loc.id, a.id); }
       if (b.label) db.run('UPDATE addresses SET label = ? WHERE id = ?', b.label, a.id);
       if (b.isDefault) { db.run('UPDATE addresses SET is_default = 0 WHERE user_id = ?', ctx.user!.id); db.run('UPDATE addresses SET is_default = 1 WHERE id = ?', a.id); }
-      return { address: addrRow(db.get<AddressRow>('SELECT * FROM addresses WHERE id = ?', a.id)!, ctx.locale) };
+      const out = { address: addrRow(db.get<AddressRow>('SELECT * FROM addresses WHERE id = ?', a.id)!, ctx.locale) }; app.sse.send(ctx.user!.id, 'sync', { scope: 'addresses' }); return out;
     });
   });
 
   r.delete('/me/addresses/:id', auth, roles('CUSTOMER'), (ctx: Ctx) => {
     const res = db.run('DELETE FROM addresses WHERE id = ? AND user_id = ?', ctx.params['id'], ctx.user!.id);
     if (!res.changes) throw E.notFound('العنوان غير موجود');
-    return undefined;
+    app.sse.send(ctx.user!.id, 'sync', { scope: 'addresses' }); return undefined;
   });
 }

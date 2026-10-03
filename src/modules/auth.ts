@@ -84,7 +84,6 @@ export function registerAuthRoutes(app: App, r: Router): void {
     const b = parse<RegisterBody>(registerSchema, ctx.body);
     const phone = cleanPhone(b.phone);
     if (b.role === 'PROVIDER' && !b.provider) throw E.unprocessable('بيانات مقدم الخدمة مطلوبة', 'VALIDATION_ERROR', [{ path: 'provider', message: 'هذا الحقل مطلوب' }]);
-    if (b.role === 'PROVIDER' && !b.email) throw E.unprocessable('البريد الإلكتروني مطلوب لمقدم الخدمة', 'PROVIDER_EMAIL_REQUIRED', [{ path: 'email', message: 'هذا الحقل مطلوب لمقدم الخدمة' }]);
     const companyName = b.provider?.providerType === 'COMPANY' ? (b.provider.companyName || b.provider.displayName) : b.provider?.companyName;
     if (b.provider?.providerType === 'COMPANY' && !companyName) throw E.unprocessable('اسم الشركة مطلوب', 'VALIDATION_ERROR', [{ path: 'provider.companyName', message: 'هذا الحقل مطلوب' }]);
     const hash = await hashPassword(b.password);

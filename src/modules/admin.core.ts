@@ -1,6 +1,6 @@
 import { s, parse, normalizePhone, PHONE_RE } from '../core/validate.js';
 import { E } from '../core/errors.js';
-import { hashPassword, uuid } from '../core/security.js';
+import { hashPassword, verifyPassword, uuid } from '../core/security.js';
 import { iso, pageParams, cursorSql, finishPage, parseJson } from '../core/util.js';
 import { auth, adminLevel } from './auth.middleware.js';
 import { serializeUser } from './auth.js';
@@ -11,6 +11,63 @@ import type { UserRow } from '../types/domain.js';
 /** إدارة المستخدمين والمديرين وسجل التدقيق (الأساس الذي تبنى عليه لوحة الإدارة). */
 export function registerAdminCoreRoutes(app: App, r: Router): void {
   const { db } = app;
+
+  r.patch('/admin/account', auth, adminLevel('SUPPORT'), async (ctx: Ctx) => {
+    const b = parse<{ fullName?: string; email?: string; currentPassword?: string; newPassword?: string }>(s.obj({
+      fullName: s.str({ min: 2, max: 80, optional: true }),
+      email: s.str({ max: 160, lower: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, patternMessage: 'بريد إلكتروني غير صالح', optional: true }),
+      currentPassword: s.str({ min: 1, max: 128, trim: false, optional: true }),
+      newPassword: s.str({ min: 10, max: 128, trim: false, pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/, patternMessage: 'يجب أن تحتوي كلمة المرور على حرف ورقم', optional: true }),
+    }), ctx.body);
+    const current = app.authService.loadUser('u.id = ?', ctx.user!.id);
+    if (b.email === undefined && b.newPassword === undefined && b.fullName === undefined) throw E.unprocessable('لا توجد تغييرات للحفظ', 'NO_CHANGES');
+    if ((b.email !== undefined || b.newPassword !== undefined) && !b.currentPassword) throw E.unprocessable('أدخل كلمة المرور الحالية لتغيير البريد أو كلمة المرور', 'CURRENT_PASSWORD_REQUIRED');
+    if (b.currentPassword && !(await verifyPassword(b.currentPassword, current.password_hash))) throw E.unauthorized('كلمة المرور الحالية غير صحيحة', 'INVALID_CURRENT_PASSWORD');
+    if (b.email !== undefined && db.get('SELECT 1 FROM users WHERE email = ? AND id != ?', b.email, current.id)) throw E.conflict('البريد الإلكتروني مستخدم من حساب آخر', 'EMAIL_TAKEN');
+    const newHash = b.newPassword !== undefined ? await hashPassword(b.newPassword) : null;
+    const now = iso(app.clock.now());
+    db.tx(() => {
+      db.run('UPDATE users SET full_name=COALESCE(?,full_name), email=COALESCE(?,email), password_hash=COALESCE(?,password_hash), token_version=token_version+1, updated_at=? WHERE id=?', b.fullName ?? null, b.email ?? null, newHash, now, current.id);
+      db.run('UPDATE refresh_tokens SET revoked_at=COALESCE(revoked_at,?) WHERE user_id=?', now, current.id);
+      app.audit.log({ ctx, action: 'admin.account_update', entityType: 'user', entityId: current.id, before: { email: current.email }, after: { email: b.email ?? current.email, passwordChanged: !!newHash, fullNameChanged: b.fullName !== undefined } });
+    });
+    const updated = app.authService.loadUser('u.id = ?', current.id);
+    return { user: serializeUser(updated), ...app.authService.issueSession(ctx, updated) };
+  });
+
+  r.get('/admin/admins', auth, adminLevel('SUPER_ADMIN'), () => {
+    const rows = db.all<any>(`SELECT u.id,u.full_name,u.phone,u.email,u.status,u.created_at,u.last_login_at,au.admin_level
+      FROM users u JOIN roles r ON r.id=u.role_id JOIN admin_users au ON au.user_id=u.id
+      WHERE r.code='ADMIN' ORDER BY CASE au.admin_level WHEN 'SUPER_ADMIN' THEN 0 WHEN 'ADMIN' THEN 1 ELSE 2 END, u.created_at DESC`);
+    return { admins: rows.map((x:any) => ({ id:x.id, fullName:x.full_name, phone:x.phone, email:x.email, status:x.status, adminLevel:x.admin_level, createdAt:x.created_at, lastLoginAt:x.last_login_at })) };
+  });
+
+  r.patch('/admin/admins/:id', auth, adminLevel('SUPER_ADMIN'), async (ctx: Ctx) => {
+    const b = parse<{ fullName?: string; phone?: string; email?: string; password?: string; adminLevel?: 'ADMIN'|'SUPPORT'; status?: 'ACTIVE'|'SUSPENDED' }>(s.obj({
+      fullName: s.str({ min: 2, max: 80, optional: true }), phone: s.str({ min: 8, max: 24, optional: true }),
+      email: s.str({ max: 160, lower: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, patternMessage: 'بريد إلكتروني غير صالح', optional: true }),
+      password: s.str({ min: 10, max: 128, trim: false, pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/, patternMessage: 'يجب أن تحتوي كلمة المرور على حرف ورقم', optional: true }),
+      adminLevel: s.oneOf(['ADMIN','SUPPORT'], { optional: true }), status: s.oneOf(['ACTIVE','SUSPENDED'], { optional: true })
+    }), ctx.body);
+    const target = app.authService.loadUser('u.id = ?', ctx.params['id']);
+    if (!target || target.role !== 'ADMIN') throw E.notFound('حساب الإدارة غير موجود');
+    if (target.id === ctx.user!.id) throw E.unprocessable('استخدم إعدادات حسابي لتعديل حسابك', 'SELF_ADMIN_EDIT');
+    if (target.admin_level === 'SUPER_ADMIN') throw E.forbidden('لا يمكن تعديل مدير النظام الأعلى من حساب آخر', 'PROTECTED_SUPER_ADMIN');
+    const phone = b.phone !== undefined ? normalizePhone(b.phone) : undefined;
+    if (phone !== undefined && !PHONE_RE.test(phone)) throw E.unprocessable('رقم هاتف غير صالح', 'VALIDATION_ERROR');
+    if (b.email !== undefined && db.get('SELECT 1 FROM users WHERE email = ? AND id != ?', b.email, target.id)) throw E.conflict('البريد الإلكتروني مستخدم مسبقًا', 'EMAIL_TAKEN');
+    if (phone !== undefined && db.get('SELECT 1 FROM users WHERE phone = ? AND id != ?', phone, target.id)) throw E.conflict('رقم الهاتف مستخدم مسبقًا', 'PHONE_TAKEN');
+    const hash = b.password !== undefined ? await hashPassword(b.password) : null;
+    const now = iso(app.clock.now());
+    db.tx(() => {
+      db.run('UPDATE users SET full_name=COALESCE(?,full_name), phone=COALESCE(?,phone), email=COALESCE(?,email), password_hash=COALESCE(?,password_hash), status=COALESCE(?,status), token_version=token_version+1, updated_at=? WHERE id=?', b.fullName ?? null, phone ?? null, b.email ?? null, hash, b.status ?? null, now, target.id);
+      if (b.adminLevel) db.run('UPDATE admin_users SET admin_level=? WHERE user_id=?', b.adminLevel, target.id);
+      db.run('UPDATE refresh_tokens SET revoked_at=COALESCE(revoked_at,?) WHERE user_id=?', now, target.id);
+      app.audit.log({ ctx, action: 'admin.update', entityType: 'user', entityId: target.id, before: { email: target.email, adminLevel: target.admin_level, status: target.status }, after: { email: b.email ?? target.email, adminLevel: b.adminLevel ?? target.admin_level, status: b.status ?? target.status, passwordChanged: !!hash } });
+    });
+    app.sse.send(target.id, 'sync', { scope: 'users' }); return { user: serializeUser(app.authService.loadUser('u.id = ?', target.id)) };
+  });
+
 
   r.get('/admin/dashboard', auth, adminLevel('SUPPORT'), () => {
     const count = (sql: string, ...params: unknown[]) => Number(db.get<{ n: number }>(sql, ...params)?.n || 0);
@@ -49,7 +106,7 @@ export function registerAdminCoreRoutes(app: App, r: Router): void {
       db.run('UPDATE users SET status = ?, token_version = token_version + 1, updated_at = ? WHERE id = ?', b.status, iso(app.clock.now()), u.id);
       if (b.status === 'SUSPENDED') db.run('UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE user_id = ?', iso(app.clock.now()), u.id);
       app.audit.log({ ctx, action: b.status === 'SUSPENDED' ? 'user.suspend' : 'user.activate', entityType: 'user', entityId: u.id, before: { status: u.status }, after: { status: b.status, reason: b.reason || null } });
-      return { user: serializeUser({ ...u, status: b.status }) };
+      app.sse.send(u.id, 'sync', { scope: 'users' }); return { user: serializeUser({ ...u, status: b.status }) };
     });
   });
 

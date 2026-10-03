@@ -22,6 +22,7 @@ export class SseHub {
       try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* connection closed */ }
     }
   }
+  broadcast(event: string, data: unknown): void { for (const set of this.clients.values()) for (const res of set) try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* connection closed */ } }
   ping(): void { for (const set of this.clients.values()) for (const res of set) try { res.write(': ping\n\n'); } catch { /* ignore */ } }
   closeAll(): void { clearInterval(this.timer); for (const set of this.clients.values()) for (const r of set) r.end(); this.clients.clear(); }
 }

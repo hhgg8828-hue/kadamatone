@@ -18,12 +18,12 @@ export const formFieldSchema = s.obj({
 });
 export const formSchemaSchema = s.arr(formFieldSchema, { max: 30 });
 /** يبني مُحقِّقًا من مخطط النموذج ويتحقق من form_data القادمة من العميل (على الخادم دائمًا). */
-export function validateFormData(fields, data, opts = {}) {
+export function validateFormData(fields, data) {
     const shape = {};
     const known = new Set();
     for (const f of fields) {
         known.add(f.key);
-        const opt = { optional: opts.relaxed ? true : !f.required };
+        const opt = { optional: !f.required };
         if (f.type === 'text' || f.type === 'textarea')
             shape[f.key] = s.str({ ...opt, max: f.maxLength || (f.type === 'textarea' ? 1000 : 200) });
         else if (f.type === 'number')
@@ -164,6 +164,7 @@ export function registerCatalogAdminRoutes(app, r) {
         catalog.invalidate();
         app.audit.log({ ctx, action: 'category.create', entityType: 'category', entityId: id, after: b });
         ctx.status = 201;
+        app.sse.broadcast('sync', { scope: 'catalog' });
         return { category: catalog.serializeCategory(db.get('SELECT * FROM categories WHERE id=?', id), ctx.locale, { withServices: true, admin: true }) };
     });
     r.patch('/admin/categories/:id', auth, adminLevel('ADMIN'), (ctx) => {
@@ -177,6 +178,7 @@ export function registerCatalogAdminRoutes(app, r) {
             throw E.unprocessable('القسم الأب غير موجود', 'INVALID_PARENT');
         db.run(`UPDATE categories SET name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),parent_id=COALESCE(?,parent_id),keywords=COALESCE(?,keywords),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),updated_at=? WHERE id=?`, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.parentId ?? null, b.keywords ? JSON.stringify(b.keywords) : null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), iso(app.clock.now()), old.id);
         catalog.invalidate();
+        app.sse.broadcast('sync', { scope: 'catalog' });
         app.audit.log({ ctx, action: 'category.update', entityType: 'category', entityId: old.id, before: { isActive: !!old.is_active }, after: b });
         return { category: catalog.serializeCategory(db.get('SELECT * FROM categories WHERE id=?', old.id), ctx.locale, { withServices: true, admin: true }) };
     });
@@ -194,6 +196,7 @@ export function registerCatalogAdminRoutes(app, r) {
         catalog.invalidate();
         app.audit.log({ ctx, action: 'service.create', entityType: 'service', entityId: id, after: b });
         ctx.status = 201;
+        app.sse.broadcast('sync', { scope: 'catalog' });
         return { service: catalog.serializeService(db.get('SELECT * FROM services WHERE id=?', id), ctx.locale, { full: true }) };
     });
     r.patch('/admin/services/:id', auth, adminLevel('ADMIN'), (ctx) => {
@@ -209,6 +212,7 @@ export function registerCatalogAdminRoutes(app, r) {
             throw E.unprocessable('القسم غير موجود', 'INVALID_CATEGORY');
         db.run(`UPDATE services SET category_id=COALESCE(?,category_id),name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),keywords=COALESCE(?,keywords),pricing_type=?,base_price=?,form_schema=COALESCE(?,form_schema),default_priority=COALESCE(?,default_priority),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),updated_at=? WHERE id=?`, b.categoryId ?? null, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.keywords ? JSON.stringify(b.keywords) : null, pricing, price, b.formSchema ? JSON.stringify(b.formSchema) : null, b.defaultPriority ?? null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), iso(app.clock.now()), old.id);
         catalog.invalidate();
+        app.sse.broadcast('sync', { scope: 'catalog' });
         app.audit.log({ ctx, action: 'service.update', entityType: 'service', entityId: old.id, before: { isActive: !!old.is_active, pricingType: old.pricing_type, basePrice: old.base_price }, after: b });
         return { service: catalog.serializeService(db.get('SELECT * FROM services WHERE id=?', old.id), ctx.locale, { full: true }) };
     });

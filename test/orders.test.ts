@@ -388,12 +388,12 @@ describe('الشكاوى', () => {
 });
 
 describe('التحقق من نموذج الطلب الديناميكي (على الخادم)', () => {
-  test('حقول نموذج الخدمة اختيارية في الطلب الأولي، وحقول غير معرّفة تُحذف', async () => {
+  test('حقل إلزامي مفقود في form_schema → 422، وحقول غير معرّفة تُحذف', async () => {
     const areaId = await makeArea('اختبار-نموذج', 14.5, 44.5);
-    const svc = await getServiceBySlug('daily-worker'); // التفاصيل الإضافية اختيارية في الطلب الأولي
+    const svc = await getServiceBySlug('daily-worker'); // workers_count إلزامي حسب seed-data
     const customer = await registerUser(api);
     const missing = await api('POST', '/api/v1/orders', { token: customer.body.accessToken, body: { serviceId: svc.id, description: 'أحتاج عمالًا للنقل', contactPhone: '+967771112233', location: { lat: 14.5, lng: 44.5 }, formData: {} } });
-    assert.equal(missing.status, 201);
+    assert.equal(missing.status, 422);
     const ok = await api('POST', '/api/v1/orders', { token: customer.body.accessToken, body: { serviceId: svc.id, description: 'أحتاج عمالًا للنقل', contactPhone: '+967771112233', location: { lat: 14.5, lng: 44.5 }, formData: { workers_count: 3, malicious: '<script>' } } });
     assert.equal(ok.status, 201);
     assert.deepEqual(Object.keys(ok.body.order.formData).sort(), ['workers_count']);

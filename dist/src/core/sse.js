@@ -30,6 +30,12 @@ export class SseHub {
             catch { /* connection closed */ }
         }
     }
+    broadcast(event, data) { for (const set of this.clients.values())
+        for (const res of set)
+            try {
+                res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+            }
+            catch { /* connection closed */ } }
     ping() { for (const set of this.clients.values())
         for (const res of set)
             try {

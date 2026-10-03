@@ -22,7 +22,7 @@ const tripInputSchema: Schema = s.obj({
   destinationAddressId: s.str({ max: 64, optional: true }),
   purpose: purposeSchema,
   purposeNote: s.str({ max: 500, optional: true }),
-  description: s.str({ min: 0, max: 1000, optional: true, default: '' }),
+  description: s.str({ min: 5, max: 1000 }),
   contactPhone: s.str({ min: 8, max: 24 }),
   notes: s.str({ max: 500, optional: true }),
 });

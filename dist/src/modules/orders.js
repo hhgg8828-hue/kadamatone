@@ -9,7 +9,7 @@ import { canTransition, CANCELLABLE_ORDER, statusIndex } from '../../shared/orde
 import { serializeTrip } from './trips.js';
 const createOrderSchema = s.obj({
     serviceId: s.str({ min: 1, max: 64 }),
-    description: s.str({ min: 0, max: 1000, optional: true, default: '' }),
+    description: s.str({ min: 5, max: 1000 }),
     location: { ...locationSchema, optional: true },
     addressId: s.str({ max: 64, optional: true }),
     contactPhone: s.str({ min: 8, max: 24 }),
@@ -51,13 +51,13 @@ export function createOrders(app) {
                 attachments: (parseJson(o.attachments, []) ?? []).map((id) => `/api/v1/files/${id}`), wave: o.wave,
                 createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason,
             };
-            const trip = serializeTrip(app, o.id, ctx.locale);
-            if (trip)
-                out.trip = trip;
             if (ctx.user?.role === 'PROVIDER' || ctx.user?.role === 'ADMIN') {
                 const cu = db.get('SELECT id, full_name, phone FROM users WHERE id = ?', o.customer_id);
                 out.customer = { id: cu.id, fullName: cu.full_name, phone: approx ? null : cu.phone };
             }
+            const trip = serializeTrip(app, o.id, ctx.locale);
+            if (trip)
+                out.trip = trip;
             if (o.provider_id) {
                 const p = app.providers.summary(o.provider_id, ctx.locale);
                 out.provider = { id: p.id, displayName: p.displayName, avatarUrl: p.avatarUrl, rating: p.rating.avg };
@@ -113,7 +113,7 @@ export function registerOrderRoutes(app, r) {
         if (!svc)
             throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
         const fields = parseJson(svc.form_schema, []) ?? [];
-        const formData = validateFormData(fields, b.formData, { relaxed: true });
+        const formData = validateFormData(fields, b.formData);
         const idemKey = String(ctx.req.headers['idempotency-key'] || '') || null;
         return db.tx(() => {
             if (idemKey) {

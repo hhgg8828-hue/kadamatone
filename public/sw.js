@@ -1,4 +1,4 @@
-const CACHE='khadamat-shell-v1';
+const CACHE='khadamat-shell-v59';
 const SHELL=['/','/provider.html','/admin.html','/css/app.css','/js/app.js','/manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));

@@ -49,7 +49,7 @@ describe('Database & Seed', () => {
   });
   test('النقل يحتوي الخدمات المطلوبة', async () => {
     const r = await api('GET', '/api/v1/categories/transport/services');
-    assert.deepEqual(r.body.services.map((s: Row) => s.name), ['سيارة مع سائق', 'نقل أفراد', 'نقل بضائع', 'نقل أثاث']);
+    assert.deepEqual(r.body.services.map((s: Row) => s.name), ['مشاوير بالدباب', 'سيارة مع سائق', 'نقل أفراد', 'نقل بضائع', 'نقل أثاث']);
   });
   test('Seed قابل لإعادة التشغيل بدون تكرار', async () => {
     const before = t.app.db.one('SELECT COUNT(*) c FROM services').c;

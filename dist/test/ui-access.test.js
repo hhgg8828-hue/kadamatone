@@ -178,4 +178,14 @@ test('V49: provider can choose direct acceptance or quote, and admin complaint U
     assert.ok(app.includes('حل المشكلة وإبقاء الطلب مكتملًا'));
     assert.ok(!app.includes('RESTORE_COMPLETED أو CANCEL_ORDER أو WARN_PROVIDER'));
 });
+test('V57: واجهة المشاوير بالدباب تحتوي خرائط الانطلاق والوجهة وعداد الأجرة', () => {
+    const app = fs.readFileSync(path.join(root, 'app.ts'), 'utf8');
+    assert.ok(app.includes("s.slug==='motorcycle-trips'"));
+    assert.ok(app.includes('tripOriginMap'));
+    assert.ok(app.includes('tripDestinationMap'));
+    assert.ok(app.includes('/trips/estimate'));
+    assert.ok(app.includes('/trips'));
+    assert.ok(app.includes('tripDistance'));
+    assert.ok(app.includes('tripFare'));
+});
 //# sourceMappingURL=ui-access.test.js.map
