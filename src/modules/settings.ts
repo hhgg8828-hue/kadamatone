@@ -17,6 +17,10 @@ export const SETTINGS: Record<string, SettingMeta> = {
   'assignment.max_waves': { def: 3, schema: s.int({ min: 1, max: 20 }), desc: 'أقصى عدد موجات إسناد' },
   'assignment.search_retry_minutes': { def: 10, schema: s.int({ min: 1, max: 1440 }), desc: 'دقائق إعادة البحث عن مقدم خدمة بعد استنفاد الموجات' },
   'assignment.auto_reassign_provider_cancel': { def: true, schema: s.bool(), desc: 'إعادة البحث تلقائيًا إذا ألغى مقدم الخدمة بعد القبول وقبل بدء التنفيذ' },
+  'presence.timeout_sec': { def: 300, schema: s.int({ min: 30, max: 86400 }), desc: 'مهلة اعتبار مقدم الخدمة غير متصل عند غياب نبضة الحياة' },
+  'operations.acceptance_sla_sec': { def: 180, schema: s.int({ min: 30, max: 86400 }), desc: 'مدة انتظار القبول قبل تنبيه الإدارة' },
+  'operations.execution_sla_multiplier': { def: 2, schema: s.num({ min: 1, max: 20 }), desc: 'معامل تنبيه التأخر أثناء التنفيذ' },
+
   'assignment.max_distance_km': { def: 5000, schema: s.num({ min: 1, max: 5000 }), desc: 'إعداد قديم غير مستخدم في المطابقة؛ لا يقيّد المسافة' },
   'matching.weight_distance': { def: 0.6, schema: s.num({ min: 0, max: 1 }), desc: 'وزن المسافة في الترتيب' },
   'matching.weight_rating': { def: 0.4, schema: s.num({ min: 0, max: 1 }), desc: 'وزن التقييم في الترتيب' },

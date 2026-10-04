@@ -214,7 +214,15 @@ export function registerCatalogAdminRoutes(app: App, r: App['router']): void {
 export function registerCatalogRoutes(app: App, r: App['router']): void {
   const { catalog } = app;
   r.get('/categories', (ctx: Ctx) => ({ categories: catalog.tree(ctx.query['lang'] === 'en' ? 'en' : ctx.locale) }));
-  r.get('/catalog/bootstrap', (ctx: Ctx) => { const locale = ctx.query['lang'] === 'en' ? 'en' : ctx.locale; const data = catalog.all(); return { categories: catalog.tree(locale), services: data.services.filter(x=>x.is_active).map(x=>catalog.serializeService(x, locale)) }; });
+  r.get('/catalog/bootstrap', (ctx: Ctx) => {
+    const locale = ctx.query['lang'] === 'en' ? 'en' : ctx.locale; const data = catalog.all();
+    const now = iso(Date.now());
+    const temporaryServices = app.db.all<any>(`SELECT * FROM temporary_services WHERE is_active=1 AND start_at<=? AND end_at>? ORDER BY sort_order,start_at`, now, now).map((x:any) => ({
+      id:x.id, linkedServiceId:x.linked_service_id, name:tr(parseJson(x.name_i18n),locale), title:tr(parseJson(x.title_i18n),locale), description:tr(parseJson(x.description_i18n||'{}'),locale), icon:x.icon, categoryId:x.category_id, startAt:x.start_at,endAt:x.end_at,sortOrder:x.sort_order,actionLabel:tr(parseJson(x.action_label_i18n||'{}'),locale),areaIds:parseJson(x.area_ids_json||'[]'),maxOrders:x.max_orders,pricing:parseJson(x.pricing_json||'{}')
+    }));
+    const campaigns = app.db.all<any>(`SELECT * FROM admin_campaigns WHERE is_active=1 AND start_at<=? AND end_at>? ORDER BY sort_order,start_at`,now,now).map((x:any)=>({id:x.id,title:tr(parseJson(x.title_i18n),locale),description:tr(parseJson(x.description_i18n||'{}'),locale),buttonLabel:tr(parseJson(x.button_label_i18n||'{}'),locale),actionType:x.action_type,actionValue:x.action_value,startAt:x.start_at,endAt:x.end_at,sortOrder:x.sort_order,areaIds:parseJson(x.area_ids_json||'[]')}));
+    return { categories: catalog.tree(locale), services: data.services.filter(x=>x.is_active).map(x=>catalog.serializeService(x, locale)), temporaryServices, campaigns };
+  });
   r.get('/categories/:slug/services', (ctx: Ctx) => {
     const data = catalog.all();
     const c = data.categories.find((x) => x.slug === ctx.params['slug'] && x.is_active);

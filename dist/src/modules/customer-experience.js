@@ -1,7 +1,7 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
 import { uuid } from '../core/security.js';
-import { iso } from '../core/util.js';
+import { iso, tr } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
 const serializeBeneficiary = (app, b, locale) => ({ id: b.id, label: b.label, fullName: b.full_name, phone: b.phone, location: b.location_id ? app.locations.serialize(app.db.get('SELECT * FROM locations WHERE id=?', b.location_id), locale) : null });
 const beneficiarySchema = s.obj({
@@ -81,19 +81,45 @@ export function registerCustomerExperienceRoutes(app, r) {
         db.run('INSERT INTO assistant_messages(id,session_id,role,body,image_file_id,created_at) VALUES(?,?,?,?,?,?)', uuid(), session.id, 'CUSTOMER', b.text, b.imageFileId || null, now);
         const prior = JSON.parse(session.draft_json || '{}');
         const result = await app.intentParser.parse(b.text, { catalog: app.catalog, locale: ctx.locale, image });
-        const top = result.matches[0];
-        const draft = { ...prior, rawText: [...(prior.rawText || []), b.text].slice(-8), serviceId: top?.serviceId || prior.serviceId || null, serviceName: top?.serviceName || prior.serviceName || null, imageFileId: b.imageFileId || prior.imageFileId || null, purchaseIntent: result.extracted.purchaseIntent, priority: result.priority };
+        let top = result.matches[0];
+        if (prior.serviceId && prior.purchaseIntent) {
+            const priorSvc = app.catalog.all().byService.get(prior.serviceId);
+            if (priorSvc) {
+                const cat = app.catalog.all().byCategory.get(priorSvc.category_id);
+                top = { serviceId: priorSvc.id, serviceSlug: priorSvc.slug, serviceName: tr(priorSvc.name_i18n, ctx.locale), categoryId: priorSvc.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.5, confidence: 0.5, icon: priorSvc.icon };
+            }
+        }
+        if (!top && prior.serviceId) {
+            const priorSvc = app.catalog.all().byService.get(prior.serviceId);
+            if (priorSvc) {
+                const cat = app.catalog.all().byCategory.get(priorSvc.category_id);
+                top = { serviceId: priorSvc.id, serviceSlug: priorSvc.slug, serviceName: tr(priorSvc.name_i18n, ctx.locale), categoryId: priorSvc.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.3, confidence: 0.3, icon: priorSvc.icon };
+            }
+        }
+        if (!top && result.extracted.purchaseIntent) {
+            const fallback = app.catalog.all().services.find(x => x.is_active && ['shopping-delivery', 'purchase-and-delivery', 'pharmacy-purchase'].includes(x.slug));
+            if (fallback) {
+                const cat = app.catalog.all().byCategory.get(fallback.category_id);
+                top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.35, confidence: 0.35, icon: fallback.icon };
+            }
+        }
+        const confirmation = /^(نعم|ايوه|أيوه|نعم ارسل|ارسل|أرسل|تمام|موافق|موافقه|موافقًا|نفذ|نفذ الطلب)$/i.test(String(b.text).trim());
+        const priorHasService = Boolean(prior.serviceId);
+        const destinationCandidate = priorHasService && prior.purchaseIntent && !confirmation && b.text.trim().length >= 3 && !/^(نعم|ايوه|أيوه|تمام|موافق|ارسل|أرسل|نفذ)/i.test(b.text.trim()) ? b.text.trim() : null;
+        const purchaseIntent = Boolean(result.extracted.purchaseIntent || prior.purchaseIntent);
+        const draft = { ...prior, rawText: [...(prior.rawText || []), b.text].slice(-8), serviceId: top?.serviceId || prior.serviceId || null, serviceName: top?.serviceName || prior.serviceName || null, imageFileId: b.imageFileId || prior.imageFileId || null, purchaseIntent, priority: result.priority, destinationText: prior.destinationText || destinationCandidate || null, confirmed: prior.confirmed || confirmation };
         let question = null;
         if (!draft.serviceId)
             question = 'ما الذي تريد تنفيذه؟ يمكنك كتابة اسم الغرض أو إرسال صورة له.';
-        else if (result.extracted.purchaseIntent && !draft.destinationText)
+        else if (draft.purchaseIntent && !draft.destinationText)
             question = 'أين تريد توصيله؟';
-        else if (result.clarification?.question)
+        else if (result.clarification?.question && !draft.confirmed && !(draft.purchaseIntent && draft.destinationText))
             question = result.clarification.question;
         else if (!draft.confirmed)
             question = 'فهمت طلبك. هل تريد إرسال الطلب الآن؟';
         const reply = question === 'فهمت طلبك. هل تريد إرسال الطلب الآن؟' ? `فهمت أنك تريد ${draft.serviceName || 'تنفيذ هذه المهمة'}. هل تريد إرسال الطلب الآن؟` : question || 'فهمت طلبك. أعطني المعلومة الناقصة وسأكمل الطلب.';
         db.run('UPDATE assistant_sessions SET draft_json=?,updated_at=? WHERE id=?', JSON.stringify(draft), now, session.id);
+        db.run('INSERT INTO intent_audit(id,customer_id,assistant_session_id,original_text,image_attached,predicted_service_id,predicted_confidence,parser_source,selected_service_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)', uuid(), ctx.user.id, session.id, b.text, b.imageFileId ? 1 : 0, draft.serviceId || null, top?.confidence || null, result.source, draft.serviceId || null, now, now);
         db.run('INSERT INTO assistant_messages(id,session_id,role,body,created_at) VALUES(?,?,?,?,?)', uuid(), session.id, 'ASSISTANT', reply, now);
         return { sessionId: session.id, reply, question, draft, result, ready: Boolean(draft.serviceId && question?.includes('إرسال الطلب')) };
     });

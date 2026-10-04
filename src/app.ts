@@ -21,6 +21,7 @@ import { registerFileRoutes } from './modules/files.js';
 import { registerSearchRoutes } from './modules/search.js';
 import { createProviders, registerProviderRoutes, type Providers } from './modules/providers.js';
 import { registerAdminCoreRoutes } from './modules/admin.core.js';
+import { registerAdminOperationsRoutes } from './modules/admin.operations.js';
 import { registerPlatformRoutes } from './modules/platform.js';
 import { createOrders, registerOrderRoutes, type Orders } from './modules/orders.js';
 import { createAssignmentService, registerAssignmentRoutes, type AssignmentService } from './modules/assignment.js';
@@ -82,6 +83,7 @@ export function createApp(overrides: ConfigOverrides = {}): App {
   registerProviderRoutes(app, r);
   registerNotificationRoutes(app, r);
   registerAdminCoreRoutes(app, r);
+  registerAdminOperationsRoutes(app, r);
   registerPlatformRoutes(app, r);
   registerOrderRoutes(app, r);
   registerAssignmentRoutes(app, r);

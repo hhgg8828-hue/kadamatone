@@ -79,4 +79,53 @@ test('V66.3: إنشاء الطلب يمكنه ربط جلسة مساعد الط�
 finally {
     await t.close();
 } });
+test('V66.4: بيانات مقدم الخدمة تشمل حالة التشغيل ونسبة القبول وزمن الاستجابة', async () => { const t = await startApp(); try {
+    const p = await registerUser(t.api, { role: 'PROVIDER', provider: { providerType: 'DRIVER', displayName: 'مقدم قياس' } });
+    const pid = t.app.db.get('SELECT id FROM service_providers WHERE user_id=?', p.body.user.id).id;
+    t.app.db.run("UPDATE service_providers SET verification_status='VERIFIED',is_online=1 WHERE id=?", pid);
+    const now = new Date();
+    const offered = new Date(now.getTime() - 120000).toISOString();
+    const responded = new Date(now.getTime() - 60000).toISOString();
+    const c = await registerUser(t.api);
+    const svcId = svc(t, 'custom-request').id;
+    const oid = 'metric-order';
+    t.app.db.run('INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,pricing_type,currency,attachments,location_provided,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', oid, 'KH-METRIC', c.body.user.id, svcId, 'SEARCHING', 'NORMAL', 'x', '{}', 'no-location', 'system-yemen', c.creds.phone, 'FIXED', 'YER', '[]', 0, offered, offered);
+    t.app.db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at,responded_at) VALUES(?,?,?,?,?,?,?,?,?,?)', 'metric-assignment', oid, pid, 'REJECTED', 1, 0.5, 1, offered, new Date(now.getTime() + 60000).toISOString(), responded);
+    const prof = await t.api('GET', '/api/v1/provider/profile', { token: p.body.accessToken });
+    assert.equal(prof.status, 200);
+    assert.equal(prof.body.provider.acceptanceRate, 0);
+    assert.equal(prof.body.provider.availabilityStatus, 'AVAILABLE');
+    assert.ok(prof.body.provider.responseTimeText);
+}
+finally {
+    await t.close();
+} });
+test('V66.4: الإدارة تستطيع التحكم في مقدم الخدمة المميز وتظهر الحالة للعميل', async () => { const t = await startApp(); try {
+    const admin = await (await import('./helpers.js')).loginAdmin(t.api);
+    const p = await registerUser(t.api, { role: 'PROVIDER', provider: { providerType: 'DRIVER', displayName: 'مقدم مميز' } });
+    const pid = t.app.db.get('SELECT id FROM service_providers WHERE user_id=?', p.body.user.id).id;
+    const f = await t.api('PATCH', `/api/v1/admin/providers/${pid}/featured`, { token: admin, body: { featured: true } });
+    assert.equal(f.status, 200);
+    assert.equal(f.body.featured, true);
+    assert.ok(t.app.db.get('SELECT 1 FROM featured_providers WHERE provider_id=?', pid));
+    const off = await t.api('PATCH', `/api/v1/admin/providers/${pid}/featured`, { token: admin, body: { featured: false } });
+    assert.equal(off.status, 200);
+    assert.equal(off.body.featured, false);
+}
+finally {
+    await t.close();
+} });
+test('V66.4: مساعد الطلب يحتفظ بالسياق ويحوّل إجابة الوجهة إلى مسودة منظمة', async () => { const t = await startApp(); try {
+    const c = await registerUser(t.api);
+    const a = await t.api('POST', '/api/v1/assist/session', { token: c.body.accessToken, body: { text: 'أريد سلك كهرباء يشتريه لي ويوصله' } });
+    assert.equal(a.status, 200);
+    assert.ok(a.body.draft.serviceId);
+    const b = await t.api('POST', '/api/v1/assist/session', { token: c.body.accessToken, body: { sessionId: a.body.sessionId, text: 'إلى قرية السحول' } });
+    assert.equal(b.status, 200);
+    assert.equal(b.body.draft.destinationText, 'إلى قرية السحول');
+    assert.match(String(b.body.reply), /إرسال الطلب|طلب/);
+}
+finally {
+    await t.close();
+} });
 //# sourceMappingURL=v66_3.test.js.map

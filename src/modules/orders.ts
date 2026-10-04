@@ -108,6 +108,7 @@ export function createOrders(app: App): Orders {
       if (!res.changes) throw E.conflict('تم تعديل الطلب من عملية أخرى، أعد المحاولة', 'VERSION_CONFLICT');
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,metadata,created_at) VALUES (?,?,?,?,?,?,?,?)',
         o.id, o.status, to, ctx.user?.id ?? null, actorRole, reason ?? null, metadata ? JSON.stringify(metadata) : null, now);
+      if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED') db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?',to,now,o.id);
       return db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!;
     },
   };
@@ -202,6 +203,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
         b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName||null, b.recipientPhone||null, b.recipientUserId||null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', nowIso);
       if (b.assistantSessionId) db.run("UPDATE assistant_sessions SET status='CONFIRMED',updated_at=? WHERE id=? AND customer_id=?",nowIso,b.assistantSessionId,ctx.user!.id);
+      if (b.assistantSessionId) db.run('UPDATE intent_audit SET order_id=?,selected_service_id=?,updated_at=? WHERE assistant_session_id=? AND order_id IS NULL',id,svc.id,nowIso,b.assistantSessionId);
       let o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', id)!;
       o = orders.applyTransition(o, 'SEARCHING', 'SYSTEM', ctx, { reason: 'auto' });
       app.notifications.notify(ctx.user!.id, 'ORDER_RECEIVED', { code: o.code });

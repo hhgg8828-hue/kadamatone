@@ -72,6 +72,23 @@ export function registerAdminCoreRoutes(app, r) {
         app.sse.send(target.id, 'sync', { scope: 'users' });
         return { user: serializeUser(app.authService.loadUser('u.id = ?', target.id)) };
     });
+    r.get('/admin/intent-audit', auth, adminLevel('SUPPORT'), (ctx) => {
+        const limit = Math.min(200, Math.max(1, Number(ctx.query['limit'] || 50)));
+        const rows = db.all(`SELECT ia.*,u.full_name customer_name,ps.name_i18n predicted_name_i18n,ss.name_i18n selected_name_i18n,sp.display_name provider_name FROM intent_audit ia JOIN users u ON u.id=ia.customer_id LEFT JOIN services ps ON ps.id=ia.predicted_service_id LEFT JOIN services ss ON ss.id=ia.selected_service_id LEFT JOIN service_providers sp ON sp.id=ia.selected_provider_id ORDER BY ia.created_at DESC LIMIT ?`, limit);
+        return { items: rows.map((x) => ({ id: x.id, originalText: x.original_text, customerName: x.customer_name, assistantSessionId: x.assistant_session_id, orderId: x.order_id, predictedServiceId: x.predicted_service_id, predictedConfidence: x.predicted_confidence, parserSource: x.parser_source, selectedServiceId: x.selected_service_id, selectedProviderId: x.selected_provider_id, providerName: x.provider_name, assignmentResult: x.assignment_result, outcome: x.outcome, correctionServiceId: x.correction_service_id, correctionNote: x.correction_note, createdAt: x.created_at, updatedAt: x.updated_at })) };
+    });
+    r.patch('/admin/intent-audit/:id/correction', auth, adminLevel('ADMIN'), (ctx) => {
+        const b = parse(s.obj({ serviceId: s.str({ max: 64, optional: true }), note: s.str({ max: 500, optional: true }) }), ctx.body);
+        const row = db.get('SELECT id FROM intent_audit WHERE id=?', ctx.params['id']);
+        if (!row)
+            throw E.notFound('سجل المساعد غير موجود');
+        if (b.serviceId && !db.get('SELECT id FROM services WHERE id=?', b.serviceId))
+            throw E.notFound('الخدمة المصححة غير موجودة');
+        const now = iso(app.clock.now());
+        db.run('UPDATE intent_audit SET correction_service_id=?,correction_note=?,corrected_by=?,corrected_at=?,updated_at=? WHERE id=?', b.serviceId || null, b.note || null, ctx.user.id, now, now, row.id);
+        app.audit.log({ ctx, action: 'intent.correction', entityType: 'intent_audit', entityId: row.id, after: { serviceId: b.serviceId || null, note: b.note || null } });
+        return { ok: true };
+    });
     r.get('/admin/dashboard', auth, adminLevel('SUPPORT'), () => {
         const count = (sql, ...params) => Number(db.get(sql, ...params)?.n || 0);
         return { stats: {

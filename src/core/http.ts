@@ -180,7 +180,13 @@ export function createRequestHandler(app: App) {
       log.error('unhandled_error', { requestId, err: String((err as Error)?.stack || err) });
       return json(500, { error: { code: 'INTERNAL_ERROR', message: 'حدث خطأ غير متوقع، حاول لاحقًا', requestId } });
     } finally {
-      if (url.pathname.startsWith('/api/')) log.info('request', { requestId, method: req.method, path: url.pathname, status, ms: Date.now() - started });
+      if (url.pathname.startsWith('/api/')) {
+        const duration=Date.now()-started;
+        log.info('request', { requestId, method: req.method, path: url.pathname, status, ms: duration });
+        if (duration>=1000 || status>=500) {
+          try { app.db.run(`INSERT INTO system_events(level,event_type,message,request_id,method,path,status_code,duration_ms,metadata,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, status>=500?'ERROR':'WARNING', status>=500?'API_ERROR':'SLOW_API', status>=500?'فشل طلب API':'طلب API بطيء', requestId, req.method||null, url.pathname, status, duration, JSON.stringify({ip}), new Date().toISOString()); } catch { /* telemetry must never break the response */ }
+        }
+      }
     }
   };
 }
