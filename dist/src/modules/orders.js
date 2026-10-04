@@ -7,6 +7,7 @@ import { locationSchema } from './locations.js';
 import { validateFormData } from './catalog.js';
 import { canTransition, CANCELLABLE_ORDER, statusIndex } from '../../shared/orderStateMachine.js';
 import { serializeTrip } from './trips.js';
+import { executionEvent } from './execution.js';
 const createOrderSchema = s.obj({
     serviceId: s.str({ min: 1, max: 64 }),
     description: s.str({ min: 5, max: 1000 }),
@@ -19,6 +20,7 @@ const createOrderSchema = s.obj({
     formData: s.any({ optional: true }),
     notes: s.str({ max: 500, optional: true }),
     attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 10, optional: true }),
+    tasks: s.arr(s.obj({ title: s.str({ min: 2, max: 200 }), taskType: s.str({ min: 2, max: 50, optional: true }), details: s.str({ max: 1000, optional: true }) }), { max: 20, optional: true }),
     recipientName: s.str({ max: 80, optional: true }), recipientPhone: s.str({ max: 24, optional: true }), recipientUserId: s.str({ max: 64, optional: true }), assistantSessionId: s.str({ max: 64, optional: true }),
 });
 const isParticipant = (o, ctx) => {
@@ -94,6 +96,7 @@ export function createOrders(app) {
             if (!res.changes)
                 throw E.conflict('تم تعديل الطلب من عملية أخرى، أعد المحاولة', 'VERSION_CONFLICT');
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,metadata,created_at) VALUES (?,?,?,?,?,?,?,?)', o.id, o.status, to, ctx.user?.id ?? null, actorRole, reason ?? null, metadata ? JSON.stringify(metadata) : null, now);
+            executionEvent(app, o.id, 'STATUS', `تغيرت حالة الطلب إلى ${to}`, reason, actorRole, ctx.user?.id, metadata || {});
             if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED')
                 db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?', to, now, o.id);
             return db.get('SELECT * FROM orders WHERE id = ?', o.id);
@@ -117,6 +120,8 @@ export function registerOrderRoutes(app, r) {
             throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
         const fields = parseJson(svc.form_schema, []) ?? [];
         const formData = validateFormData(fields, b.formData);
+        if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now())
+            throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
         const idemKey = String(ctx.req.headers['idempotency-key'] || '') || null;
         return db.tx(() => {
             if (idemKey) {
@@ -198,6 +203,11 @@ export function registerOrderRoutes(app, r) {
                 pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id, b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get('platform.currency'), b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName || null, b.recipientPhone || null, b.recipientUserId || null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user.id, 'CUSTOMER', nowIso);
+            if (b.tasks?.length) {
+                for (let i = 0; i < b.tasks.length; i++)
+                    db.run('INSERT INTO order_tasks(id,order_id,sequence_no,title,task_type,status,details,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)', uuid(), id, i + 1, b.tasks[i].title, b.tasks[i].taskType || 'GENERAL', 'PENDING', b.tasks[i].details || null, nowIso, nowIso);
+                executionEvent(app, id, 'COMPOUND_TASKS_CREATED', 'إنشاء طلب مركب', `تم إنشاء ${b.tasks.length} مهام مرتبطة بالطلب`, 'CUSTOMER', ctx.user.id, { count: b.tasks.length });
+            }
             if (b.assistantSessionId)
                 db.run("UPDATE assistant_sessions SET status='CONFIRMED',updated_at=? WHERE id=? AND customer_id=?", nowIso, b.assistantSessionId, ctx.user.id);
             if (b.assistantSessionId)

@@ -4,6 +4,8 @@
  * عند توفر الشبكة لاحقًا: `npm i -D @types/node` ثم حذف هذا الملف — لا تغيير في الكود.
  */
 declare module 'node:crypto' {
+  const crypto: any;
+  export default crypto;
   export function randomUUID(): string;
   export function randomBytes(size: number): Buffer;
   export function createHash(alg: string): { update(d: string | Buffer): any; digest(enc: 'hex' | 'base64' | 'base64url'): string };
@@ -90,8 +92,10 @@ declare function fetch(url: string, init?: any): Promise<{ status: number; ok: b
 declare class Buffer extends Uint8Array {
   static from(data: string | ArrayBuffer | number[], enc?: string): Buffer;
   static concat(list: Buffer[]): Buffer;
+  static alloc(size: number): Buffer;
   toString(enc?: string): string;
   static isBuffer(x: any): x is Buffer;
+  writeUInt32BE(value: number, offset: number): Buffer;
   equals(other: Uint8Array): boolean;
   subarray(start?: number, end?: number): Buffer;
 }
@@ -105,6 +109,8 @@ declare class URL {
   constructor(input: string, base?: string);
   pathname: string;
   href: string;
+  protocol: string;
+  host: string;
   searchParams: URLSearchParams;
 }
 declare class URLSearchParams {

@@ -41,6 +41,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     if (isProd) throw new Error('JWT_SECRET is required in production (min 32 chars)');
     jwtSecret = crypto.randomBytes(32).toString('hex'); // تطوير: يتغير مع كل تشغيل
   }
+  if (!jwtSecret) throw new Error('JWT_SECRET could not be initialized');
   if (isProd && jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
   const abs = (p: string) => (p === ':memory:' ? p : path.resolve(ROOT, p));
   return Object.freeze({

@@ -45,6 +45,7 @@ export function createNotifications(app) {
     /** قنوات التوصيل (Port: NotificationChannel). InApp الآن؛ FCM/SMS لاحقًا بنفس الواجهة. */
     const channels = [
         { name: 'in_app', deliver: (userId, n) => app.sse.send(userId, 'notification', n) },
+        { name: 'web_push', deliver: (userId, n) => { void app.webPush.send(userId, n); } },
     ];
     const svc = {
         channels,
@@ -54,8 +55,11 @@ export function createNotifications(app) {
             const row = { id: uuid(), user_id: userId, type, params: JSON.stringify(params), data: JSON.stringify(data), read_at: null, created_at: iso(app.clock.now()) };
             db.run('INSERT INTO notifications(id,user_id,type,params,data,created_at) VALUES (?,?,?,?,?,?)', row.id, userId, type, row.params, row.data, row.created_at);
             db.afterCommit(() => {
-                const locale = (db.get('SELECT locale FROM users WHERE id = ?', userId)?.locale) || 'ar';
+                const userMeta = db.get('SELECT u.locale, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id = ?', userId);
+                const locale = userMeta?.locale || 'ar';
                 const rendered = renderNotification(row, locale);
+                const targetPage = userMeta?.role === 'PROVIDER' ? '/provider.html' : userMeta?.role === 'ADMIN' ? '/admin' : '/';
+                rendered.data = { ...(rendered.data || {}), targetPage };
                 for (const ch of channels) {
                     try {
                         ch.deliver(userId, rendered);
@@ -84,6 +88,7 @@ export function createNotifications(app) {
 }
 export function registerNotificationRoutes(app, r) {
     const { db, notifications } = app;
+    r.get('/notifications/vapid-public-key', (ctx) => ({ publicKey: app.webPush.publicKey(), subject: app.settings.get('push.subject') }));
     r.get('/notifications', auth, (ctx) => notifications.list(ctx.user.id, ctx.query, ctx.user.locale));
     r.post('/notifications/read-all', auth, (ctx) => {
         db.run('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL', iso(app.clock.now()), ctx.user.id);

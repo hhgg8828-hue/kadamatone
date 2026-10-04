@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.14",
-  "description": "خدمات (Khadamat) — V66.5 operational command center, live monitoring, alerts, temporary services, campaigns, reports and system health",
+  "version": "0.6.16",
+  "description": "خدمات (Khadamat) — V66.7 execution, intent-to-capability matching, prioritized temporary services, compound tasks, smart timeline and map fallback",
   "private": true,
   "type": "module",
   "engines": {

@@ -26,14 +26,13 @@ export async function seedBase(db, config) {
             c.services.forEach((sv, si) => {
                 if (db.get('SELECT 1 FROM services WHERE slug = ?', sv.slug))
                     return;
-                db.run(`INSERT INTO services(id,category_id,slug,name_i18n,icon,keywords,pricing_type,base_price,form_schema,cancellation_policy_id,requires_inspection,requires_vehicle,supports_waiting,sort_order,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), cat.id, sv.slug, j(sv.name), sv.icon, j(sv.keywords), sv.pricing, sv.pricing === 'FIXED' ? sv.price : null, j(sv.form), 'default', sv.requiresInspection ? 1 : 0, sv.requiresVehicle ? 1 : 0, sv.supportsWaiting ? 1 : 0, si + 1, now, now);
+                db.run(`INSERT INTO services(id,category_id,slug,name_i18n,icon,keywords,pricing_type,base_price,form_schema,cancellation_policy_id,requires_inspection,requires_vehicle,supports_waiting,seasonal_enabled,season_start_at,season_end_at,sort_order,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), cat.id, sv.slug, j(sv.name), sv.icon, j(sv.keywords), sv.pricing, sv.pricing === 'FIXED' ? sv.price : null, j(sv.form), 'default', sv.requiresInspection ? 1 : 0, sv.requiresVehicle ? 1 : 0, sv.supportsWaiting ? 1 : 0, sv.seasonal ? 1 : 0, null, null, si + 1, now, now);
                 out.services++;
             });
         });
         // إعدادات تشغيلية للخدمات التي تتطلب إثبات تسليم: تُطبق بعد إنشاء seed للخدمات لأن migrations تسبق seedBase.
         db.run("UPDATE services SET delivery_proof_type='PIN' WHERE slug IN ('parcel-delivery','shopping-delivery','document-delivery','motorcycle-trips','pharmacy-purchase','purchase-and-delivery')");
-        db.run("UPDATE services SET seasonal_enabled=1,season_start_at=NULL,season_end_at=NULL WHERE slug IN ('seasonal-harvest','seasonal-plowing','seasonal-crop-transport')");
         // طلب خدمة غير موجودة يجب أن يُزرع بعد الأقسام لأن migrations تُطبق قبل seedBase.
         if (!db.get('SELECT 1 FROM services WHERE slug=?', 'custom-request')) {
             const cat = db.get('SELECT id FROM categories WHERE slug=?', 'delivery');

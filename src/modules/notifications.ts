@@ -64,6 +64,7 @@ export function createNotifications(app: App): Notifications {
   /** قنوات التوصيل (Port: NotificationChannel). InApp الآن؛ FCM/SMS لاحقًا بنفس الواجهة. */
   const channels: NotificationChannel[] = [
     { name: 'in_app', deliver: (userId, n) => app.sse.send(userId, 'notification', n) },
+    { name: 'web_push', deliver: (userId, n) => { void app.webPush.send(userId, n); } },
   ];
   const svc: Notifications = {
     channels,
@@ -72,8 +73,11 @@ export function createNotifications(app: App): Notifications {
       const row: NotificationRow = { id: uuid(), user_id: userId, type, params: JSON.stringify(params), data: JSON.stringify(data), read_at: null, created_at: iso(app.clock.now()) };
       db.run('INSERT INTO notifications(id,user_id,type,params,data,created_at) VALUES (?,?,?,?,?,?)', row.id, userId, type, row.params, row.data, row.created_at);
       db.afterCommit(() => {
-        const locale = (db.get<{ locale: Locale }>('SELECT locale FROM users WHERE id = ?', userId)?.locale) || 'ar';
+        const userMeta = db.get<{ locale: Locale; role: string }>('SELECT u.locale, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id = ?', userId);
+        const locale = userMeta?.locale || 'ar';
         const rendered = renderNotification(row, locale);
+        const targetPage = userMeta?.role === 'PROVIDER' ? '/provider.html' : userMeta?.role === 'ADMIN' ? '/admin' : '/';
+        rendered.data = { ...(rendered.data as Record<string, unknown> || {}), targetPage };
         for (const ch of channels) { try { ch.deliver(userId, rendered); } catch (e) { app.log.warn('channel_failed', { channel: ch.name, err: String(e) }); } }
       });
       return row.id;
@@ -95,6 +99,7 @@ export function createNotifications(app: App): Notifications {
 
 export function registerNotificationRoutes(app: App, r: Router): void {
   const { db, notifications } = app;
+  r.get('/notifications/vapid-public-key', (ctx: Ctx) => ({ publicKey: app.webPush.publicKey(), subject: app.settings.get<string>('push.subject') }));
   r.get('/notifications', auth, (ctx: Ctx) => notifications.list(ctx.user!.id, ctx.query, ctx.user!.locale));
   r.post('/notifications/read-all', auth, (ctx: Ctx) => {
     db.run('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL', iso(app.clock.now()), ctx.user!.id);

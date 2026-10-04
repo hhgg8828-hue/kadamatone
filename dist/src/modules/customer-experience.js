@@ -100,14 +100,22 @@ export function registerCustomerExperienceRoutes(app, r) {
             const fallback = app.catalog.all().services.find(x => x.is_active && ['shopping-delivery', 'purchase-and-delivery', 'pharmacy-purchase'].includes(x.slug));
             if (fallback) {
                 const cat = app.catalog.all().byCategory.get(fallback.category_id);
-                top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.35, confidence: 0.35, icon: fallback.icon };
+                top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.60, confidence: 0.60, icon: fallback.icon };
+            }
+        }
+        if (result.extracted.purchaseIntent && top && !['shopping-delivery', 'purchase-and-delivery', 'pharmacy-purchase', 'motorcycle-trips'].includes(top.serviceSlug)) {
+            const fallback = app.catalog.all().services.find(x => x.is_active && x.slug === (/صيدلية|دواء|علاج/.test(b.text) ? 'pharmacy-purchase' : 'purchase-and-delivery'));
+            if (fallback) {
+                const cat = app.catalog.all().byCategory.get(fallback.category_id);
+                top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: Math.max(top.score, 0.60), confidence: Math.max(top.confidence, 0.60), icon: fallback.icon };
             }
         }
         const confirmation = /^(نعم|ايوه|أيوه|نعم ارسل|ارسل|أرسل|تمام|موافق|موافقه|موافقًا|نفذ|نفذ الطلب)$/i.test(String(b.text).trim());
         const priorHasService = Boolean(prior.serviceId);
         const destinationCandidate = priorHasService && prior.purchaseIntent && !confirmation && b.text.trim().length >= 3 && !/^(نعم|ايوه|أيوه|تمام|موافق|ارسل|أرسل|نفذ)/i.test(b.text.trim()) ? b.text.trim() : null;
         const purchaseIntent = Boolean(result.extracted.purchaseIntent || prior.purchaseIntent);
-        const draft = { ...prior, rawText: [...(prior.rawText || []), b.text].slice(-8), serviceId: top?.serviceId || prior.serviceId || null, serviceName: top?.serviceName || prior.serviceName || null, imageFileId: b.imageFileId || prior.imageFileId || null, purchaseIntent, priority: result.priority, destinationText: prior.destinationText || destinationCandidate || null, confirmed: prior.confirmed || confirmation };
+        const inferredTaskType = result.extracted.purchaseIntent ? (/صيدلية|دواء|علاج/.test(b.text) ? 'PURCHASE_PHARMACY' : 'PURCHASE_AND_DELIVERY') : null;
+        const draft = { ...prior, rawText: [...(prior.rawText || []), b.text].slice(-8), serviceId: top?.serviceId || prior.serviceId || null, serviceName: top?.serviceName || prior.serviceName || null, imageFileId: b.imageFileId || prior.imageFileId || null, purchaseIntent, priority: result.priority, destinationText: prior.destinationText || destinationCandidate || null, taskType: prior.taskType || inferredTaskType, requiredCapabilities: inferredTaskType === 'PURCHASE_PHARMACY' ? ['purchase:pharmacy', 'delivery:item'] : inferredTaskType ? ['purchase:store', 'delivery:item'] : [], confirmed: prior.confirmed || confirmation };
         let question = null;
         if (!draft.serviceId)
             question = 'ما الذي تريد تنفيذه؟ يمكنك كتابة اسم الغرض أو إرسال صورة له.';
@@ -137,9 +145,17 @@ export function registerCustomerExperienceRoutes(app, r) {
             image = { mime: f.mime, dataBase64: app.storage.read(f.storage_key).toString('base64') };
         }
         const result = await app.intentParser.parse(b.text, { catalog: app.catalog, locale: ctx.locale, image });
-        const top = result.matches[0];
+        let top = result.matches[0];
+        if (result.extracted.purchaseIntent) {
+            const desired = /صيدلية|دواء|علاج/.test(b.text) ? 'pharmacy-purchase' : 'purchase-and-delivery';
+            const fallback = app.catalog.all().services.find(x => x.is_active && x.slug === desired);
+            if (fallback) {
+                const cat = app.catalog.all().byCategory.get(fallback.category_id);
+                top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.60, confidence: 0.60, icon: fallback.icon };
+            }
+        }
         db.run('INSERT INTO customer_searches(customer_id,query,service_id,created_at) VALUES(?,?,?,?)', ctx.user.id, b.text, top?.serviceId || null, iso(app.clock.now()));
-        return { ...result, recommended: top && top.confidence >= 0.40 ? top : null, customService: app.catalog.all().services.find(x => x.slug === 'custom-request')?.id || null };
+        return { ...result, matches: top ? [top, ...result.matches.filter(x => x.serviceId !== top.serviceId)] : result.matches, recommended: top && top.confidence >= 0.40 ? top : null, customService: app.catalog.all().services.find(x => x.slug === 'custom-request')?.id || null };
     });
     r.get('/orders/:id/purchase-change', auth, (ctx) => {
         const o = db.get('SELECT * FROM orders WHERE id=?', ctx.params.id);

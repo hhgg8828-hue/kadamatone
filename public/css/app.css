@@ -198,3 +198,6 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 @media(max-width:600px){.trip-map{height:230px}.trip-meter-main span{font-size:36px}.trip-location-head .btn{font-size:12px;padding:8px 10px}}
 /* V57 mobile touch reliability */
 #online,[data-action],button{touch-action:manipulation}
+
+/* V66.7 RTL hardening for admin navigation, tables and modal editors. */
+.admin-page,.admin-page .modal,.admin-page .modal>.card{direction:rtl;text-align:right;transform:none}.admin-page .table{direction:rtl}.admin-page .admin-tabs{direction:rtl;justify-content:flex-start}.admin-page .admin-table-wrap{direction:rtl}

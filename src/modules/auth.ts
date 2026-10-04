@@ -9,7 +9,7 @@ import type { Ctx, Router } from '../core/http.js';
 import type { UserRow } from '../types/domain.js';
 
 const COOKIE = 'khadamat_rt';
-const PASSWORD: Schema = s.str({ min: 8, max: 128, trim: false, pattern: /^(?=.*[A-Za-z\u0600-\u06FF])(?=.*\d).+$/, patternMessage: 'يجب أن تحتوي كلمة المرور على حرف ورقم' });
+const PASSWORD: Schema = s.str({ min: 8, max: 128, trim: false, patternMessage: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
 const PHONE: Schema = s.str({ min: 8, max: 24 });
 const EMAIL: Schema = s.str({ max: 160, lower: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, patternMessage: 'بريد إلكتروني غير صالح', optional: true });
 

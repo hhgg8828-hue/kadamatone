@@ -40,7 +40,11 @@ export class NearestRatedMatcher implements Matcher {
     const chain = order.area_id ? new Set(this.app.catalog.areaChain(String(order.area_id))) : new Set<string>();
     const serviceSlug = String(db.get<{slug:string}>('SELECT slug FROM services WHERE id=?', order.service_id)?.slug || '');
     let requiredCapability: string | null = null;
-    if (serviceSlug === 'motorcycle-trips') { const form=(()=>{ try{return JSON.parse(order.form_data||'{}')}catch{return {}} })() as any; const purpose=String(form.purpose||''); requiredCapability = purpose==='PASSENGER'?'trip:passenger': purpose==='MEDICINE'?'trip:medicine': purpose==='ITEM_PURCHASE'?'trip:purchase': purpose==='PARCEL'||purpose==='HOME_PICKUP'?'trip:delivery': purpose==='RESTAURANT_PICKUP'?'trip:restaurant': purpose==='DOCUMENT_DELIVERY'?'trip:documents':purpose==='TECHNICIAN_PICKUP'?'trip:worker':purpose==='STORE_SHOPPING'?'trip:shopping':purpose==='SMALL_CARGO'?'trip:cargo':null; }
+    const form=(()=>{ try{return JSON.parse(order.form_data||'{}')}catch{return {}} })() as any;
+    if (serviceSlug === 'motorcycle-trips') { const purpose=String(form.purpose||''); requiredCapability = purpose==='PASSENGER'?'trip:passenger': purpose==='MEDICINE'?'trip:medicine': purpose==='ITEM_PURCHASE'?'trip:purchase': purpose==='PARCEL'||purpose==='HOME_PICKUP'?'trip:delivery': purpose==='RESTAURANT_PICKUP'?'trip:restaurant': purpose==='DOCUMENT_DELIVERY'?'trip:documents':purpose==='TECHNICIAN_PICKUP'?'trip:worker':purpose==='STORE_SHOPPING'?'trip:shopping':purpose==='SMALL_CARGO'?'trip:cargo':null; }
+    else if (serviceSlug === 'pharmacy-purchase') requiredCapability='purchase:pharmacy';
+    else if (['purchase-and-delivery','shopping-delivery'].includes(serviceSlug)) requiredCapability='purchase:store';
+    else if (serviceSlug === 'document-delivery') requiredCapability='delivery:item';
     const rows = db.all<any>(`SELECT sp.id,sp.base_lat,sp.base_lng,sp.rating_avg,sp.completed_orders_count,
         GROUP_CONCAT(DISTINCT psa.area_id) provider_area_ids,
         GROUP_CONCAT(DISTINCT pc.capability_key) capability_keys,
@@ -76,7 +80,8 @@ export class NearestRatedMatcher implements Matcher {
       const qualityComponent = rating/5;
       const experienceComponent = Math.min(1, completed/50);
       // Distance-first: quality can break close ties but cannot normally outrank a materially closer capable provider.
-      const composite = dist === null ? qualityComponent*0.65 + favorite*0.25 + experienceComponent*0.10 : distanceComponent*0.78 + qualityComponent*0.12 + favorite*0.06 + experienceComponent*0.04;
+      const urgencyBoost = order.priority === 'URGENT' ? (dist === null ? 0.08 : Math.max(0,1-Math.min(dist,10)/10)*0.12) : 0;
+      const composite = dist === null ? qualityComponent*0.58 + favorite*0.22 + experienceComponent*0.10 + urgencyBoost : distanceComponent*0.72 + qualityComponent*0.12 + favorite*0.06 + experienceComponent*0.04 + urgencyBoost;
       scored.push({ providerId:p.id, distanceKm:dist===null?null:round(dist,2), score:round(composite,6) });
     }
     scored.sort((a,b)=>{

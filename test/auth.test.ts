@@ -40,9 +40,9 @@ describe('Registration', () => {
     const b = await registerUser(api, { phone: '+٩٦٧٧٧١٢٣٤٥٦٧' });
     assert.equal(b.status, 409);
   });
-  test('كلمة مرور ضعيفة → 422', async () => {
+  test('كلمة مرور أقصر من 8 أحرف → 422', async () => {
     assert.equal((await registerUser(api, { password: 'short1' })).status, 422);
-    assert.equal((await registerUser(api, { password: 'onlyletters' })).status, 422);
+    assert.equal((await registerUser(api, { password: 'abcdefgh' })).status, 201);
   });
   test('هاتف/بريد غير صالح → 422', async () => {
     assert.equal((await registerUser(api, { phone: 'abc' })).status, 422);

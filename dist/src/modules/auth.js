@@ -5,7 +5,7 @@ import { iso } from '../core/util.js';
 import { limit } from '../core/rateLimit.js';
 import { auth } from './auth.middleware.js';
 const COOKIE = 'khadamat_rt';
-const PASSWORD = s.str({ min: 8, max: 128, trim: false, pattern: /^(?=.*[A-Za-z\u0600-\u06FF])(?=.*\d).+$/, patternMessage: 'يجب أن تحتوي كلمة المرور على حرف ورقم' });
+const PASSWORD = s.str({ min: 8, max: 128, trim: false, patternMessage: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
 const PHONE = s.str({ min: 8, max: 24 });
 const EMAIL = s.str({ max: 160, lower: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, patternMessage: 'بريد إلكتروني غير صالح', optional: true });
 function cleanPhone(raw) {

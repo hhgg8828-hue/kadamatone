@@ -185,6 +185,16 @@ export function registerProviderRoutes(app: App, r: Router): void {
     });
   });
 
+  r.post('/provider/presence-heartbeat', ...isProvider, (ctx: Ctx) => {
+    const now=iso(app.clock.now());
+    const p=db.get<any>('SELECT id,user_id,is_online FROM service_providers WHERE id=?',pid(ctx));
+    if(!p) throw E.notFound('ملف مقدم الخدمة غير موجود');
+    if(!p.is_online) return {isOnline:false,lastSeenAt:null};
+    db.run('UPDATE service_providers SET last_seen_at=?,updated_at=? WHERE id=?',now,now,p.id);
+    db.run('UPDATE provider_presence_sessions SET last_seen_at=? WHERE provider_id=? AND ended_at IS NULL',now,p.id);
+    return {isOnline:true,lastSeenAt:now};
+  });
+
   r.post('/provider/online', ...isProvider, (ctx: Ctx) => {
     const { online } = parse<{ online: boolean }>(s.obj({ online: s.bool() }), ctx.body);
     const p = db.get<{ verification_status: VerificationStatus; base_lat: number | null; base_lng: number | null }>('SELECT verification_status, base_lat, base_lng FROM service_providers WHERE id = ?', pid(ctx))!;
@@ -232,6 +242,23 @@ export function registerProviderRoutes(app: App, r: Router): void {
       app.audit.log({ ctx, action: 'provider.verification_update', entityType: 'service_provider', entityId: p.id, before: { status: p.verification_status }, after: { status: b.status, reason: b.reason || null } });
       return { provider: app.providers.summary(p.id, ctx.locale) };
     });
+  });
+
+  r.get('/provider/vehicles', ...isProvider, (ctx: Ctx) => ({
+    vehicles: db.all<any>(`SELECT id,vehicle_type,make,model,year,color,plate_number,status,verified_at,rejection_reason,is_active,created_at,updated_at FROM provider_vehicles WHERE provider_id=? ORDER BY created_at DESC`, pid(ctx))
+  }));
+
+  r.post('/provider/vehicles', ...isProvider, (ctx: Ctx) => {
+    const b=parse<any>(s.obj({vehicleType:s.oneOf(['MOTORCYCLE','CAR','PICKUP','VAN','TRUCK'],{optional:true,default:'MOTORCYCLE'}),make:s.str({max:80,optional:true}),model:s.str({max:80,optional:true}),year:s.int({min:1950,max:2100,optional:true}),color:s.str({max:40,optional:true}),plateNumber:s.str({max:40,optional:true})}),ctx.body);
+    const idem=String(ctx.req.headers['idempotency-key']||'').trim();
+    const providerId=pid(ctx);
+    if(idem){const old=db.get<any>('SELECT * FROM provider_vehicles WHERE provider_id=? AND idempotency_key=?',providerId,idem);if(old){ctx.status=200;return {vehicle:old,idempotent:true};}}
+    if(b.plateNumber){const taken=db.get<any>('SELECT id FROM provider_vehicles WHERE plate_number=? AND provider_id<>?',b.plateNumber,providerId);if(taken)throw E.conflict('رقم اللوحة مستخدم لمركبة أخرى','VEHICLE_PLATE_TAKEN');}
+    const now=iso(app.clock.now()),id=uuid();
+    db.run(`INSERT INTO provider_vehicles(id,provider_id,vehicle_type,make,model,year,color,plate_number,status,is_active,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,id,providerId,b.vehicleType,b.make||null,b.model||null,b.year??null,b.color||null,b.plateNumber||null,'PENDING',1,idem||null,now,now);
+    app.audit.log({ctx,action:'provider.vehicle.create',entityType:'provider_vehicle',entityId:id,after:{providerId,vehicleType:b.vehicleType,make:b.make||null,model:b.model||null,year:b.year??null,plateNumber:b.plateNumber||null}});
+    ctx.status=201;
+    return {vehicle:db.get<any>('SELECT id,vehicle_type,make,model,year,color,plate_number,status,verified_at,rejection_reason,is_active,created_at,updated_at FROM provider_vehicles WHERE id=?',id)!};
   });
 
   r.get('/provider/earnings', ...isProvider, (ctx: Ctx) => app.providers.earnings(pid(ctx)));

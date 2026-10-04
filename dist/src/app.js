@@ -14,6 +14,7 @@ import { createAudit } from './modules/audit.js';
 import { createCatalog, registerCatalogRoutes, registerCatalogAdminRoutes } from './modules/catalog.js';
 import { createLocations } from './modules/locations.js';
 import { createNotifications, registerNotificationRoutes } from './modules/notifications.js';
+import { createWebPushService } from './modules/webpush.js';
 import { createAuthService, registerAuthRoutes } from './modules/auth.js';
 import { registerUserRoutes } from './modules/users.js';
 import { registerFileRoutes } from './modules/files.js';
@@ -32,6 +33,7 @@ import { registerTripRoutes } from './modules/trips.js';
 import { registerTrackingRoutes } from './modules/tracking.js';
 import { registerCustomerExperienceRoutes } from './modules/customer-experience.js';
 import { registerDeliveryProofRoutes } from './modules/delivery-proof.js';
+import { registerExecutionRoutes } from './modules/execution.js';
 import { createScheduler } from './modules/scheduler.js';
 import { CashPayment } from './ports/payment.js';
 export function createApp(overrides = {}) {
@@ -49,6 +51,7 @@ export function createApp(overrides = {}) {
     app.audit = createAudit(app);
     app.catalog = createCatalog(app);
     app.locations = createLocations(app);
+    app.webPush = createWebPushService(app);
     app.notifications = createNotifications(app);
     app.authService = createAuthService(app);
     app.providers = createProviders(app);
@@ -79,6 +82,7 @@ export function createApp(overrides = {}) {
     registerTrackingRoutes(app, r);
     registerCustomerExperienceRoutes(app, r);
     registerDeliveryProofRoutes(app, r);
+    registerExecutionRoutes(app, r);
     app.server = http.createServer(createRequestHandler(app));
     app.server.requestTimeout = 30_000;
     app.server.headersTimeout = 15_000;

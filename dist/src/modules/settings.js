@@ -26,6 +26,9 @@ export const SETTINGS = {
     'trips.per_km_fare': { def: 300, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة كل كيلومتر للمشوار بالريال' },
     'trips.minimum_fare': { def: 1000, schema: s.num({ min: 0, max: 1000000 }), desc: 'الحد الأدنى لأجرة المشوار بالريال' },
     'trips.waiting_per_minute_fare': { def: 50, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة دقيقة الانتظار للمشاوير' },
+    'push.vapid_public_key': { def: '', schema: s.str({ max: 200 }), desc: 'مفتاح VAPID العام لإشعارات الويب' },
+    'push.vapid_private_key': { def: '', schema: s.str({ max: 4000 }), desc: 'مفتاح VAPID الخاص لإشعارات الويب' },
+    'push.subject': { def: 'mailto:HaithamPro77@gmail.com', schema: s.str({ min: 5, max: 200 }), desc: 'هوية مرسل إشعارات الويب VAPID' },
 };
 export function createSettings(app) {
     const { db } = app;

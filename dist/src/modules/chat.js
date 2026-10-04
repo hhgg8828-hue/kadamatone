@@ -34,6 +34,14 @@ export function registerChatRoutes(app, r) {
         if (['CANCELLED'].includes(o.status))
             throw E.unprocessable('لا يمكن مراسلة الطلب بعد إلغائه', 'ORDER_CLOSED');
         const b = parse(bodySchema, ctx.body);
+        const idem = String(ctx.req.headers['idempotency-key'] || '').trim();
+        if (idem) {
+            const old = app.db.get('SELECT * FROM order_messages WHERE order_id=? AND sender_id=? AND idempotency_key=?', o.id, ctx.user.id, idem);
+            if (old) {
+                ctx.status = 200;
+                return { message: out(app, old), idempotent: true };
+            }
+        }
         const attachmentFileIds = (b.attachmentFileIds || []).filter((id) => !!app.db.get(`SELECT id FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'`, id, ctx.user.id));
         if ((b.attachmentFileIds || []).length !== attachmentFileIds.length)
             throw E.unprocessable('يوجد ملف مرفق غير صالح', 'INVALID_ATTACHMENT');
@@ -41,7 +49,7 @@ export function registerChatRoutes(app, r) {
             throw E.unprocessable('اكتب رسالة أو أرسل ملفًا أو أرسل موقعًا', 'MESSAGE_EMPTY');
         const now = iso(app.clock.now());
         const id = uuid();
-        app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)', id, o.id, ctx.user.id, ctx.user.role, (b.body || '').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'), JSON.stringify(attachmentFileIds), b.location?.lat ?? null, b.location?.lng ?? null, b.location?.accuracy ?? null, b.location?.addressText ?? null, now);
+        app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,idempotency_key,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', id, o.id, ctx.user.id, ctx.user.role, (b.body || '').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'), JSON.stringify(attachmentFileIds), idem || null, b.location?.lat ?? null, b.location?.lng ?? null, b.location?.accuracy ?? null, b.location?.addressText ?? null, now);
         const targets = new Set();
         if (o.customer_id !== ctx.user.id)
             targets.add(o.customer_id);
@@ -52,7 +60,7 @@ export function registerChatRoutes(app, r) {
         }
         for (const uid of targets) {
             const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
-            app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id });
+            app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id, open: 'chat' });
             app.sse.send(uid, 'chat_message', { orderId: o.id, message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) });
         }
         ctx.status = 201;

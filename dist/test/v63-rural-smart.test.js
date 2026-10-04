@@ -53,6 +53,9 @@ test('V63: الخدمة الموسمية لا تظهر خارج الموسم و�
         const svc = findService(t, 'seasonal-harvest');
         const hidden = await t.api('GET', `/api/v1/services/${svc.id}`, { token: admin });
         assert.equal(hidden.status, 404);
+        const bootstrap = await t.api('GET', '/api/v1/catalog/bootstrap', { token: admin });
+        assert.equal(bootstrap.status, 200, bootstrap.text);
+        assert.equal((bootstrap.body.services || []).some((x) => x.id === svc.id), false);
         const now = t.app.clock.now();
         const start = new Date(now - 60_000).toISOString();
         const end = new Date(now + 60_000).toISOString();
