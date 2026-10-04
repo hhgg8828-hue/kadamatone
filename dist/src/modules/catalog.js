@@ -58,7 +58,7 @@ export function createCatalog(app) {
         serializeService(x, locale, { full = false } = {}) {
             const c = load().byCategory.get(x.category_id);
             const out = { id: x.id, slug: x.slug, categoryId: x.category_id, categorySlug: c?.slug, name: tr(x.name_i18n, locale), description: tr(x.description_i18n, locale), icon: x.icon,
-                pricingType: x.pricing_type, basePrice: x.base_price, currency: app.settings.get('platform.currency'), defaultPriority: x.default_priority };
+                pricingType: x.pricing_type, basePrice: x.base_price, currency: app.settings.get('platform.currency'), defaultPriority: x.default_priority, requiresInspection: !!x.requires_inspection, requiresVehicle: !!x.requires_vehicle, supportsWaiting: !!x.supports_waiting };
             if (full) {
                 const fields = parseJson(x.form_schema, []) ?? [];
                 out.formSchema = fields.map((f) => ({ ...f, labelText: tr(f.label, locale), options: f.options?.map((o) => ({ value: o.value, label: tr(o.label, locale) })) }));
@@ -147,6 +147,7 @@ export function registerCatalogAdminRoutes(app, r) {
         description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), keywords, pricingType: s.oneOf(['FIXED', 'QUOTE']),
         basePrice: s.num({ min: 0, optional: true }), defaultPriority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true, default: 'NORMAL' }),
         sortOrder: s.int({ min: -100000, max: 100000, optional: true, default: 0 }), formSchema: formSchemaSchema,
+        requiresInspection: s.bool({ optional: true, default: false }), requiresVehicle: s.bool({ optional: true, default: false }), supportsWaiting: s.bool({ optional: true, default: false }),
     });
     const adminCatalog = (locale) => {
         const data = catalog.all();
@@ -192,7 +193,7 @@ export function registerCatalogAdminRoutes(app, r) {
         if (b.pricingType === 'FIXED' && b.basePrice === undefined)
             throw E.unprocessable('السعر الأساسي مطلوب للخدمة ذات السعر الثابت', 'BASE_PRICE_REQUIRED');
         const id = uuid(), now = iso(app.clock.now());
-        db.run('INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,default_priority,sort_order,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.categoryId, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.pricingType, b.pricingType === 'QUOTE' ? null : b.basePrice, JSON.stringify(b.formSchema || []), b.defaultPriority || 'NORMAL', b.sortOrder || 0, 1, now, now);
+        db.run('INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,default_priority,sort_order,is_active,created_at,updated_at,requires_inspection,requires_vehicle,supports_waiting) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.categoryId, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.pricingType, b.pricingType === 'QUOTE' ? null : b.basePrice, JSON.stringify(b.formSchema || []), b.defaultPriority || 'NORMAL', b.sortOrder || 0, 1, now, now, b.requiresInspection ? 1 : 0, b.requiresVehicle ? 1 : 0, b.supportsWaiting ? 1 : 0);
         catalog.invalidate();
         app.audit.log({ ctx, action: 'service.create', entityType: 'service', entityId: id, after: b });
         ctx.status = 201;
@@ -203,14 +204,14 @@ export function registerCatalogAdminRoutes(app, r) {
         const old = db.get('SELECT * FROM services WHERE id=?', ctx.params['id']);
         if (!old)
             throw E.notFound('الخدمة غير موجودة');
-        const b = parse(s.obj({ categoryId: s.str({ max: 64, optional: true }), name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), keywords, pricingType: s.oneOf(['FIXED', 'QUOTE'], { optional: true }), basePrice: s.num({ min: 0, optional: true }), defaultPriority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true }), sortOrder: s.int({ min: -100000, max: 100000, optional: true }), formSchema: s.arr(formFieldSchema, { max: 30, optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
+        const b = parse(s.obj({ categoryId: s.str({ max: 64, optional: true }), name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), keywords, pricingType: s.oneOf(['FIXED', 'QUOTE'], { optional: true }), basePrice: s.num({ min: 0, optional: true }), defaultPriority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true }), sortOrder: s.int({ min: -100000, max: 100000, optional: true }), formSchema: s.arr(formFieldSchema, { max: 30, optional: true }), requiresInspection: s.bool({ optional: true }), requiresVehicle: s.bool({ optional: true }), supportsWaiting: s.bool({ optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
         const pricing = b.pricingType || old.pricing_type;
         const price = pricing === 'QUOTE' ? null : (b.basePrice !== undefined ? b.basePrice : old.base_price);
         if (pricing === 'FIXED' && price === null)
             throw E.unprocessable('السعر الأساسي مطلوب للخدمة ذات السعر الثابت', 'BASE_PRICE_REQUIRED');
         if (b.categoryId && !db.get('SELECT 1 FROM categories WHERE id=?', b.categoryId))
             throw E.unprocessable('القسم غير موجود', 'INVALID_CATEGORY');
-        db.run(`UPDATE services SET category_id=COALESCE(?,category_id),name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),keywords=COALESCE(?,keywords),pricing_type=?,base_price=?,form_schema=COALESCE(?,form_schema),default_priority=COALESCE(?,default_priority),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),updated_at=? WHERE id=?`, b.categoryId ?? null, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.keywords ? JSON.stringify(b.keywords) : null, pricing, price, b.formSchema ? JSON.stringify(b.formSchema) : null, b.defaultPriority ?? null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), iso(app.clock.now()), old.id);
+        db.run(`UPDATE services SET category_id=COALESCE(?,category_id),name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),keywords=COALESCE(?,keywords),pricing_type=?,base_price=?,form_schema=COALESCE(?,form_schema),default_priority=COALESCE(?,default_priority),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),requires_inspection=COALESCE(?,requires_inspection),requires_vehicle=COALESCE(?,requires_vehicle),supports_waiting=COALESCE(?,supports_waiting),updated_at=? WHERE id=?`, b.categoryId ?? null, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.keywords ? JSON.stringify(b.keywords) : null, pricing, price, b.formSchema ? JSON.stringify(b.formSchema) : null, b.defaultPriority ?? null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.requiresInspection === undefined ? null : (b.requiresInspection ? 1 : 0), b.requiresVehicle === undefined ? null : (b.requiresVehicle ? 1 : 0), b.supportsWaiting === undefined ? null : (b.supportsWaiting ? 1 : 0), iso(app.clock.now()), old.id);
         catalog.invalidate();
         app.sse.broadcast('sync', { scope: 'catalog' });
         app.audit.log({ ctx, action: 'service.update', entityType: 'service', entityId: old.id, before: { isActive: !!old.is_active, pricingType: old.pricing_type, basePrice: old.base_price }, after: b });

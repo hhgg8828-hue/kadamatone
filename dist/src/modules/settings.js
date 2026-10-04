@@ -20,6 +20,7 @@ export const SETTINGS = {
     'trips.base_fare': { def: 500, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة بداية المشوار بالريال' },
     'trips.per_km_fare': { def: 300, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة كل كيلومتر للمشوار بالريال' },
     'trips.minimum_fare': { def: 1000, schema: s.num({ min: 0, max: 1000000 }), desc: 'الحد الأدنى لأجرة المشوار بالريال' },
+    'trips.waiting_per_minute_fare': { def: 50, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة دقيقة الانتظار للمشاوير' },
 };
 export function createSettings(app) {
     const { db } = app;

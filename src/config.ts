@@ -35,6 +35,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   if (!overrides.__skipDotEnv) loadDotEnv(path.join(ROOT, '.env'));
   const env = { ...process.env, ...overrides } as Record<string, string | undefined>;
   const isProd = env.NODE_ENV === 'production';
+  if (isProd && !env.ADMIN_PASSWORD) throw new Error('ADMIN_PASSWORD is required in production');
   let jwtSecret = env.JWT_SECRET;
   if (!jwtSecret) {
     if (isProd) throw new Error('JWT_SECRET is required in production (min 32 chars)');
@@ -65,7 +66,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
       name: env.ADMIN_NAME || 'مدير النظام',
       phone: env.ADMIN_PHONE || '+967700000000',
       email: env.ADMIN_EMAIL || 'admin@khadamat.local',
-      password: env.ADMIN_PASSWORD || 'Khadamat@Admin2026!',
+      password: env.ADMIN_PASSWORD || 'Admin12345',
     },
     publicDir: path.join(ROOT, 'public'),
     sharedDir: path.join(ROOT, 'shared'),

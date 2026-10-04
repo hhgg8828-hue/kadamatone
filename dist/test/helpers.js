@@ -33,7 +33,8 @@ export async function startApp(extra = {}) {
 let counter = 0;
 export const uniquePhone = () => `+9677${String(Date.now()).slice(-6)}${String(++counter).padStart(2, '0')}`;
 export async function registerUser(api, over = {}) {
-    const body = { fullName: 'مستخدم تجريبي', phone: uniquePhone(), password: 'Passw0rd123', role: 'CUSTOMER', ...over };
+    const role = String(over.role || 'CUSTOMER');
+    const body = { fullName: 'مستخدم تجريبي', phone: uniquePhone(), password: 'Passw0rd123', role, ...(role === 'PROVIDER' ? { email: `provider-${Date.now()}-${counter}@test.local` } : {}), ...over };
     const r = await api('POST', '/api/v1/auth/register', { body });
     return { ...r, creds: body };
 }

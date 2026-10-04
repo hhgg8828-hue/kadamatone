@@ -58,6 +58,8 @@ export function registerAuthRoutes(app, r) {
     r.post('/auth/register', limit('register', { max: 10, windowMs: 3600_000 }), async (ctx) => {
         const b = parse(registerSchema, ctx.body);
         const phone = cleanPhone(b.phone);
+        if (b.role === 'PROVIDER' && !b.email)
+            throw E.unprocessable('البريد الإلكتروني إلزامي لمقدم الخدمة', 'PROVIDER_EMAIL_REQUIRED', [{ path: 'email', message: 'هذا الحقل مطلوب لمقدم الخدمة' }]);
         if (b.role === 'PROVIDER' && !b.provider)
             throw E.unprocessable('بيانات مقدم الخدمة مطلوبة', 'VALIDATION_ERROR', [{ path: 'provider', message: 'هذا الحقل مطلوب' }]);
         const companyName = b.provider?.providerType === 'COMPANY' ? (b.provider.companyName || b.provider.displayName) : b.provider?.companyName;

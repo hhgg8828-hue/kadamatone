@@ -43,7 +43,7 @@ export interface CategoryRow {
 export interface ServiceRow {
   id: string; category_id: string; slug: string; name_i18n: string; description_i18n: string | null; icon: string | null;
   keywords: string; pricing_type: PricingType; base_price: number | null; form_schema: string; cancellation_policy_id: string | null;
-  default_priority: Priority; sort_order: number; is_active: 0 | 1; created_at: string; updated_at: string;
+  default_priority: Priority; requires_inspection: 0 | 1; requires_vehicle: 0 | 1; supports_waiting: 0 | 1; sort_order: number; is_active: 0 | 1; created_at: string; updated_at: string;
 }
 export interface ServiceAreaRow {
   id: string; parent_id: string | null; name_i18n: string; type: 'COUNTRY' | 'CITY' | 'DISTRICT';
@@ -58,7 +58,7 @@ export interface OrderRow {
   pricing_type: PricingType; price_snapshot: number | null; agreed_price: number | null; currency: string; payment_method: string;
   customer_notes: string | null; attachments: string; cancelled_by_role: string | null; cancel_reason: string | null; cancellation_fee: number | null;
   wave: number; accepted_at: string | null; started_at: string | null; completed_at: string | null; cancelled_at: string | null;
-  version: number; idempotency_key: string | null; created_at: string; updated_at: string;
+  version: number; recipient_name: string | null; recipient_phone: string | null; recipient_user_id: string | null; delivery_pin_hash: string | null; idempotency_key: string | null; created_at: string; updated_at: string;
 }
 export interface OrderAssignmentRow {
   id: string; order_id: string; provider_id: string; status: AssignmentStatus; wave: number; score: number | null; distance_km: number | null;

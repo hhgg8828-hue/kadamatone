@@ -11,8 +11,8 @@ app.log.info('startup_seed_complete', {
   servicesAdded: seedResult.services,
   adminCreated: seedResult.adminCreated,
 });
-if (seedResult.adminCreated && seedResult.adminPassword && !app.config.admin.password) {
-  app.log.info('startup_admin_password_generated', { password: seedResult.adminPassword });
+if (seedResult.adminCreated) {
+  app.log.info('startup_admin_created', { email: app.config.admin.email });
 }
 
 app.server.listen(app.config.port, () => app.log.info('server_started', { port: app.config.port, env: app.config.env }));

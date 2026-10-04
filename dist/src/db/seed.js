@@ -26,11 +26,17 @@ export async function seedBase(db, config) {
             c.services.forEach((sv, si) => {
                 if (db.get('SELECT 1 FROM services WHERE slug = ?', sv.slug))
                     return;
-                db.run(`INSERT INTO services(id,category_id,slug,name_i18n,icon,keywords,pricing_type,base_price,form_schema,cancellation_policy_id,sort_order,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), cat.id, sv.slug, j(sv.name), sv.icon, j(sv.keywords), sv.pricing, sv.pricing === 'FIXED' ? sv.price : null, j(sv.form), 'default', si + 1, now, now);
+                db.run(`INSERT INTO services(id,category_id,slug,name_i18n,icon,keywords,pricing_type,base_price,form_schema,cancellation_policy_id,requires_inspection,requires_vehicle,supports_waiting,sort_order,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), cat.id, sv.slug, j(sv.name), sv.icon, j(sv.keywords), sv.pricing, sv.pricing === 'FIXED' ? sv.price : null, j(sv.form), 'default', sv.requiresInspection ? 1 : 0, sv.requiresVehicle ? 1 : 0, sv.supportsWaiting ? 1 : 0, si + 1, now, now);
                 out.services++;
             });
         });
+        // طلب خدمة غير موجودة يجب أن يُزرع بعد الأقسام لأن migrations تُطبق قبل seedBase.
+        if (!db.get('SELECT 1 FROM services WHERE slug=?', 'custom-request')) {
+            const cat = db.get('SELECT id FROM categories WHERE slug=?', 'delivery');
+            if (cat)
+                db.run(`INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,cancellation_policy_id,default_priority,sort_order,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), cat.id, 'custom-request', j({ ar: 'طلب خدمة أخرى', en: 'Custom service request' }), j({ ar: 'اطلب أي خدمة غير موجودة في القائمة مع وصف وصورة اختيارية', en: 'Request any service not listed' }), '✨', j(['أخرى', 'خدمة أخرى', 'طلب خاص', 'غير موجودة']), 'QUOTE', null, '[]', 'default', 'NORMAL', 999, 1, now, now);
+        }
     });
     // مدير النظام الأول
     const a = config.admin;

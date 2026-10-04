@@ -12,7 +12,7 @@ import type { OrderRow, OrderStatus, Priority, ActorRole, LocationRow } from '..
 import { serializeTrip } from './trips.js';
 
 export interface CreateOrderInput {
-  serviceId: string; description: string; location: LocationInput; addressId?: string; contactPhone: string;
+  serviceId: string; description: string; location: LocationInput; addressId?: string; contactPhone: string; recipientName?: string; recipientPhone?: string; recipientUserId?: string;
   scheduledAt?: string; priority?: Priority; formData?: Record<string, unknown>; notes?: string; attachmentFileIds?: string[];
 }
 const createOrderSchema: Schema = s.obj({
@@ -26,12 +26,13 @@ const createOrderSchema: Schema = s.obj({
   formData: s.any({ optional: true }),
   notes: s.str({ max: 500, optional: true }),
   attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 10, optional: true }),
+  recipientName: s.str({ max: 80, optional: true }), recipientPhone: s.str({ max: 24, optional: true }), recipientUserId: s.str({ max: 64, optional: true }),
 });
 
 export interface OrderOut {
   id: string; code: string; status: OrderStatus; priority: Priority; description: string; formData: Record<string, unknown>;
   service: { id: string; name: string; icon: string | null; categoryName: string }; location: ReturnType<App['locations']['serialize']>;
-  contactPhone: string | null; scheduledAt: string | null; pricingType: string; priceSnapshot: number | null; agreedPrice: number | null; currency: string;
+  contactPhone: string | null; recipient?: { fullName: string; phone: string } | null; scheduledAt: string | null; pricingType: string; priceSnapshot: number | null; agreedPrice: number | null; currency: string;
   paymentMethod: string; notes: string | null; attachments: string[]; wave: number; customer?: { id: string; fullName: string; phone: string | null };
   provider?: { id: string; displayName: string; avatarUrl: string | null; rating: number } | null;
   createdAt: string; acceptedAt: string | null; startedAt: string | null; completedAt: string | null; cancelledAt: string | null; cancelReason: string | null;
@@ -69,7 +70,7 @@ export function createOrders(app: App): Orders {
         id: o.id, code: o.code, status: o.status, priority: o.priority, description: o.description, formData: parseJson(o.form_data, {}) ?? {},
         service: { id: x.id, name: tr(x.name_i18n, ctx.locale), icon: x.icon, categoryName: tr(cat?.name_i18n, ctx.locale) },
         location: app.locations.serialize(loc, ctx.locale, { approximate: approx }),
-        contactPhone: approx ? null : o.contact_phone, scheduledAt: o.scheduled_at, pricingType: o.pricing_type, priceSnapshot: o.price_snapshot, agreedPrice: o.agreed_price,
+        contactPhone: approx ? null : o.contact_phone, recipient: (!approx && (isOwnerCustomer || ctx.user?.role === 'ADMIN' || ctx.user?.role === 'PROVIDER')) && o.recipient_name ? { fullName:o.recipient_name, phone:o.recipient_phone||'' } : null, scheduledAt: o.scheduled_at, pricingType: o.pricing_type, priceSnapshot: o.price_snapshot, agreedPrice: o.agreed_price,
         currency: o.currency, paymentMethod: o.payment_method, notes: isOwnerCustomer || ctx.user?.role === 'ADMIN' ? o.customer_notes : null,
         attachments: (parseJson<string[]>(o.attachments, []) ?? []).map((id) => `/api/v1/files/${id}`), wave: o.wave,
         createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason,
@@ -175,11 +176,11 @@ export function registerOrderRoutes(app: App, r: Router): void {
       const code = genCode(db, now);
       const attachments = (b.attachmentFileIds || []).filter((fid) => db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user!.id));
       db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,
-                pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,created_at,updated_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,created_at,updated_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, code, ctx.user!.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id,
         b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get<string>('platform.currency'),
-        b.notes || null, JSON.stringify(attachments), idemKey, nowIso, nowIso);
+        b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName||null, b.recipientPhone||null, b.recipientUserId||null, nowIso, nowIso);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', nowIso);
       let o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', id)!;
       o = orders.applyTransition(o, 'SEARCHING', 'SYSTEM', ctx, { reason: 'auto' });
