@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.17",
-  "description": "خدمات (Khadamat) — V66.8 shopping service, hybrid intent engine, capability matching, simplified trips, temporary campaign management and RTL hardening",
+  "version": "0.6.18",
+  "description": "خدمات (Khadamat) — V66.9 unified release, historical feature consolidation, catalog integrity, hybrid intent, operations and reliability",
   "private": true,
   "type": "module",
   "engines": {
