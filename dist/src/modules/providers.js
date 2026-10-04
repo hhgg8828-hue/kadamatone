@@ -1,7 +1,7 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
 import { uuid } from '../core/security.js';
-import { iso, tr, round } from '../core/util.js';
+import { iso, tr, round, haversineKm } from '../core/util.js';
 import { auth, roles, adminLevel } from './auth.middleware.js';
 const TIME = s.str({ pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMessage: 'الوقت بصيغة HH:MM' });
 export function createProviders(app) {
@@ -201,6 +201,37 @@ export function registerProviderRoutes(app, r) {
         });
     });
     r.get('/provider/earnings', ...isProvider, (ctx) => app.providers.earnings(pid(ctx)));
+    r.get('/providers/nearby', auth, roles('CUSTOMER'), (ctx) => {
+        const serviceId = String(ctx.query['serviceId'] || '');
+        if (!serviceId)
+            throw E.unprocessable('حدد الخدمة أولًا', 'SERVICE_REQUIRED');
+        if (!catalog.getActiveService(serviceId))
+            throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
+        const lat = Number(ctx.query['lat']), lng = Number(ctx.query['lng']);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180)
+            throw E.unprocessable('حدد موقعًا صالحًا لعرض مقدمي الخدمة القريبين', 'LOCATION_REQUIRED');
+        const limit = Math.min(30, Math.max(1, Number(ctx.query['limit'] || 15)));
+        const rows = db.all(`SELECT sp.*, u.full_name, u.avatar_file_id
+      FROM service_providers sp JOIN users u ON u.id=sp.user_id
+      JOIN provider_services ps ON ps.provider_id=sp.id AND ps.service_id=? AND ps.is_active=1
+      WHERE sp.verification_status='VERIFIED' AND sp.is_online=1 AND u.status='ACTIVE'`, serviceId);
+        const targetArea = catalog.resolveArea(lat, lng);
+        const chain = targetArea ? new Set(catalog.areaChain(targetArea.id)) : new Set();
+        const out = rows.map((p) => {
+            const live = db.get(`SELECT lat,lng,updated_at FROM provider_live_locations WHERE provider_id=? AND updated_at >= ?`, p.id, new Date(app.clock.now() - 5 * 60_000).toISOString());
+            const point = live ? { lat: Number(live.lat), lng: Number(live.lng), source: 'live' } : (p.base_lat !== null && p.base_lng !== null ? { lat: Number(p.base_lat), lng: Number(p.base_lng), source: 'base' } : null);
+            if (!point)
+                return null;
+            const providerAreas = db.all(`SELECT area_id FROM provider_service_areas WHERE provider_id=?`, p.id);
+            if (providerAreas.length && targetArea && !providerAreas.some(x => chain.has(x.area_id)))
+                return null;
+            const distanceKm = round(haversineKm(lat, lng, point.lat, point.lng), 2);
+            const areas = providerAreas.map(x => catalog.all().areas.find(a => a.id === x.area_id)).filter(Boolean).map((a) => ({ id: a.id, name: tr(a.name_i18n, ctx.locale), localityType: a.locality_type || a.type }));
+            const rating = Number(p.rating_avg || 0);
+            return { id: p.id, displayName: p.display_name, providerType: p.provider_type, verified: true, isOnline: true, rating: { avg: rating, count: Number(p.rating_count || 0) }, completedOrders: Number(p.completed_orders_count || 0), distanceKm, distanceText: `${distanceKm} كم`, locationSource: point.source, coverage: areas };
+        }).filter(Boolean).sort((a, b) => a.distanceKm - b.distanceKm || b.rating.avg - a.rating.avg).slice(0, limit);
+        return { serviceId, targetArea: targetArea ? { id: targetArea.id, name: tr(targetArea.name_i18n, ctx.locale), localityType: targetArea.locality_type || targetArea.type } : null, providers: out };
+    });
     r.get('/providers/:id', (ctx) => {
         const p = db.get('SELECT id, user_id, verification_status FROM service_providers WHERE id = ?', ctx.params['id']);
         if (!p)

@@ -601,7 +601,11 @@ async function openAskMe() {
         } if (finalText.trim())
             textEl.value = (textEl.value.trim() ? textEl.value.trim() + ' ' : '') + finalText.trim(); voiceStatus.textContent = interim ? `أسمع: ${interim}` : 'تم التقاط الصوت.'; };
         recognition.onerror = (e) => { voiceStatus.textContent = e?.error === 'not-allowed' ? 'اسمح للمتصفح باستخدام الميكروفون ثم حاول مرة أخرى.' : 'تعذر التقاط الصوت، حاول مرة أخرى.'; };
-        recognition.onend = () => { listening = false; voiceBtn.textContent = '🎤 تحدث'; if (!String(voiceStatus.textContent || '').startsWith('تم'))
+        recognition.onend = () => { listening = false; voiceBtn.textContent = '🎤 تحدث'; const spoken = textEl.value.trim(); if (spoken.length >= 2) {
+            voiceStatus.textContent = 'تم التقاط الطلب. جارٍ فهمه تلقائيًا...';
+            analyzeAsk(true).catch(() => { });
+        }
+        else if (!String(voiceStatus.textContent || '').startsWith('تم'))
             voiceStatus.textContent = 'انتهى التسجيل.'; };
         try {
             recognition.start();
@@ -619,7 +623,7 @@ async function openAskMe() {
             return;
         pendingAssistImage = f;
         if (!textEl.value.trim())
-            textEl.value = 'أريد طلب خدمة بناءً على الصورة المرفقة';
+            textEl.value = 'حلل الصورة المرفقة وحدد الخدمة المناسبة';
         box.innerHTML = '<div class="notice">📷 تم استلام الصورة. جارٍ فحصها تلقائيًا لتحديد الخدمة المناسبة...</div>';
         if (navigator.onLine)
             await analyzeAsk(true);
@@ -912,6 +916,29 @@ async function openSafetyCenters() { try {
 catch (e) {
     alert(e.message);
 } }
+async function openNearbyProviders(serviceId, lat, lng) {
+    let la = lat, ln = lng;
+    if (!Number.isFinite(la) || !Number.isFinite(ln)) {
+        try {
+            const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }));
+            la = pos.coords.latitude;
+            ln = pos.coords.longitude;
+        }
+        catch {
+            alert('حدد موقعك أولًا لعرض مقدمي الخدمة القريبين.');
+            return;
+        }
+    }
+    try {
+        const j = await api(`/providers/nearby?serviceId=${encodeURIComponent(serviceId)}&lat=${encodeURIComponent(String(la))}&lng=${encodeURIComponent(String(ln))}&limit=20`);
+        const rows = j.providers || [];
+        showModal(`<div><h2>📍 مقدمو الخدمة القريبون</h2><p class="muted">الخدمة المطلوبة: ${esc(state.services.find((x) => x.id === serviceId)?.name || 'الخدمة')} · ${j.targetArea ? `منطقتك: ${esc(j.targetArea.name)} (${esc(j.targetArea.localityType)})` : 'لم تُحدد منطقة إدارية'}</p>${rows.length ? `<div class="admin-table-wrap"><table class="table"><thead><tr><th>مقدم الخدمة</th><th>التقييم</th><th>المسافة</th><th>التغطية</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map((p) => `<tr><td><b>${esc(p.displayName)}</b><br><small class="muted">${esc(p.providerType || 'مقدم خدمة')} ✓ موثق</small></td><td>⭐ ${esc(p.rating?.avg ?? 0)} <small>(${esc(p.rating?.count ?? 0)})</small></td><td><b>${esc(p.distanceText)}</b><br><small class="muted">${esc(p.locationSource === 'live' ? 'الموقع الحالي' : 'الموقع الأساسي')}</small></td><td>${p.coverage?.length ? p.coverage.slice(0, 3).map((a) => esc(a.name)).join(' · ') : 'تغطية عامة'}</td><td><span class="status">متاح</span></td><td><button class="btn small" data-nearby-order="${esc(p.id)}" type="button">طلب الخدمة</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="card empty">لا يوجد مقدم خدمة متاح الآن لهذه الخدمة ضمن النطاق القريب. يمكنك إرسال الطلب وسيستمر النظام في البحث.</div>'}</div>`);
+        document.querySelectorAll('[data-nearby-order]').forEach(x => x.addEventListener('click', () => { closeModal(); openOrderForm(serviceId); }));
+    }
+    catch (e) {
+        alert(e.message);
+    }
+}
 async function openOrderForm(serviceId, initial = null) {
     const idempotencyKey = newIdempotencyKey();
     const [j, addrPayload, beneficiaryPayload] = await Promise.all([api('/services/' + encodeURIComponent(serviceId)), api('/me/addresses'), api('/me/beneficiaries').catch(() => ({ beneficiaries: [] }))]);
@@ -925,7 +952,8 @@ async function openOrderForm(serviceId, initial = null) {
         await openMotorcycleTripForm(s, savedAddresses);
         return;
     }
-    showModal(`<h2>${esc(s.name)}</h2><form id="orderForm"><div class="field description-field"><label>وصف الطلب</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه بالتفصيل">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}<div class="field location-field"><label>الموقع <span class="muted">(اختياري)</span></label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div><p class="muted">يمكنك اختيار مستفيد محفوظ أو إدخال شخص آخر دون إنشاء نظام طلب منفصل.</p></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
+    showModal(`<h2>${esc(s.name)}</h2><div class="row" style="margin-bottom:10px"><button class="btn secondary small" id="nearbyProvidersBtn" type="button">📍 مقدمو الخدمة القريبون</button><span class="muted">اعرض المتاحين حول موقعك قبل إرسال الطلب.</span></div><form id="orderForm"><div class="field description-field"><label>وصف الطلب</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه بالتفصيل">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}<div class="field location-field"><label>الموقع <span class="muted">(اختياري)</span></label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div><p class="muted">يمكنك اختيار مستفيد محفوظ أو إدخال شخص آخر دون إنشاء نظام طلب منفصل.</p></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
+    document.getElementById('nearbyProvidersBtn')?.addEventListener('click', () => { const la = Number(document.getElementById('lat')?.value); const ln = Number(document.getElementById('lng')?.value); openNearbyProviders(serviceId, Number.isFinite(la) ? la : undefined, Number.isFinite(ln) ? ln : undefined); });
     document.getElementById('beneficiarySelect')?.addEventListener('change', e => { const v = e.target.value; document.getElementById('otherRecipient')?.classList.toggle('hide-section', v !== '__other__'); });
     document.querySelectorAll('[data-description-suggestion]').forEach(x => x.addEventListener('click', () => { const t = document.getElementById('orderDescription'); if (t) {
         t.value = x.dataset.descriptionSuggestion || '';
@@ -1264,11 +1292,12 @@ async function openOrderChat(orderId) {
             const msgs = await load();
             const box = document.getElementById('chatMessages');
             if (box) {
-                box.innerHTML = msgs.length ? msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p>${m.location ? `<div class="card" style="margin-top:8px"><b>📍 موقع مرسل</b><p class="muted">${esc(m.location.addressText || 'إحداثيات الموقع')}</p><a class="btn secondary small" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(m.location.lat)}&mlon=${encodeURIComponent(m.location.lng)}#map=18/${encodeURIComponent(m.location.lat)}/${encodeURIComponent(m.location.lng)}">فتح الموقع</a></div>` : ''}</div>`).join('') : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
+                box.innerHTML = msgs.length ? msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p>${m.attachments?.length ? `<div class="card" style="margin-top:8px"><b>📎 المرفقات</b><div class="row" style="margin-top:6px">${m.attachments.map((a) => `<button type="button" class="btn secondary small" data-chat-file="${esc(a.url)}">فتح المرفق</button>`).join('')}</div></div>` : ''}${m.location ? `<div class="card" style="margin-top:8px"><b>📍 موقع مرسل</b><p class="muted">${esc(m.location.addressText || 'إحداثيات الموقع')}</p><a class="btn secondary small" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(m.location.lat)}&mlon=${encodeURIComponent(m.location.lng)}#map=18/${encodeURIComponent(m.location.lat)}/${encodeURIComponent(m.location.lng)}">فتح الموقع</a></div>` : ''}</div>`).join('') : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
                 box.scrollTop = box.scrollHeight;
+                box.querySelectorAll('[data-chat-file]').forEach((x) => x.addEventListener('click', () => openPrivateFile(String(x.dataset.chatFile || ''))));
             }
         };
-        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">تواصل داخل الطلب فقط. لا نعرض أرقام الهاتف تلقائيًا.</p></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div></form></div>`);
+        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">تواصل داخل الطلب فقط. لا نعرض أرقام الهاتف تلقائيًا.</p></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
         await render();
         document.querySelectorAll('[data-chat-quick]').forEach(x => x.addEventListener('click', () => { const body = document.getElementById('chatBody'); if (body) {
             body.value = x.dataset.chatQuick || '';
@@ -1276,8 +1305,21 @@ async function openOrderChat(orderId) {
         } }));
         document.getElementById('chatForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('sendChat'); const body = document.getElementById('chatBody').value.trim(); if (!body)
             return; btn.disabled = true; try {
-            await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', body: JSON.stringify({ body }) });
+            let attachmentFileIds = [];
+            const f = document.getElementById('chatFile')?.files?.[0];
+            if (f) {
+                if (f.size > 5 * 1024 * 1024)
+                    throw new Error('حجم الملف يتجاوز 5MB');
+                const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الملف')); fr.readAsDataURL(f); });
+                const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: f.name, dataBase64: data }) });
+                attachmentFileIds = [up.file.id];
+            }
+            if (!body && !attachmentFileIds.length)
+                return;
+            await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', body: JSON.stringify({ body, attachmentFileIds }) });
             document.getElementById('chatBody').value = '';
+            document.getElementById('chatFile').value = '';
+            document.getElementById('chatFileStatus').textContent = '';
             await render();
         }
         catch (x) {
@@ -1378,7 +1420,8 @@ async function openOrder(id) {
     try {
         const j = await api('/orders/' + id);
         const o = j.order;
-        showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> <span class="status">${esc(statusAr(o.status))}</span></p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}<p class="muted">${esc(formatDateTime(o.createdAt))}</p>${o.provider ? `<div class="card" style="margin-top:12px"><div class="row" style="justify-content:space-between"><div><b>👤 ${esc(o.provider.displayName)}</b><p class="muted">⭐ ${esc(o.provider.rating)} · مقدم خدمة موثق</p></div><div class="row"><button class="btn secondary small" id="viewProviderProfile" type="button">عرض الملف</button><button class="btn secondary small" id="favoriteProviderBtn" type="button">⭐ حفظ كمفضل</button></div></div></div>` : ''}${o.provider && ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<div class="row"><button class="btn secondary" id="openChatBtn" type="button">💬 محادثة مع مقدم الخدمة</button><button class="btn secondary" id="trackTripBtn" type="button">📍 تتبع الموقع</button><button class="btn secondary" id="shareTripBtn" type="button">🔗 مشاركة المشوار</button></div>` : ''}${o.pricingType === 'QUOTE' && ['SEARCHING', 'ASSIGNED'].includes(o.status) ? `<button class="btn" id="openQuotesBtn" type="button">💰 مشاهدة عروض الأسعار</button>` : ''}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>${['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn danger" id="cancel">إلغاء الطلب</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="complaintBtn" type="button">⚠️ ${o.status === 'DISPUTED' ? 'متابعة الشكوى' : 'فتح شكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="rating-box card"><h3>⭐ التقييم</h3><p class="muted">الخدمة مكتملة. افتح شاشة التقييم لإرسال نجومك وتعليقك.</p><button class="btn" id="openRatingBtn" type="button">⭐ تقييم مقدم الخدمة</button></div>` : ''}</div>`);
+        const purchaseChanges = (o.service?.slug === 'purchase-and-delivery' || o.service?.slug === 'pharmacy-purchase') ? ((await api('/orders/' + encodeURIComponent(id) + '/purchase-change')).changes || []) : [];
+        showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> <span class="status">${esc(statusAr(o.status))}</span></p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}<p class="muted">${esc(formatDateTime(o.createdAt))}</p>${o.provider ? `<div class="card" style="margin-top:12px"><div class="row" style="justify-content:space-between"><div><b>👤 ${esc(o.provider.displayName)}</b><p class="muted">⭐ ${esc(o.provider.rating)} · مقدم خدمة موثق</p></div><div class="row"><button class="btn secondary small" id="viewProviderProfile" type="button">عرض الملف</button><button class="btn secondary small" id="favoriteProviderBtn" type="button">⭐ حفظ كمفضل</button></div></div></div>` : ''}${o.provider && ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<div class="row"><button class="btn secondary" id="openChatBtn" type="button">💬 محادثة مع مقدم الخدمة</button><button class="btn secondary" id="trackTripBtn" type="button">📍 تتبع الموقع</button><button class="btn secondary" id="shareTripBtn" type="button">🔗 مشاركة المشوار</button></div>` : ''}${o.pricingType === 'QUOTE' && ['SEARCHING', 'ASSIGNED'].includes(o.status) ? `<button class="btn" id="openQuotesBtn" type="button">💰 مشاهدة عروض الأسعار</button>` : ''}${purchaseChanges.some((c) => c.status === 'PENDING') ? `<div class="card"><b>🛒 تعديل مطلوب في الشراء</b>${purchaseChanges.filter((c) => c.status === 'PENDING').slice(0, 1).map((c) => `<p>السعر المقترح: <b>${esc(c.requestedPrice)}</b></p><p class="muted">${esc(c.requestedProduct || '')}${c.reason ? ' — ' + esc(c.reason) : ''}</p><div class="row"><button class="btn" id="approvePurchaseChange" type="button">موافقة</button><button class="btn danger secondary" id="rejectPurchaseChange" type="button">رفض</button></div>`).join('')}</div>` : ''}${o.service?.deliveryProofType === 'RECIPIENT_CONFIRMATION' && ['ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>👤 تأكيد الاستلام</b><p class="muted">أدخل اسم الشخص الذي استلم الخدمة ليتمكن مقدم الخدمة من إنهاء الطلب.</p><div class="row"><input id="customerRecipientConfirmName" maxlength="120" placeholder="اسم المستلم"><button class="btn" id="customerRecipientConfirmBtn" type="button">تأكيد الاستلام</button></div></div>` : ''}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>${['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn danger" id="cancel">إلغاء الطلب</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="complaintBtn" type="button">⚠️ ${o.status === 'DISPUTED' ? 'متابعة الشكوى' : 'فتح شكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="rating-box card"><h3>⭐ التقييم</h3><p class="muted">الخدمة مكتملة. افتح شاشة التقييم لإرسال نجومك وتعليقك.</p><button class="btn" id="openRatingBtn" type="button">⭐ تقييم مقدم الخدمة</button></div>` : ''}</div>`);
         document.getElementById('openChatBtn')?.addEventListener('click', () => openOrderChat(id));
         document.getElementById('trackTripBtn')?.addEventListener('click', () => openTripTracking(id));
         document.getElementById('shareTripBtn')?.addEventListener('click', async () => { try {
@@ -1417,6 +1460,33 @@ async function openOrder(id) {
         } });
         document.getElementById('openRatingBtn')?.addEventListener('click', () => openRating(id));
         document.getElementById('complaintBtn')?.addEventListener('click', () => openOrderComplaint(id, o.status === 'DISPUTED'));
+        document.getElementById('approvePurchaseChange')?.addEventListener('click', async () => { const c = purchaseChanges.find((x) => x.status === 'PENDING'); if (!c)
+            return; try {
+            await api('/orders/' + encodeURIComponent(id) + '/purchase-change/' + encodeURIComponent(c.id) + '/respond', { method: 'POST', body: JSON.stringify({ decision: 'APPROVE' }) });
+            await openOrder(id);
+        }
+        catch (e) {
+            alert(e.message);
+        } });
+        document.getElementById('rejectPurchaseChange')?.addEventListener('click', async () => { const c = purchaseChanges.find((x) => x.status === 'PENDING'); if (!c)
+            return; try {
+            await api('/orders/' + encodeURIComponent(id) + '/purchase-change/' + encodeURIComponent(c.id) + '/respond', { method: 'POST', body: JSON.stringify({ decision: 'REJECT' }) });
+            await openOrder(id);
+        }
+        catch (e) {
+            alert(e.message);
+        } });
+        document.getElementById('customerRecipientConfirmBtn')?.addEventListener('click', async () => { const name = document.getElementById('customerRecipientConfirmName').value.trim(); if (name.length < 2) {
+            alert('أدخل اسم المستلم');
+            return;
+        } const b = document.getElementById('customerRecipientConfirmBtn'); b.disabled = true; try {
+            await api('/orders/' + encodeURIComponent(id) + '/delivery-proof/recipient-confirm', { method: 'POST', body: JSON.stringify({ recipientName: name }) });
+            await openOrder(id);
+        }
+        catch (e) {
+            b.disabled = false;
+            alert(e.message);
+        } });
     }
     catch (e) {
         alert(e.message);
@@ -1824,7 +1894,7 @@ async function openProviderOrder(id) { try {
     const lat = Number(loc.lat), lng = Number(loc.lng);
     const mapUrl = hasLoc ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}` : '';
     const g = hasLoc ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}&travelmode=driving` : '';
-    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}${o.customer ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">التواصل عبر محادثة الطلب داخل خدمات.</p></div>` : ''}${o.customer ? `<button class="btn secondary" id="providerChatBtn" type="button">💬 محادثة مع العميل</button>` : ''}${o.service?.deliveryProofType === 'PIN' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>🔐 تأكيد التسليم</b><p class="muted">أدخل رمز التسليم الذي يقدمه المستلم قبل إنهاء الطلب.</p><div class="row"><input id="deliveryPinInput" inputmode="numeric" maxlength="6" placeholder="رمز من 6 أرقام"><button class="btn" id="verifyDeliveryPin" type="button">تأكيد الرمز</button></div></div>` : ''}${o.trip && o.status === 'IN_PROGRESS' ? `<div class="row"><button class="btn secondary" id="startWaitBtn" type="button">⏱️ بدء الانتظار</button><button class="btn secondary" id="stopWaitBtn" type="button">⏹️ إنهاء الانتظار</button></div>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ متابعة الشكوى</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
+    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}${o.customer ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">التواصل عبر محادثة الطلب داخل خدمات.</p></div>` : ''}${o.customer ? `<button class="btn secondary" id="providerChatBtn" type="button">💬 محادثة مع العميل</button>` : ''}${o.service?.deliveryProofType === 'PIN' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>🔐 تأكيد التسليم بالرمز</b><p class="muted">أدخل رمز التسليم الذي يقدمه المستلم قبل إنهاء الطلب.</p><div class="row"><input id="deliveryPinInput" inputmode="numeric" maxlength="6" placeholder="رمز من 6 أرقام"><button class="btn" id="verifyDeliveryPin" type="button">تأكيد الرمز</button></div></div>` : o.service?.deliveryProofType === 'RECIPIENT_CONFIRMATION' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>👤 تأكيد المستلم</b><p class="muted">يؤكد المستلم اسمه من جهاز العميل قبل إنهاء الطلب.</p><div class="row"><input id="recipientConfirmName" maxlength="120" placeholder="اسم المستلم"><span id="recipientProofStatus" class="muted">بانتظار التأكيد</span></div></div>` : o.service?.deliveryProofType === 'PHOTO' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>📷 صورة إثبات التسليم</b><p class="muted">التقط صورة واضحة لإثبات التسليم ثم ارفعها.</p><input id="deliveryProofPhoto" type="file" accept="image/jpeg,image/png,image/webp"><button class="btn" id="uploadDeliveryProof" type="button" style="margin-top:8px">رفع إثبات التسليم</button><p id="deliveryProofPhotoStatus" class="muted"></p></div>` : ''}${o.trip && o.status === 'IN_PROGRESS' ? `<div class="row"><button class="btn secondary" id="startWaitBtn" type="button">⏱️ بدء الانتظار</button><button class="btn secondary" id="stopWaitBtn" type="button">⏹️ إنهاء الانتظار</button></div>` : ''}${(o.service?.slug === 'purchase-and-delivery' || o.service?.slug === 'pharmacy-purchase') && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn secondary" id="purchaseChangeBtn" type="button">🛒 طلب تعديل الشراء</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ متابعة الشكوى</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
     if (hasLoc) {
         const el = document.getElementById('providerOrderMap');
         const L = window.L;
@@ -1845,6 +1915,27 @@ async function openProviderOrder(id) { try {
         btn.disabled = false;
         alert(e.message);
     } });
+    document.getElementById('uploadDeliveryProof')?.addEventListener('click', async () => { const btn = document.getElementById('uploadDeliveryProof'); const st = document.getElementById('deliveryProofPhotoStatus'); const f = document.getElementById('deliveryProofPhoto')?.files?.[0]; if (!f) {
+        st.textContent = 'اختر صورة أولًا';
+        st.className = 'error';
+        return;
+    } if (f.size > 5 * 1024 * 1024) {
+        st.textContent = 'حجم الصورة يتجاوز 5MB';
+        st.className = 'error';
+        return;
+    } btn.disabled = true; st.textContent = 'جارٍ رفع الصورة...'; try {
+        const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(f); });
+        const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'work_photo', name: f.name, dataBase64: data }) });
+        await api('/provider/orders/' + encodeURIComponent(id) + '/delivery-proof/photo', { method: 'POST', body: JSON.stringify({ fileId: up.file.id }) });
+        st.textContent = '✓ تم حفظ إثبات التسليم';
+        st.className = 'success';
+        btn.textContent = 'تم الرفع';
+    }
+    catch (e) {
+        btn.disabled = false;
+        st.textContent = e.message;
+        st.className = 'error';
+    } });
     document.getElementById('startWaitBtn')?.addEventListener('click', async () => { try {
         await api('/trips/' + encodeURIComponent(id) + '/wait', { method: 'POST', body: JSON.stringify({ action: 'START' }) });
         alert('بدأ احتساب وقت الانتظار');
@@ -1860,6 +1951,14 @@ async function openProviderOrder(id) { try {
         alert(e.message);
     } });
     document.getElementById('providerComplaintBtn')?.addEventListener('click', () => openOrderComplaint(id, true));
+    document.getElementById('purchaseChangeBtn')?.addEventListener('click', async () => { const price = prompt('السعر الجديد المقترح'); if (price === null)
+        return; const requestedProduct = prompt('المنتج/البديل (اختياري)') || undefined; const reason = prompt('سبب التعديل (اختياري)') || undefined; try {
+        await api('/provider/orders/' + encodeURIComponent(id) + '/purchase-change', { method: 'POST', body: JSON.stringify({ requestedPrice: Number(price), requestedProduct, reason }) });
+        alert('تم إرسال طلب تعديل الشراء للعميل.');
+    }
+    catch (e) {
+        alert(e.message);
+    } });
     document.getElementById('rateCustomer')?.addEventListener('click', async () => { const b = document.getElementById('rateCustomer'); b.disabled = true; try {
         await api('/provider/orders/' + encodeURIComponent(id) + '/rate-customer', { method: 'POST', body: JSON.stringify({ score: Number(document.getElementById('customerScore').value), comment: document.getElementById('customerComment').value }) });
         alert('تم تقييم العميل');
@@ -2118,8 +2217,8 @@ function openServiceEditor(sv, cats, refresh) {
     } });
 }
 function openAreaEditor(area, areas, refresh) {
-    showModal(`<h2>${area ? 'تعديل المنطقة' : 'إضافة منطقة'}</h2><form id="areaEditor"><div class="grid"><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(area?.nameI18n?.ar || area?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(area?.nameI18n?.en || '')}"></div><div class="field"><label>النوع</label><select name="type" ${area ? 'disabled' : ''}><option value="COUNTRY" ${area?.type === 'COUNTRY' ? 'selected' : ''}>دولة</option><option value="CITY" ${area?.type === 'CITY' ? 'selected' : ''}>مدينة</option><option value="DISTRICT" ${area?.type === 'DISTRICT' ? 'selected' : ''}>حي</option></select></div><div class="field"><label>المنطقة الأم</label><select name="parentId"><option value="">بدون</option>${areas.filter((x) => x.id !== area?.id).map((x) => `<option value="${esc(x.id)}" ${area?.parentId === x.id ? 'selected' : ''}>${esc(x.name)} (${esc(x.type)})</option>`).join('')}</select></div><div class="field"><label>خط العرض</label><input name="centerLat" type="number" step="0.000001" value="${esc(area?.centerLat ?? '')}" required></div><div class="field"><label>خط الطول</label><input name="centerLng" type="number" step="0.000001" value="${esc(area?.centerLng ?? '')}" required></div><div class="field"><label>نصف القطر كم</label><input name="radiusKm" type="number" min="0.1" max="5000" step="0.1" value="${esc(area?.radiusKm ?? 25)}" required></div>${area ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${area.isActive ? 'selected' : ''}>نشطة</option><option value="false" ${!area.isActive ? 'selected' : ''}>معطلة</option></select></div>` : ''}</div><button class="btn">حفظ المنطقة</button></form>`);
-    document.getElementById('areaEditor').addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.target); const body = { name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, centerLat: Number(f.get('centerLat')), centerLng: Number(f.get('centerLng')), radiusKm: Number(f.get('radiusKm')) }; if (!area) {
+    showModal(`<h2>${area ? 'تعديل المنطقة' : 'إضافة منطقة'}</h2><form id="areaEditor"><div class="grid"><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(area?.nameI18n?.ar || area?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(area?.nameI18n?.en || '')}"></div><div class="field"><label>نوع الموقع</label><select name="type" ${area ? 'disabled' : ''}><option value="COUNTRY" ${area?.type === 'COUNTRY' ? 'selected' : ''}>دولة</option><option value="CITY" ${area?.type === 'CITY' ? 'selected' : ''}>مدينة</option><option value="DISTRICT" ${area?.type === 'DISTRICT' ? 'selected' : ''}>منطقة/نطاق</option></select></div><div class="field"><label>المستوى المحلي</label><select name="localityType"><option value="COUNTRY" ${area?.localityType === 'COUNTRY' ? 'selected' : ''}>دولة</option><option value="CITY" ${area?.localityType === 'CITY' ? 'selected' : ''}>مدينة</option><option value="DIRECTORATE" ${area?.localityType === 'DIRECTORATE' ? 'selected' : ''}>مديرية</option><option value="ISOLATION" ${area?.localityType === 'ISOLATION' ? 'selected' : ''}>عزلة</option><option value="VILLAGE" ${area?.localityType === 'VILLAGE' ? 'selected' : ''}>قرية</option><option value="NEIGHBORHOOD" ${area?.localityType === 'NEIGHBORHOOD' ? 'selected' : ''}>حارة</option><option value="DISTRICT" ${area?.localityType === 'DISTRICT' ? 'selected' : ''}>حي/منطقة</option></select></div><div class="field"><label>المنطقة الأم</label><select name="parentId"><option value="">بدون</option>${areas.filter((x) => x.id !== area?.id).map((x) => `<option value="${esc(x.id)}" ${area?.parentId === x.id ? 'selected' : ''}>${esc(x.name)} (${esc(x.type)})</option>`).join('')}</select></div><div class="field"><label>خط العرض</label><input name="centerLat" type="number" step="0.000001" value="${esc(area?.centerLat ?? '')}" required></div><div class="field"><label>خط الطول</label><input name="centerLng" type="number" step="0.000001" value="${esc(area?.centerLng ?? '')}" required></div><div class="field"><label>نصف القطر كم</label><input name="radiusKm" type="number" min="0.1" max="5000" step="0.1" value="${esc(area?.radiusKm ?? 25)}" required></div>${area ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${area.isActive ? 'selected' : ''}>نشطة</option><option value="false" ${!area.isActive ? 'selected' : ''}>معطلة</option></select></div>` : ''}</div><button class="btn">حفظ المنطقة</button></form>`);
+    document.getElementById('areaEditor').addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.target); const body = { name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, localityType: String(f.get('localityType') || 'DISTRICT'), centerLat: Number(f.get('centerLat')), centerLng: Number(f.get('centerLng')), radiusKm: Number(f.get('radiusKm')) }; if (!area) {
         body.type = String(f.get('type'));
         body.parentId = String(f.get('parentId') || '') || undefined;
     }

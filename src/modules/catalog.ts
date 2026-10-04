@@ -47,7 +47,7 @@ export function validateFormData(fields: FormField[], data: unknown): Record<str
 export interface CatalogSnapshot { categories: CategoryRow[]; services: ServiceRow[]; areas: ServiceAreaRow[]; byService: Map<string, ServiceRow>; byCategory: Map<string, CategoryRow> }
 export interface ServiceOut { id: string; slug: string; categoryId: string; categorySlug: string | undefined; name: string; description: string; icon: string | null; pricingType: PricingType; basePrice: number | null; currency: string; defaultPriority: Priority; formSchema?: unknown; requiresInspection?: boolean; requiresVehicle?: boolean; supportsWaiting?: boolean; deliveryProofType?: string; seasonalEnabled?: boolean; seasonStartAt?: string | null; seasonEndAt?: string | null; isActive?: boolean; nameI18n?: unknown; descriptionI18n?: unknown }
 export interface CategoryOut { id: string; slug: string; parentId: string | null; name: string; description: string; icon: string | null; moduleType: string; sortOrder: number; services?: ServiceOut[]; isActive?: boolean; nameI18n?: unknown; descriptionI18n?: unknown; keywords?: unknown; children?: CategoryOut[] }
-export interface AreaOut { id: string; parentId: string | null; name: string; type: string; centerLat: number; centerLng: number; radiusKm: number; isActive?: boolean; nameI18n?: unknown }
+export interface AreaOut { id: string; parentId: string | null; name: string; type: string; localityType: string; centerLat: number; centerLng: number; radiusKm: number; isActive?: boolean; nameI18n?: unknown }
 
 export interface Catalog {
   invalidate(): void;
@@ -79,7 +79,7 @@ export function createCatalog(app: App): Catalog {
     if (cache && app.clock.now() - cachedAt < TTL) return cache;
     const categories = db.all<CategoryRow>('SELECT * FROM categories ORDER BY sort_order, created_at');
     const services = db.all<ServiceRow>('SELECT * FROM services ORDER BY sort_order, created_at');
-    const areas = db.all<ServiceAreaRow>('SELECT * FROM service_areas ORDER BY type, created_at');
+    const areas = db.all<ServiceAreaRow>('SELECT * FROM service_areas ORDER BY locality_type, type, created_at');
     cache = { categories, services, areas, byService: new Map(services.map((x) => [x.id, x])), byCategory: new Map(categories.map((c) => [c.id, c])) };
     cachedAt = app.clock.now();
     return cache;
@@ -119,7 +119,7 @@ export function createCatalog(app: App): Catalog {
       return c?.is_active ? x : null;
     },
     serializeArea(a, locale, admin = false) {
-      const out: AreaOut = { id: a.id, parentId: a.parent_id, name: tr(a.name_i18n, locale), type: a.type, centerLat: a.center_lat, centerLng: a.center_lng, radiusKm: a.radius_km };
+      const out: AreaOut = { id: a.id, parentId: a.parent_id, name: tr(a.name_i18n, locale), type: a.type, localityType: a.locality_type || a.type, centerLat: a.center_lat, centerLng: a.center_lng, radiusKm: a.radius_km };
       if (admin) { out.isActive = !!a.is_active; out.nameI18n = parseJson(a.name_i18n, {}); }
       return out;
     },

@@ -31,7 +31,7 @@ export function registerFileRoutes(app: App, r: Router): void {
     if (!buf.length) throw E.unprocessable('الملف فارغ', 'EMPTY_FILE');
     if (buf.length > MAX_BYTES) throw E.unprocessable('حجم الملف يتجاوز 5MB', 'FILE_TOO_LARGE');
     const mime = sniff(buf);
-    const allowed = b.purpose === 'provider_document' ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : ['image/jpeg', 'image/png', 'image/webp'];
+    const allowed = (b.purpose === 'provider_document' || b.purpose === 'order_attachment') ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : ['image/jpeg', 'image/png', 'image/webp'];
     if (!mime || !allowed.includes(mime)) throw E.unprocessable('نوع الملف غير مدعوم', 'UNSUPPORTED_FILE_TYPE');
     if (b.purpose === 'service_icon' && ctx.user!.role !== 'ADMIN') throw E.forbidden();
     const id = uuid();
@@ -50,8 +50,7 @@ export function registerFileRoutes(app: App, r: Router): void {
       const u = ctx.user!;
       let ok = u.role === 'ADMIN' || f.owner_id === u.id;
       if (!ok && u.role === 'PROVIDER' && f.purpose === 'order_attachment') {
-        ok = !!db.get(`SELECT 1 FROM orders o, json_each(o.attachments) je WHERE je.value = ?
-                       AND (o.provider_id = ? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id = o.id AND a.provider_id = ? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId);
+        ok = !!db.get(`SELECT 1 FROM orders o, json_each(o.attachments) je WHERE je.value = ? AND (o.provider_id = ? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id = o.id AND a.provider_id = ? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId) || !!db.get(`SELECT 1 FROM order_messages m JOIN orders o ON o.id=m.order_id, json_each(m.attachments) je WHERE je.value=? AND (o.provider_id=? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id=o.id AND a.provider_id=? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId);
       }
       if (!ok) throw E.forbidden();
     }

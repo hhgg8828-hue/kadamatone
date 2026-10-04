@@ -46,10 +46,16 @@ export class NearestRatedMatcher {
             if (loc && (p.base_lat === null || p.base_lng === null))
                 continue;
             const serviceAreas = db.all(`SELECT area_id FROM service_area_rules WHERE service_id=?`, order.service_id);
-            if (serviceAreas.length) {
-                const allowed = new Set(serviceAreas.map(x => x.area_id));
-                const orderArea = order.location_provided === 0 ? '' : (order.area_id ? String(order.area_id) : '');
-                if (order.location_provided !== 0 && !allowed.has(orderArea))
+            if (serviceAreas.length && order.location_provided !== 0 && order.area_id) {
+                const chain = new Set(this.app.catalog.areaChain(String(order.area_id)));
+                if (!serviceAreas.some(x => chain.has(x.area_id)))
+                    continue;
+            }
+            // مقدم الخدمة قد يغطي قرية أو عزلة أو مديرية محددة. المنطقة الأب تغطي أبناءها.
+            const providerAreas = db.all(`SELECT area_id FROM provider_service_areas WHERE provider_id=?`, p.id);
+            if (providerAreas.length && order.location_provided !== 0 && order.area_id) {
+                const chain = new Set(this.app.catalog.areaChain(String(order.area_id)));
+                if (!providerAreas.some(x => chain.has(x.area_id)))
                     continue;
             }
             const live = db.get(`SELECT lat,lng,updated_at FROM provider_live_locations WHERE provider_id=? AND updated_at >= ?`, p.id, new Date(this.app.clock.now() - 5 * 60_000).toISOString());

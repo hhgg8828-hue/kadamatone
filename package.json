@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.8",
-  "description": "خدمات (Khadamat) — V65.2 voice and automatic visual intent",
+  "version": "0.6.10",
+  "description": "خدمات (Khadamat) — V66.1 comprehensive audit fixes, locality coverage, nearby providers and chat attachments",
   "private": true,
   "type": "module",
   "engines": {

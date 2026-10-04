@@ -6,8 +6,8 @@ import { auth, roles } from './auth.middleware.js';
 import type { App } from '../app.js';
 import type { Ctx, Router } from '../core/http.js';
 
-interface MsgRow { id:string; order_id:string; sender_id:string; sender_role:string; body:string; location_lat:number|null; location_lng:number|null; location_accuracy_m:number|null; location_address_text:string|null; created_at:string }
-const bodySchema=s.obj({body:s.str({min:0,max:2000}),location:s.obj({lat:s.num({min:-90,max:90}),lng:s.num({min:-180,max:180}),accuracy:s.num({min:0,max:100000,optional:true}),addressText:s.str({max:300,optional:true})},{optional:true})});
+interface MsgRow { id:string; order_id:string; sender_id:string; sender_role:string; body:string; attachments:string; location_lat:number|null; location_lng:number|null; location_accuracy_m:number|null; location_address_text:string|null; created_at:string }
+const bodySchema=s.obj({body:s.str({min:0,max:2000}),attachmentFileIds:s.arr(s.str({max:64}),{max:5,optional:true}),location:s.obj({lat:s.num({min:-90,max:90}),lng:s.num({min:-180,max:180}),accuracy:s.num({min:0,max:100000,optional:true}),addressText:s.str({max:300,optional:true})},{optional:true})});
 
 function canAccess(app:App, orderId:string, ctx:Ctx){
   const o=app.db.get<any>('SELECT id,customer_id,provider_id,status FROM orders WHERE id=?',orderId);
@@ -19,7 +19,7 @@ function canAccess(app:App, orderId:string, ctx:Ctx){
 }
 function out(app:App,m:MsgRow){
   const u=app.db.get<{full_name:string}>('SELECT full_name FROM users WHERE id=?',m.sender_id);
-  return {id:m.id,orderId:m.order_id,senderId:m.sender_id,senderRole:m.sender_role,senderName:u?.full_name||'',body:m.body,location:m.location_lat===null?null:{lat:m.location_lat,lng:m.location_lng,accuracy:m.location_accuracy_m,addressText:m.location_address_text},createdAt:m.created_at};
+  return {id:m.id,orderId:m.order_id,senderId:m.sender_id,senderRole:m.sender_role,senderName:u?.full_name||'',body:m.body,attachments:(JSON.parse(m.attachments||'[]') as string[]).map(id=>({id,url:`/api/v1/files/${id}`})),location:m.location_lat===null?null:{lat:m.location_lat,lng:m.location_lng,accuracy:m.location_accuracy_m,addressText:m.location_address_text},createdAt:m.created_at};
 }
 
 export function registerChatRoutes(app:App,r:Router){
@@ -32,8 +32,8 @@ export function registerChatRoutes(app:App,r:Router){
   });
   r.post('/orders/:id/messages',auth,roles('CUSTOMER','PROVIDER'),(ctx:Ctx)=>{
     const o=canAccess(app,ctx.params.id!,ctx); if(['CANCELLED'].includes(o.status)) throw E.unprocessable('لا يمكن مراسلة الطلب بعد إلغائه','ORDER_CLOSED');
-    const b=parse<any>(bodySchema,ctx.body); if(!b.body?.trim() && !b.location) throw E.unprocessable('اكتب رسالة أو أرسل موقعًا','MESSAGE_EMPTY'); const now=iso(app.clock.now()); const id=uuid();
-    app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',id,o.id,ctx.user!.id,ctx.user!.role,(b.body||'').trim() || '📍 الموقع المرسل',b.location?.lat??null,b.location?.lng??null,b.location?.accuracy??null,b.location?.addressText??null,now);
+    const b=parse<any>(bodySchema,ctx.body); const attachmentFileIds=(b.attachmentFileIds||[]).filter((id:string)=>!!app.db.get(`SELECT id FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'`,id,ctx.user!.id)); if((b.attachmentFileIds||[]).length!==attachmentFileIds.length) throw E.unprocessable('يوجد ملف مرفق غير صالح','INVALID_ATTACHMENT'); if(!b.body?.trim() && !b.location && !attachmentFileIds.length) throw E.unprocessable('اكتب رسالة أو أرسل ملفًا أو أرسل موقعًا','MESSAGE_EMPTY'); const now=iso(app.clock.now()); const id=uuid();
+    app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',id,o.id,ctx.user!.id,ctx.user!.role,(b.body||'').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'),JSON.stringify(attachmentFileIds),b.location?.lat??null,b.location?.lng??null,b.location?.accuracy??null,b.location?.addressText??null,now);
     const targets=new Set<string>();
     if(o.customer_id!==ctx.user!.id) targets.add(o.customer_id);
     if(o.provider_id){const p=app.db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',o.provider_id);if(p&&p.user_id!==ctx.user!.id)targets.add(p.user_id)}

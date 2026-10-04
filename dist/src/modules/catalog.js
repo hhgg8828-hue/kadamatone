@@ -57,7 +57,7 @@ export function createCatalog(app) {
             return cache;
         const categories = db.all('SELECT * FROM categories ORDER BY sort_order, created_at');
         const services = db.all('SELECT * FROM services ORDER BY sort_order, created_at');
-        const areas = db.all('SELECT * FROM service_areas ORDER BY type, created_at');
+        const areas = db.all('SELECT * FROM service_areas ORDER BY locality_type, type, created_at');
         cache = { categories, services, areas, byService: new Map(services.map((x) => [x.id, x])), byCategory: new Map(categories.map((c) => [c.id, c])) };
         cachedAt = app.clock.now();
         return cache;
@@ -104,7 +104,7 @@ export function createCatalog(app) {
             return c?.is_active ? x : null;
         },
         serializeArea(a, locale, admin = false) {
-            const out = { id: a.id, parentId: a.parent_id, name: tr(a.name_i18n, locale), type: a.type, centerLat: a.center_lat, centerLng: a.center_lng, radiusKm: a.radius_km };
+            const out = { id: a.id, parentId: a.parent_id, name: tr(a.name_i18n, locale), type: a.type, localityType: a.locality_type || a.type, centerLat: a.center_lat, centerLng: a.center_lng, radiusKm: a.radius_km };
             if (admin) {
                 out.isActive = !!a.is_active;
                 out.nameI18n = parseJson(a.name_i18n, {});
