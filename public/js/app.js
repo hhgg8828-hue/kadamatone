@@ -30,6 +30,7 @@ const stopPollers = () => { if (customerPollTimer !== undefined) {
     offerCountdownTimer = undefined;
 } };
 let pendingAssistImage = null;
+let pendingAssistImageFileId = null;
 let realtime;
 let providerLocationWatch;
 let providerLocationLastSent = 0;
@@ -44,6 +45,22 @@ const stopRealtime = () => { if (realtime) {
     clearTimeout(realtimeRetry);
     realtimeRetry = undefined;
 } };
+async function enableSystemNotifications() {
+    if (!('Notification' in window))
+        throw new Error('المتصفح لا يدعم إشعارات الجهاز');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted')
+        throw new Error('لم يتم السماح بإشعارات الجهاز');
+    localStorage.setItem('khadamat_system_notifications', '1');
+    return true;
+}
+function maybeSystemNotification(title, body) {
+    try {
+        if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible')
+            new Notification(title, { body, tag: 'khadamat-notification' });
+    }
+    catch { }
+}
 function toast(title, body) { let box = document.getElementById('liveToasts'); if (!box) {
     box = document.createElement('div');
     box.id = 'liveToasts';
@@ -62,6 +79,7 @@ async function startRealtime() {
             try {
                 const n = JSON.parse(ev.data || '{}');
                 toast(n.title || 'إشعار جديد', n.body || '');
+                maybeSystemNotification(n.title || 'إشعار جديد', n.body || '');
                 if (document.getElementById('notificationList'))
                     await refreshOpenNotifications();
                 if (n.type === 'CHAT_MESSAGE' && n.orderId && document.getElementById('chatMessages')) {
@@ -340,8 +358,15 @@ function bindNotificationActions() {
 }
 async function openNotifications() { try {
     const ns = await fetchNotifications();
-    showModal(`<div class="service-picker-head notification-modal-head"><div><h2>الإشعارات</h2><p class="muted">تتحدث هذه النافذة تلقائيًا عند وصول أي تحديث جديد.</p></div><button class="btn secondary" id="readAllNotifications" type="button">✓ تحديد الكل كمقروء</button></div><div id="notificationLiveState" class="notification-live-state"><span class="live-pulse"></span> التحديث المباشر مفعل</div><div id="notificationList"></div>`);
+    showModal(`<div class="service-picker-head notification-modal-head"><div><h2>الإشعارات</h2><p class="muted">تتحدث هذه النافذة تلقائيًا عند وصول أي تحديث جديد.</p></div><div class="row"><button class="btn secondary" id="enableSystemNotifications" type="button">🔔 تفعيل تنبيهات الجهاز</button><button class="btn secondary" id="readAllNotifications" type="button">✓ تحديد الكل كمقروء</button></div></div><div id="notificationLiveState" class="notification-live-state"><span class="live-pulse"></span> التحديث المباشر مفعل</div><div id="notificationList"></div>`);
     await renderNotificationList(ns);
+    document.getElementById('enableSystemNotifications')?.addEventListener('click', async () => { try {
+        await enableSystemNotifications();
+        toast('تم التفعيل', 'ستظهر تنبيهات الجهاز عند وصول إشعار والتطبيق ليس أمامك.');
+    }
+    catch (e) {
+        alert(e.message);
+    } });
     document.getElementById('readAllNotifications')?.addEventListener('click', async () => { await api('/notifications/read-all', { method: 'POST', body: '{}' }); await refreshOpenNotifications(); });
     if (notificationModalTimer)
         clearInterval(notificationModalTimer);
@@ -531,10 +556,23 @@ async function openAskMe() {
         btn.disabled = true;
         btn.textContent = 'جارٍ الفهم...';
         try {
-            const j = await api('/assist/request', { method: 'POST', body: JSON.stringify({ text: q }) });
+            let imageFileId = pendingAssistImageFileId;
+            if (!imageFileId && pendingAssistImage && navigator.onLine) {
+                const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(pendingAssistImage); });
+                const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: pendingAssistImage.name, dataBase64: data }) });
+                imageFileId = up.file.id;
+                pendingAssistImageFileId = imageFileId;
+                pendingAssistImage = null;
+            }
+            const j = await api('/assist/request', { method: 'POST', body: JSON.stringify({ text: q, ...(imageFileId ? { imageFileId } : {}) }) });
             const matches = j.matches || [];
-            if (j.recommended) {
-                box.innerHTML = `<div class="card"><b>أقرب خدمة مقترحة</b><p>${esc(j.recommended.icon || '🛠️')} ${esc(j.recommended.serviceName)}</p><small class="muted">${esc(j.recommended.categoryName)} · دقة المطابقة ${Math.round(Number(j.recommended.confidence || 0) * 100)}%</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;
+            if (j.clarification?.options?.length) {
+                box.innerHTML = `<div class="card"><b>${esc(j.clarification.question || 'ماذا تقصد؟')}</b><div style="margin-top:10px">${j.clarification.options.slice(0, 3).map((o) => `<button class="suggestion" data-ask-service="${esc(o.serviceId)}" type="button"><span>🛠️</span><span><b>${esc(o.label)}</b></span><span>←</span></button>`).join('')}</div></div>`;
+                box.querySelectorAll('[data-ask-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.askService)));
+            }
+            else if (j.recommended) {
+                const steps = (j.steps || []).slice(0, 3);
+                box.innerHTML = `<div class="card"><b>${j.extracted?.compound ? 'فهمنا أن طلبك يجمع أكثر من حاجة' : 'أقرب خدمة مقترحة'}</b><p>${esc(j.recommended.icon || '🛠️')} ${esc(j.recommended.serviceName)}</p>${steps.length > 1 ? `<div class="notice">${steps.map((x) => esc(x.serviceName)).join(' + ')}</div>` : ''}<small class="muted">${esc(j.recommended.categoryName)} · ${j.source === 'AI' ? 'مساعد ذكي' : 'فهم ذكي'}</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;
                 document.getElementById('askUse')?.addEventListener('click', () => openOrderForm(j.recommended.serviceId));
                 document.getElementById('askMore')?.addEventListener('click', () => renderAskMatches(matches, j.customService));
             }
@@ -1067,6 +1105,8 @@ async function openOrderForm(serviceId, initial = null) {
         let offlineImage;
         const customFile = document.getElementById('customImage');
         const file = customFile?.files?.[0] || pendingAssistImage;
+        if (pendingAssistImageFileId && !customFile?.files?.[0])
+            attachmentFileIds = [pendingAssistImageFileId];
         if (file) {
             if (file.size > 5 * 1024 * 1024) {
                 msg.textContent = 'حجم الصورة يتجاوز 5MB';
@@ -1081,6 +1121,7 @@ async function openOrderForm(serviceId, initial = null) {
             else
                 offlineImage = { name: file.name, dataBase64: data };
             pendingAssistImage = null;
+            pendingAssistImageFileId = null;
         }
         if (addressId)
             b.addressId = addressId;

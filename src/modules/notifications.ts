@@ -34,6 +34,9 @@ export const TEMPLATES: Record<string, { ar: [string, string]; en: [string, stri
   COMPLAINT_REPLIED: { ar: ['رد جديد على الشكوى', 'هناك رد جديد على الشكوى {complaint}.'], en: ['New complaint reply', 'New reply on complaint {complaint}.'] },
   COMPLAINT_CLOSED: { ar: ['تم إغلاق الشكوى', 'تم إغلاق الشكوى {complaint}. القرار: {resolution}'], en: ['Complaint closed', 'Complaint {complaint} was closed. Resolution: {resolution}'] },
   CHAT_MESSAGE: { ar: ['رسالة جديدة', 'لديك رسالة جديدة في الطلب {code}.'], en: ['New message', 'You have a new message on order {code}.'] },
+  PURCHASE_CHANGE_REQUEST: { ar: ['تعديل مطلوب في الشراء', 'طلب مقدم الخدمة تعديل شراء الطلب {code} إلى {amount}. راجع الطلب ووافق أو ارفض.'], en: ['Purchase change requested', 'The provider requested a purchase change for {code} to {amount}. Review it.'] },
+  PURCHASE_CHANGE_RESPONDED: { ar: ['رد العميل على تعديل الشراء', 'العميل {approved} طلب تعديل الشراء للطلب {code}.'], en: ['Purchase change response', 'The customer {approved} the purchase change for order {code}.'] },
+  SEARCH_RETRY: { ar: ['استمرار البحث عن مقدم خدمة', 'لم نجد مقدم خدمة بعد للطلب {code} وسنواصل البحث تلقائيًا.'], en: ['Provider search continues', 'No provider has accepted order {code} yet; we will keep searching automatically.'] },
 };
 export type NotificationType = keyof typeof TEMPLATES;
 
@@ -95,6 +98,18 @@ export function registerNotificationRoutes(app: App, r: Router): void {
   r.get('/notifications', auth, (ctx: Ctx) => notifications.list(ctx.user!.id, ctx.query, ctx.user!.locale));
   r.post('/notifications/read-all', auth, (ctx: Ctx) => {
     db.run('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL', iso(app.clock.now()), ctx.user!.id);
+    return { ok: true };
+  });
+  r.post('/notifications/subscriptions', auth, (ctx: Ctx) => {
+    const b = parse<{ endpoint: string; p256dh?: string; auth?: string; platform?: string }>(s.obj({ endpoint: s.str({ min: 10, max: 2000 }), p256dh: s.str({ max: 500, optional: true }), auth: s.str({ max: 500, optional: true }), platform: s.str({ max: 30, optional: true }) }), ctx.body);
+    const now = iso(app.clock.now());
+    db.run(`INSERT INTO notification_subscriptions(id,user_id,endpoint,p256dh,auth,platform,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(user_id,endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,platform=excluded.platform,updated_at=excluded.updated_at`, uuid(), ctx.user!.id, b.endpoint, b.p256dh || null, b.auth || null, b.platform || 'WEB', now, now);
+    return { ok: true };
+  });
+  r.delete('/notifications/subscriptions', auth, (ctx: Ctx) => {
+    const endpoint = String(ctx.query['endpoint'] || '');
+    if (!endpoint) throw E.unprocessable('حدد عنوان الاشتراك', 'ENDPOINT_REQUIRED');
+    db.run('DELETE FROM notification_subscriptions WHERE user_id=? AND endpoint=?', ctx.user!.id, endpoint);
     return { ok: true };
   });
   r.post('/notifications/:id/read', auth, (ctx: Ctx) => {

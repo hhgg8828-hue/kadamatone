@@ -20,6 +20,33 @@ export function registerDeliveryProofRoutes(app: App, r: Router): void {
     return { pin: code };
   });
 
+  r.post('/orders/:id/delivery-proof/recipient-confirm', auth, roles('CUSTOMER'), (ctx: Ctx) => {
+    const b = parse<{ recipientName: string }>(s.obj({ recipientName: s.str({ min: 2, max: 120 }) }), ctx.body);
+    const o = db.get<any>('SELECT o.*, s.delivery_proof_type FROM orders o JOIN services s ON s.id=o.service_id WHERE o.id=? AND o.customer_id=?', ctx.params.id!, ctx.user!.id);
+    if (!o) throw E.notFound('الطلب غير موجود');
+    if (o.delivery_proof_type !== 'RECIPIENT_CONFIRMATION') throw E.unprocessable('هذا الطلب لا يستخدم تأكيد المستلم', 'PROOF_NOT_REQUIRED');
+    if (!['ON_THE_WAY','IN_PROGRESS'].includes(o.status)) throw E.unprocessable('لا يمكن تأكيد التسليم في هذه الحالة', 'INVALID_ORDER_STATE');
+    const now = new Date(app.clock.now()).toISOString();
+    db.run('UPDATE orders SET delivery_proof_verified_at=?,delivery_proof_verified_by=?,delivery_proof_method=?,delivery_proof_recipient_name=?,delivery_proof_recipient_confirmed_at=?,updated_at=?,version=version+1 WHERE id=?', now, ctx.user!.id, 'RECIPIENT_CONFIRMATION', b.recipientName, now, now, o.id);
+    const providerUser = o.provider_id ? db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',o.provider_id) : null;
+    app.notifications.notify(providerUser?.user_id || o.customer_id, 'DELIVERY_PROOF_VERIFIED', { code:o.code }, { orderId:o.id });
+    return { ok:true, verifiedAt:now, method:'RECIPIENT_CONFIRMATION', recipientName:b.recipientName };
+  });
+
+  r.post('/provider/orders/:id/delivery-proof/photo', auth, roles('PROVIDER'), (ctx: Ctx) => {
+    const b = parse<{ fileId: string }>(s.obj({ fileId: s.str({ min: 10, max: 64 }) }), ctx.body);
+    const o = db.get<any>('SELECT o.*, s.delivery_proof_type FROM orders o JOIN services s ON s.id=o.service_id WHERE o.id=? AND o.provider_id=?', ctx.params.id!, ctx.user!.providerId);
+    if (!o) throw E.notFound('الطلب غير موجود');
+    if (o.delivery_proof_type !== 'PHOTO') throw E.unprocessable('هذا الطلب لا يستخدم إثبات الصورة', 'PROOF_NOT_REQUIRED');
+    const f = db.get<any>("SELECT id FROM files WHERE id=? AND owner_id=? AND purpose='work_photo'", b.fileId, ctx.user!.id);
+    if (!f) throw E.unprocessable('الصورة غير صالحة أو لا تخص مقدم الخدمة', 'INVALID_PROOF_FILE');
+    if (!['ON_THE_WAY','IN_PROGRESS'].includes(o.status)) throw E.unprocessable('لا يمكن رفع إثبات التسليم في هذه الحالة', 'INVALID_ORDER_STATE');
+    const now = new Date(app.clock.now()).toISOString();
+    db.run('UPDATE orders SET delivery_proof_verified_at=?,delivery_proof_verified_by=?,delivery_proof_method=?,delivery_proof_file_id=?,updated_at=?,version=version+1 WHERE id=?', now, ctx.user!.id, 'PHOTO', b.fileId, now, o.id);
+    app.notifications.notify(o.customer_id, 'DELIVERY_PROOF_VERIFIED', { code:o.code }, { orderId:o.id });
+    return { ok:true, verifiedAt:now, method:'PHOTO', fileId:b.fileId };
+  });
+
   r.post('/provider/orders/:id/delivery-proof/verify', auth, roles('PROVIDER'), (ctx: Ctx) => {
     const b = parse<{ pin: string }>(s.obj({ pin: s.str({ min: 6, max: 6, pattern: /^\d{6}$/ }) }), ctx.body);
     return db.tx(() => {

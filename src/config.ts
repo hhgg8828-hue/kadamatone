@@ -23,7 +23,7 @@ export interface AdminSeed { name: string; phone: string; email: string; passwor
 export interface Config {
   env: string; isProd: boolean; port: number; dbPath: string; uploadDir: string; jwtSecret: string;
   accessTtlSec: number; refreshTtlDays: number; cookieSecure: boolean; trustProxy: boolean; corsOrigins: string[];
-  mapProvider: string; routingUrl: string; routingTimeoutMs: number; assignmentTickMs: number; logLevel: string; disableScheduler: boolean; disableRateLimit: boolean;
+  mapProvider: string; routingUrl: string; routingTimeoutMs: number; assignmentTickMs: number; logLevel: string; disableScheduler: boolean; disableRateLimit: boolean; aiIntentUrl: string | null; aiIntentKey: string | null; aiIntentModel: string; aiIntentTimeoutMs: number; aiIntentAuto: boolean; aiIntentCircuitCooldownMs: number;
   admin: AdminSeed; publicDir: string; sharedDir: string; root: string;
 }
 export interface ConfigOverrides { [key: string]: string | boolean | undefined; __skipDotEnv?: boolean }
@@ -62,6 +62,12 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     logLevel: env.LOG_LEVEL || 'info',
     disableScheduler: bool(env.DISABLE_SCHEDULER, false),
     disableRateLimit: bool(env.DISABLE_RATE_LIMIT, false),
+    aiIntentUrl: env.AI_INTENT_URL || (env.OPENAI_API_KEY ? 'https://api.openai.com/v1/chat/completions' : null),
+    aiIntentKey: env.AI_INTENT_KEY || env.OPENAI_API_KEY || null,
+    aiIntentModel: env.AI_INTENT_MODEL || env.OPENAI_MODEL || 'gpt-4o-mini',
+    aiIntentTimeoutMs: int(env.AI_INTENT_TIMEOUT_MS, 1800),
+    aiIntentAuto: bool(env.AI_INTENT_AUTO, true),
+    aiIntentCircuitCooldownMs: int(env.AI_INTENT_CIRCUIT_COOLDOWN_MS, 30000),
     admin: {
       name: env.ADMIN_NAME || 'مدير النظام',
       phone: env.ADMIN_PHONE || '+967700000000',

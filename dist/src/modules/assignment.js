@@ -157,10 +157,13 @@ export function createAssignmentService(app) {
                     continue;
                 }
                 if (Date.parse(o.search_exhausted_at) + retryMs <= now) {
+                    const full = db.get('SELECT * FROM orders WHERE id = ?', o.id);
                     db.run('UPDATE orders SET wave=0, search_exhausted_at=NULL, updated_at=?, version=version+1 WHERE id=?', nowIso, o.id);
                     const r = svc.assignWave(o.id);
-                    if (r.offered > 0)
+                    if (r.offered > 0) {
                         waved++;
+                        app.notifications.notify(full.customer_id, 'SEARCH_RETRY', { code: full.code }, { orderId: full.id });
+                    }
                 }
             }
             return { expired, waved, exhausted };
@@ -199,8 +202,8 @@ export function registerAssignmentRoutes(app, r) {
             const updated = orders.applyTransition(o, b.to, 'PROVIDER', ctx);
             if (b.to === 'COMPLETED') {
                 const proof = db.get('SELECT delivery_proof_type FROM services WHERE id=?', o.service_id);
-                if (proof?.delivery_proof_type === 'PIN' && !db.get('SELECT 1 FROM orders WHERE id=? AND delivery_proof_verified_at IS NOT NULL', o.id))
-                    throw E.unprocessable('يجب تأكيد رمز التسليم قبل إنهاء الطلب', 'DELIVERY_PROOF_REQUIRED');
+                if (proof?.delivery_proof_type && proof.delivery_proof_type !== 'NONE' && !db.get('SELECT 1 FROM orders WHERE id=? AND delivery_proof_verified_at IS NOT NULL', o.id))
+                    throw E.unprocessable('يجب إكمال إثبات التسليم قبل إنهاء الطلب', 'DELIVERY_PROOF_REQUIRED');
                 db.run('UPDATE service_providers SET completed_orders_count = completed_orders_count + 1, updated_at = ? WHERE id = ?', iso(app.clock.now()), o.provider_id);
                 app.payment.onCompleted(updated);
             }

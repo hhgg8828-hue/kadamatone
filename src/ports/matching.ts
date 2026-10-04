@@ -57,16 +57,22 @@ export class NearestRatedMatcher implements Matcher {
         const orderArea = order.location_provided === 0 ? '' : (order.area_id ? String(order.area_id) : '');
         if (order.location_provided !== 0 && !allowed.has(orderArea)) continue;
       }
-      const dist = loc && p.base_lat !== null && p.base_lng !== null ? haversineKm(loc.lat, loc.lng, p.base_lat, p.base_lng) : null;
-      const rating = Number(db.get<{rating_avg:number}>('SELECT rating_avg FROM service_providers WHERE id=?',p.id)?.rating_avg||0);
-      scored.push({ providerId: p.id, distanceKm: dist === null ? null : round(dist, 2), score: dist === null ? round(rating, 4) : round(-dist + rating * 0.001, 4) });
+      const live = db.get<{lat:number;lng:number;updated_at:string}>(`SELECT lat,lng,updated_at FROM provider_live_locations WHERE provider_id=? AND updated_at >= ?`, p.id, new Date(this.app.clock.now()-5*60_000).toISOString());
+      const candidatePoint = live ? {lat:Number(live.lat),lng:Number(live.lng)} : (p.base_lat !== null && p.base_lng !== null ? {lat:Number(p.base_lat),lng:Number(p.base_lng)} : null);
+      const dist = loc && candidatePoint ? haversineKm(loc.lat, loc.lng, candidatePoint.lat, candidatePoint.lng) : null;
+      const profile = db.get<{rating_avg:number;rating_count:number}>('SELECT rating_avg,rating_count FROM service_providers WHERE id=?',p.id);
+      const rating = Number(profile?.rating_avg||0);
+      const completed = Number(db.get<{c:number}>("SELECT COUNT(*) c FROM orders WHERE provider_id=? AND status='COMPLETED'",p.id)?.c||0);
+      const favorite = db.get('SELECT 1 FROM favorite_providers WHERE customer_id=? AND provider_id=?',order.customer_id,p.id) ? 1 : 0;
+      const distanceComponent = dist === null ? 0 : Math.max(0, 1 - Math.min(dist, 50)/50);
+      const qualityComponent = Math.min(1, rating/5);
+      const experienceComponent = Math.min(1, completed/50);
+      const composite = dist === null ? qualityComponent*0.65 + favorite*0.25 + experienceComponent*0.10 : distanceComponent*0.65 + qualityComponent*0.20 + favorite*0.10 + experienceComponent*0.05;
+      scored.push({ providerId: p.id, distanceKm: dist === null ? null : round(dist, 2), score: round(composite, 6) });
     }
 
-    // الأقرب أولًا، ثم التالي فالتالي. التقييم لا يغيّر ترتيب المسافة.
-    scored.sort((a, b) => {
-      const d = (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY);
-      return d || a.providerId.localeCompare(b.providerId);
-    });
+    // ترتيب عملي مركّب: الموقع الحي إن وجد، الجودة، تفضيل العميل، والخبرة.
+    scored.sort((a, b) => (b.score - a.score) || ((a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY)) || a.providerId.localeCompare(b.providerId));
     return scored.slice(0, limit);
   }
 }

@@ -7,7 +7,7 @@ import { Router, createRequestHandler } from './core/http.js';
 import { MemoryRateLimiter } from './core/rateLimit.js';
 import { SseHub } from './core/sse.js';
 import { LocalStorage } from './ports/storage.js';
-import { KeywordIntentParser } from './ports/intent.js';
+import { HybridIntentParser } from './ports/intent.js';
 import { NearestRatedMatcher } from './ports/matching.js';
 import { createSettings } from './modules/settings.js';
 import { createAudit } from './modules/audit.js';
@@ -43,7 +43,7 @@ export function createApp(overrides = {}) {
     app.limiter = new MemoryRateLimiter(() => app.clock.now());
     app.sse = new SseHub();
     app.storage = new LocalStorage(config.uploadDir);
-    app.intentParser = new KeywordIntentParser();
+    app.intentParser = new HybridIntentParser(config);
     app.settings = createSettings(app);
     app.audit = createAudit(app);
     app.catalog = createCatalog(app);

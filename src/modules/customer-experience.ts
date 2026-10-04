@@ -51,8 +51,8 @@ export function registerCustomerExperienceRoutes(app: App, r: Router): void {
   });
 
   r.get('/me/searches/recent',auth,roles('CUSTOMER'),(ctx:Ctx)=>({searches:db.all<any>('SELECT query,service_id serviceId,created_at createdAt FROM customer_searches WHERE customer_id=? ORDER BY id DESC LIMIT 10',ctx.user!.id)}));
-  r.post('/assist/request',auth,roles('CUSTOMER'),(ctx:Ctx)=>{
-    const b=parse<{text:string}>(s.obj({text:s.str({min:2,max:500})}),ctx.body); const result=app.intentParser.parse(b.text,{catalog:app.catalog,locale:ctx.locale});
+  r.post('/assist/request',auth,roles('CUSTOMER'),async (ctx:Ctx)=>{
+    const b=parse<{text:string;imageFileId?:string}>(s.obj({text:s.str({min:2,max:500}),imageFileId:s.str({max:64,optional:true})}),ctx.body); let image: {mime:string;dataBase64:string}|undefined; if(b.imageFileId){ const f=db.get<any>("SELECT id,mime,storage_key,size,purpose FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'",b.imageFileId,ctx.user!.id); if(!f) throw E.notFound('الصورة غير موجودة'); if(f.size>5*1024*1024) throw E.unprocessable('حجم الصورة كبير','FILE_TOO_LARGE'); image={mime:f.mime,dataBase64:app.storage.read(f.storage_key).toString('base64')}; } const result=await app.intentParser.parse(b.text,{catalog:app.catalog,locale:ctx.locale,image});
     const top=result.matches[0]; db.run('INSERT INTO customer_searches(customer_id,query,service_id,created_at) VALUES(?,?,?,?)',ctx.user!.id,b.text,top?.serviceId||null,iso(app.clock.now()));
     return { ...result, recommended: top && top.confidence >= 0.40 ? top : null, customService: app.catalog.all().services.find(x=>x.slug==='custom-request')?.id || null };
   });
@@ -64,12 +64,17 @@ export function registerCustomerExperienceRoutes(app: App, r: Router): void {
   });
   r.post('/provider/orders/:id/purchase-change',auth,roles('PROVIDER'),(ctx:Ctx)=>{
     const b=parse<any>(s.obj({requestedPrice:s.num({min:0,max:100000000}),requestedProduct:s.str({max:300,optional:true}),reason:s.str({max:500,optional:true})}),ctx.body);
-    const o=db.get<any>('SELECT * FROM orders WHERE id=? AND provider_id=?',ctx.params.id!,ctx.user!.providerId);if(!o)throw E.notFound('الطلب غير موجود');
-    if(!db.get('SELECT 1 FROM trip_orders WHERE order_id=? AND purpose IN (\'ITEM_PURCHASE\',\'MEDICINE\',\'STORE_SHOPPING\')',o.id))throw E.unprocessable('هذا الطلب ليس طلب شراء بالنيابة','PURCHASE_NOT_APPLICABLE');
+    const o=db.get<any>(`SELECT o.*, s.slug service_slug FROM orders o JOIN services s ON s.id=o.service_id WHERE o.id=? AND o.provider_id=?`,ctx.params.id!,ctx.user!.providerId);if(!o)throw E.notFound('الطلب غير موجود');
+    const trip=db.get<any>('SELECT purpose FROM trip_orders WHERE order_id=?',o.id);
+    const purchaseSlugs=new Set(['purchase-and-delivery','pharmacy-purchase']);
+    const isPurchase=purchaseSlugs.has(String(o.service_slug)) || ['ITEM_PURCHASE','MEDICINE','STORE_SHOPPING'].includes(String(trip?.purpose||''));
+    if(!isPurchase)throw E.unprocessable('هذا الطلب ليس طلب شراء بالنيابة','PURCHASE_NOT_APPLICABLE');
+    if(!['ACCEPTED','ON_THE_WAY','IN_PROGRESS'].includes(o.status))throw E.unprocessable('يمكن تعديل الشراء بعد قبول الطلب وأثناء تنفيذه','PURCHASE_CHANGE_STATE');
+    if(db.get("SELECT 1 FROM purchase_change_requests WHERE order_id=? AND status='PENDING'",o.id))throw E.conflict('يوجد طلب تعديل شراء بانتظار رد العميل','PURCHASE_CHANGE_PENDING');
     const id=uuid(),now=iso(app.clock.now());db.run('INSERT INTO purchase_change_requests(id,order_id,provider_id,requested_price,requested_product,reason,created_at) VALUES(?,?,?,?,?,?,?)',id,o.id,ctx.user!.providerId,b.requestedPrice,b.requestedProduct||null,b.reason||null,now);app.notifications.notify(o.customer_id,'PURCHASE_CHANGE_REQUEST',{code:o.code,amount:b.requestedPrice},{orderId:o.id});return {change:db.get<any>('SELECT id,requested_price requestedPrice,requested_product requestedProduct,reason,status,created_at createdAt FROM purchase_change_requests WHERE id=?',id)};
   });
   r.post('/orders/:id/purchase-change/:changeId/respond',auth,roles('CUSTOMER'),(ctx:Ctx)=>{
-    const b=parse<any>(s.obj({decision:s.oneOf(['APPROVE','REJECT'])}),ctx.body);const o=db.get<any>('SELECT * FROM orders WHERE id=? AND customer_id=?',ctx.params.id!,ctx.user!.id);if(!o)throw E.notFound('الطلب غير موجود');const c=db.get<any>('SELECT * FROM purchase_change_requests WHERE id=? AND order_id=? AND status=\'PENDING\'',ctx.params.changeId!,o.id);if(!c)throw E.notFound('طلب تغيير الشراء غير موجود');const now=iso(app.clock.now());db.run('UPDATE purchase_change_requests SET status=?,responded_at=? WHERE id=?','APPROVE'===b.decision?'APPROVED':'REJECTED',now,c.id);if(b.decision==='APPROVE')db.run('UPDATE orders SET agreed_price=?,updated_at=?,version=version+1 WHERE id=?',c.requested_price,now,o.id);if(o.provider_id){const pu=db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',o.provider_id);if(pu)app.notifications.notify(pu.user_id,'PURCHASE_CHANGE_RESPONDED',{code:o.code,approved:b.decision==='APPROVE'},{orderId:o.id})}return {ok:true,status:b.decision==='APPROVE'?'APPROVED':'REJECTED'};
+    const b=parse<any>(s.obj({decision:s.oneOf(['APPROVE','REJECT'])}),ctx.body);const o=db.get<any>('SELECT * FROM orders WHERE id=? AND customer_id=?',ctx.params.id!,ctx.user!.id);if(!o)throw E.notFound('الطلب غير موجود');const c=db.get<any>('SELECT * FROM purchase_change_requests WHERE id=? AND order_id=? AND status=\'PENDING\'',ctx.params.changeId!,o.id);if(!c)throw E.notFound('طلب تغيير الشراء غير موجود');const now=iso(app.clock.now());db.run('UPDATE purchase_change_requests SET status=?,responded_at=? WHERE id=?','APPROVE'===b.decision?'APPROVED':'REJECTED',now,c.id);if(b.decision==='APPROVE')db.run('UPDATE orders SET agreed_price=?,updated_at=?,version=version+1 WHERE id=?',c.requested_price,now,o.id);if(o.provider_id){const pu=db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',o.provider_id);if(pu)app.notifications.notify(pu.user_id,'PURCHASE_CHANGE_RESPONDED',{code:o.code,approved:b.decision==='APPROVE'?'وافق':'رفض'},{orderId:o.id})}return {ok:true,status:b.decision==='APPROVE'?'APPROVED':'REJECTED'};
   });
 
   r.post('/orders/:id/reorder',auth,roles('CUSTOMER'),(ctx:Ctx)=>{
