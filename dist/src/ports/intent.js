@@ -11,7 +11,7 @@ export class KeywordIntentParser {
         const matches = [];
         for (const svc of data.services) {
             const cat = activeCats.get(svc.category_id);
-            if (!svc.is_active || !cat)
+            if (!svc.is_active || !cat || !catalog.getActiveService(svc.id))
                 continue;
             const terms = new Set();
             for (const k of parseJson(svc.keywords, []) ?? [])

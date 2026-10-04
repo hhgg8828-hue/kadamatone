@@ -72,9 +72,10 @@ const registerSchema: Schema = s.obj({
     displayName: s.str({ min: 2, max: 80, optional: true }),
     companyName: s.str({ min: 2, max: 120, optional: true }),
     bio: s.str({ max: 1000, optional: true }),
+    specialty: s.str({ max: 120, optional: true }),
   }, { optional: true }),
 });
-interface RegisterBody { fullName: string; phone: string; email?: string; password: string; role: 'CUSTOMER' | 'PROVIDER'; locale: 'ar' | 'en'; provider?: { providerType: string; displayName?: string; companyName?: string; bio?: string } }
+interface RegisterBody { fullName: string; phone: string; email?: string; password: string; role: 'CUSTOMER' | 'PROVIDER'; locale: 'ar' | 'en'; provider?: { providerType: string; displayName?: string; companyName?: string; bio?: string; specialty?: string } }
 
 export function registerAuthRoutes(app: App, r: Router): void {
   const { db } = app;
@@ -95,8 +96,8 @@ export function registerAuthRoutes(app: App, r: Router): void {
       db.run('INSERT INTO users(id,role_id,full_name,phone,email,password_hash,locale,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
         id, b.role === 'PROVIDER' ? 2 : 1, b.fullName, phone, b.email || null, hash, b.locale, now, now);
       if (b.role === 'PROVIDER' && b.provider) {
-        db.run('INSERT INTO service_providers(id,user_id,provider_type,display_name,bio,company_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
-          uuid(), id, b.provider.providerType, b.provider.displayName || b.provider.companyName || b.fullName, b.provider.bio || null, companyName || null, now, now);
+        db.run('INSERT INTO service_providers(id,user_id,provider_type,display_name,bio,company_name,specialty,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
+          uuid(), id, b.provider.providerType, b.provider.displayName || b.provider.companyName || b.fullName, b.provider.bio || null, companyName || null, b.provider.specialty || null, now, now);
         app.notifications.notifyAdmins('PROVIDER_PENDING_ADMIN', { provider: b.provider.displayName || b.fullName }, { userId: id });
       }
       return svc.loadUser('u.id = ?', id);

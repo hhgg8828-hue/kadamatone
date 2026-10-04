@@ -41,20 +41,21 @@ export function createOrders(app) {
             const x = catalog.all().byService.get(o.service_id);
             const cat = catalog.all().byCategory.get(x.category_id);
             const loc = db.get('SELECT * FROM locations WHERE id = ?', o.location_id);
+            const locationProvided = o.location_provided !== 0;
             const isOwnerCustomer = ctx.user?.role === 'CUSTOMER' && ctx.user.id === o.customer_id;
             const approx = ctx.user?.role === 'PROVIDER' && o.provider_id !== ctx.user.providerId; // مزود لم يُسند له بعد: موقع تقريبي فقط
             const out = {
                 id: o.id, code: o.code, status: o.status, priority: o.priority, description: o.description, formData: parseJson(o.form_data, {}) ?? {},
                 service: { id: x.id, name: tr(x.name_i18n, ctx.locale), icon: x.icon, categoryName: tr(cat?.name_i18n, ctx.locale) },
-                location: app.locations.serialize(loc, ctx.locale, { approximate: approx }),
-                contactPhone: approx ? null : o.contact_phone, recipient: (!approx && (isOwnerCustomer || ctx.user?.role === 'ADMIN' || ctx.user?.role === 'PROVIDER')) && o.recipient_name ? { fullName: o.recipient_name, phone: o.recipient_phone || '' } : null, scheduledAt: o.scheduled_at, pricingType: o.pricing_type, priceSnapshot: o.price_snapshot, agreedPrice: o.agreed_price,
+                location: locationProvided ? app.locations.serialize(loc, ctx.locale, { approximate: approx }) : null,
+                contactPhone: (ctx.user?.role === 'PROVIDER' || approx) ? null : o.contact_phone, recipient: (!approx && (isOwnerCustomer || ctx.user?.role === 'ADMIN')) && o.recipient_name ? { fullName: o.recipient_name, phone: o.recipient_phone || '' } : null, scheduledAt: o.scheduled_at, pricingType: o.pricing_type, priceSnapshot: o.price_snapshot, agreedPrice: o.agreed_price,
                 currency: o.currency, paymentMethod: o.payment_method, notes: isOwnerCustomer || ctx.user?.role === 'ADMIN' ? o.customer_notes : null,
                 attachments: (parseJson(o.attachments, []) ?? []).map((id) => `/api/v1/files/${id}`), wave: o.wave,
                 createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason,
             };
             if (ctx.user?.role === 'PROVIDER' || ctx.user?.role === 'ADMIN') {
                 const cu = db.get('SELECT id, full_name, phone FROM users WHERE id = ?', o.customer_id);
-                out.customer = { id: cu.id, fullName: cu.full_name, phone: approx ? null : cu.phone };
+                out.customer = { id: cu.id, fullName: cu.full_name, phone: ctx.user?.role === 'ADMIN' ? cu.phone : null };
             }
             const trip = serializeTrip(app, o.id, ctx.locale);
             if (trip)
@@ -108,8 +109,6 @@ export function registerOrderRoutes(app, r) {
     const { db, catalog, orders } = app;
     r.post('/orders', auth, roles('CUSTOMER'), (ctx) => {
         const b = parse(createOrderSchema, ctx.body);
-        if (!b.location && !b.addressId)
-            throw E.unprocessable('حدد الموقع أو عنوانًا محفوظًا', 'VALIDATION_ERROR', [{ path: 'location', message: 'هذا الحقل مطلوب' }]);
         const svc = catalog.getActiveService(b.serviceId);
         if (!svc)
             throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
@@ -128,14 +127,24 @@ export function registerOrderRoutes(app, r) {
             if (activeCount >= app.settings.get('orders.max_active_per_customer'))
                 throw E.unprocessable('لديك عدد كبير من الطلبات النشطة حاليًا', 'TOO_MANY_ACTIVE_ORDERS');
             let locRow;
+            let locationProvided = true;
             if (b.addressId) {
                 const addr = db.get('SELECT location_id FROM addresses WHERE id = ? AND user_id = ?', b.addressId, ctx.user.id);
                 if (!addr)
                     throw E.unprocessable('العنوان غير موجود', 'INVALID_ADDRESS');
                 locRow = db.get('SELECT * FROM locations WHERE id = ?', addr.location_id);
             }
-            else {
+            else if (b.location) {
                 locRow = app.locations.create(b.location, { requireArea: false });
+            }
+            else {
+                locRow = db.get('SELECT * FROM locations WHERE id=?', 'no-location');
+                const systemArea = db.get("SELECT id FROM service_areas WHERE id IN ('system-yemen','yemen-unmapped') AND is_active=1 ORDER BY CASE id WHEN 'system-yemen' THEN 0 ELSE 1 END LIMIT 1");
+                if (locRow && systemArea && locRow.area_id !== systemArea.id)
+                    locRow = { ...locRow, area_id: systemArea.id };
+                if (!locRow)
+                    throw E.unprocessable('تعذر حفظ الطلب بدون موقع حاليًا', 'LOCATION_PLACEHOLDER_MISSING');
+                locationProvided = false;
             }
             // حماية إضافية من الضغط/الإرسال المكرر: إذا أرسل العميل نفس الطلب فعليًا
             // مرتين خلال ثوانٍ قليلة بنفس الخدمة والوصف والبيانات والموقع، نعيد الطلب
@@ -152,6 +161,10 @@ export function registerOrderRoutes(app, r) {
                     return false;
                 if (x.scheduled_at !== (b.scheduledAt || null))
                     return false;
+                if (x.location_provided === 0 && !locationProvided)
+                    return true;
+                if (x.location_provided === 0 || !locationProvided)
+                    return false;
                 const latDiff = Math.abs(Number(x.loc_lat) - Number(locRow.lat));
                 const lngDiff = Math.abs(Number(x.loc_lng) - Number(locRow.lng));
                 return latDiff < 0.00015 && lngDiff < 0.00015; // قرابة عشرات الأمتار، وليس قيدًا على الاستخدام الطبيعي.
@@ -166,8 +179,8 @@ export function registerOrderRoutes(app, r) {
             const code = genCode(db, now);
             const attachments = (b.attachmentFileIds || []).filter((fid) => db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user.id));
             db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,
-                pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,created_at,updated_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id, b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get('platform.currency'), b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName || null, b.recipientPhone || null, b.recipientUserId || null, nowIso, nowIso);
+                pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,created_at,updated_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id, b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get('platform.currency'), b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName || null, b.recipientPhone || null, b.recipientUserId || null, locationProvided ? 1 : 0, nowIso, nowIso);
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user.id, 'CUSTOMER', nowIso);
             let o = db.get('SELECT * FROM orders WHERE id = ?', id);
             o = orders.applyTransition(o, 'SEARCHING', 'SYSTEM', ctx, { reason: 'auto' });
@@ -204,6 +217,13 @@ export function registerOrderRoutes(app, r) {
             const actorRole = ctx.user.role;
             if (ctx.user.role === 'PROVIDER' && o.provider_id !== ctx.user.providerId)
                 throw E.forbidden();
+            if (actorRole === 'PROVIDER' && o.status === 'ACCEPTED' && app.settings.get('assignment.auto_reassign_provider_cancel')) {
+                const oldProvider = o.provider_id;
+                const result = app.assignment.reassignAfterProviderCancellation(o.id, oldProvider, b.reason || 'provider_cancelled');
+                const fresh = db.get('SELECT * FROM orders WHERE id=?', o.id);
+                ctx.status = 200;
+                return { order: orders.serialize(fresh, ctx), reassigned: result.offered > 0 };
+            }
             const policy = db.get(`SELECT cp.free_until_status, cp.fee_percent FROM cancellation_policies cp JOIN services s ON s.cancellation_policy_id = cp.id WHERE s.id = ?`, o.service_id);
             let fee = null;
             if (policy && actorRole === 'CUSTOMER' && o.price_snapshot && statusIndex(o.status) > statusIndex(policy.free_until_status))

@@ -31,8 +31,8 @@ export class NearestRatedMatcher implements Matcher {
 
   findCandidates(order: OrderRow, { excludeProviderIds = [], limit }: { excludeProviderIds: string[]; limit: number }): Candidate[] {
     const { db, settings } = this.app;
-    const loc = db.get<{ lat: number; lng: number }>('SELECT lat, lng FROM locations WHERE id = ?', order.location_id);
-    if (!loc) return [];
+    const loc = order.location_provided === 0 ? null : db.get<{ lat: number; lng: number }>('SELECT lat, lng FROM locations WHERE id = ?', order.location_id);
+    if (order.location_provided !== 0 && !loc) return [];
 
     const when = order.scheduled_at ? Date.parse(order.scheduled_at) : this.app.clock.now();
     const tz = settings.get<string>('platform.timezone');
@@ -48,11 +48,18 @@ export class NearestRatedMatcher implements Matcher {
     for (const p of rows) {
       if (excludeProviderIds.includes(p.id)) continue;
       if (!isProviderAvailable(db, p.id, when, tz)) continue;
-      // لا يوجد حد مسافة مصطنع. أي مقدم خدمة مؤهل يمكن ترشيحه، حتى لو كانت المسافة كبيرة.
-      // لا يمكن ترتيب مقدم خدمة لا يملك إحداثيات فعلية، لذلك لا يدخل في المطابقة الجغرافية.
-      if (p.base_lat === null || p.base_lng === null) continue;
-      const dist = haversineKm(loc.lat, loc.lng, p.base_lat, p.base_lng);
-      scored.push({ providerId: p.id, distanceKm: round(dist, 2), score: round(-dist, 4) });
+      // إذا لم يحدد العميل موقعًا، لا نفشل المطابقة: نستخدم التقييم كترتيب احتياطي.
+      // عند توفر الموقع، نفضّل المسافة الفعلية.
+      if (loc && (p.base_lat === null || p.base_lng === null)) continue;
+      const serviceAreas = db.all<{area_id:string}>(`SELECT area_id FROM service_area_rules WHERE service_id=?`, order.service_id);
+      if (serviceAreas.length) {
+        const allowed = new Set(serviceAreas.map(x=>x.area_id));
+        const orderArea = order.location_provided === 0 ? '' : (order.area_id ? String(order.area_id) : '');
+        if (order.location_provided !== 0 && !allowed.has(orderArea)) continue;
+      }
+      const dist = loc && p.base_lat !== null && p.base_lng !== null ? haversineKm(loc.lat, loc.lng, p.base_lat, p.base_lng) : null;
+      const rating = Number(db.get<{rating_avg:number}>('SELECT rating_avg FROM service_providers WHERE id=?',p.id)?.rating_avg||0);
+      scored.push({ providerId: p.id, distanceKm: dist === null ? null : round(dist, 2), score: dist === null ? round(rating, 4) : round(-dist + rating * 0.001, 4) });
     }
 
     // الأقرب أولًا، ثم التالي فالتالي. التقييم لا يغيّر ترتيب المسافة.

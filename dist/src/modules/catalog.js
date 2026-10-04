@@ -42,6 +42,16 @@ export function createCatalog(app) {
     const { db } = app;
     let cache = null, cachedAt = 0;
     const TTL = 30_000;
+    function isSeasonActive(x) {
+        if (!x.seasonal_enabled)
+            return true;
+        if (!x.season_start_at || !x.season_end_at)
+            return false;
+        const now = app.clock.now();
+        const start = Date.parse(x.season_start_at);
+        const end = Date.parse(x.season_end_at);
+        return Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end;
+    }
     function load() {
         if (cache && app.clock.now() - cachedAt < TTL)
             return cache;
@@ -58,7 +68,7 @@ export function createCatalog(app) {
         serializeService(x, locale, { full = false } = {}) {
             const c = load().byCategory.get(x.category_id);
             const out = { id: x.id, slug: x.slug, categoryId: x.category_id, categorySlug: c?.slug, name: tr(x.name_i18n, locale), description: tr(x.description_i18n, locale), icon: x.icon,
-                pricingType: x.pricing_type, basePrice: x.base_price, currency: app.settings.get('platform.currency'), defaultPriority: x.default_priority, requiresInspection: !!x.requires_inspection, requiresVehicle: !!x.requires_vehicle, supportsWaiting: !!x.supports_waiting };
+                pricingType: x.pricing_type, basePrice: x.base_price, currency: app.settings.get('platform.currency'), defaultPriority: x.default_priority, deliveryProofType: x.delivery_proof_type, requiresInspection: !!x.requires_inspection, requiresVehicle: !!x.requires_vehicle, supportsWaiting: !!x.supports_waiting, seasonalEnabled: !!x.seasonal_enabled, seasonStartAt: x.season_start_at, seasonEndAt: x.season_end_at, isActive: !!x.is_active };
             if (full) {
                 const fields = parseJson(x.form_schema, []) ?? [];
                 out.formSchema = fields.map((f) => ({ ...f, labelText: tr(f.label, locale), options: f.options?.map((o) => ({ value: o.value, label: tr(o.label, locale) })) }));
@@ -77,7 +87,7 @@ export function createCatalog(app) {
                 out.keywords = parseJson(c.keywords, []);
             }
             if (withServices)
-                out.services = data.services.filter((x) => x.category_id === c.id && (admin || x.is_active)).map((x) => svc.serializeService(x, locale));
+                out.services = data.services.filter((x) => x.category_id === c.id && (admin || (x.is_active && isSeasonActive(x)))).map((x) => svc.serializeService(x, locale, { full: admin }));
             return out;
         },
         tree(locale) {
@@ -88,7 +98,7 @@ export function createCatalog(app) {
         },
         getActiveService(id) {
             const x = load().byService.get(id);
-            if (!x || !x.is_active)
+            if (!x || !x.is_active || !isSeasonActive(x))
                 return null;
             const c = load().byCategory.get(x.category_id);
             return c?.is_active ? x : null;
@@ -147,7 +157,7 @@ export function registerCatalogAdminRoutes(app, r) {
         description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), keywords, pricingType: s.oneOf(['FIXED', 'QUOTE']),
         basePrice: s.num({ min: 0, optional: true }), defaultPriority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true, default: 'NORMAL' }),
         sortOrder: s.int({ min: -100000, max: 100000, optional: true, default: 0 }), formSchema: formSchemaSchema,
-        requiresInspection: s.bool({ optional: true, default: false }), requiresVehicle: s.bool({ optional: true, default: false }), supportsWaiting: s.bool({ optional: true, default: false }),
+        requiresInspection: s.bool({ optional: true, default: false }), requiresVehicle: s.bool({ optional: true, default: false }), supportsWaiting: s.bool({ optional: true, default: false }), seasonalEnabled: s.bool({ optional: true, default: false }), seasonStartAt: s.date({ optional: true }), seasonEndAt: s.date({ optional: true }), deliveryProofType: s.oneOf(['NONE', 'PIN', 'RECIPIENT_CONFIRMATION', 'PHOTO'], { optional: true, default: 'NONE' }),
     });
     const adminCatalog = (locale) => {
         const data = catalog.all();
@@ -185,6 +195,10 @@ export function registerCatalogAdminRoutes(app, r) {
     });
     r.post('/admin/services', auth, adminLevel('ADMIN'), (ctx) => {
         const b = parse(serviceInput, ctx.body);
+        if (b.seasonalEnabled && (!b.seasonStartAt || !b.seasonEndAt))
+            throw E.unprocessable('حدد بداية ونهاية الموسم عند تفعيل الخدمة الموسمية', 'SEASON_DATES_REQUIRED');
+        if (b.seasonalEnabled && b.seasonStartAt && b.seasonEndAt && Date.parse(b.seasonStartAt) >= Date.parse(b.seasonEndAt))
+            throw E.unprocessable('نهاية الموسم يجب أن تكون بعد بدايته', 'INVALID_SEASON');
         const cat = db.get('SELECT * FROM categories WHERE id=?', b.categoryId);
         if (!cat)
             throw E.unprocessable('القسم غير موجود', 'INVALID_CATEGORY');
@@ -193,25 +207,45 @@ export function registerCatalogAdminRoutes(app, r) {
         if (b.pricingType === 'FIXED' && b.basePrice === undefined)
             throw E.unprocessable('السعر الأساسي مطلوب للخدمة ذات السعر الثابت', 'BASE_PRICE_REQUIRED');
         const id = uuid(), now = iso(app.clock.now());
-        db.run('INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,default_priority,sort_order,is_active,created_at,updated_at,requires_inspection,requires_vehicle,supports_waiting) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.categoryId, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.pricingType, b.pricingType === 'QUOTE' ? null : b.basePrice, JSON.stringify(b.formSchema || []), b.defaultPriority || 'NORMAL', b.sortOrder || 0, 1, now, now, b.requiresInspection ? 1 : 0, b.requiresVehicle ? 1 : 0, b.supportsWaiting ? 1 : 0);
+        db.run('INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,default_priority,sort_order,is_active,created_at,updated_at,requires_inspection,requires_vehicle,supports_waiting,delivery_proof_type,seasonal_enabled,season_start_at,season_end_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.categoryId, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.pricingType, b.pricingType === 'QUOTE' ? null : b.basePrice, JSON.stringify(b.formSchema || []), b.defaultPriority || 'NORMAL', b.sortOrder || 0, 1, now, now, b.requiresInspection ? 1 : 0, b.requiresVehicle ? 1 : 0, b.supportsWaiting ? 1 : 0, b.deliveryProofType || 'NONE', b.seasonalEnabled ? 1 : 0, b.seasonStartAt || null, b.seasonEndAt || null);
         catalog.invalidate();
         app.audit.log({ ctx, action: 'service.create', entityType: 'service', entityId: id, after: b });
         ctx.status = 201;
         app.sse.broadcast('sync', { scope: 'catalog' });
         return { service: catalog.serializeService(db.get('SELECT * FROM services WHERE id=?', id), ctx.locale, { full: true }) };
     });
+    r.get('/admin/services/:id/areas', auth, adminLevel('SUPPORT'), (ctx) => {
+        if (!db.get('SELECT 1 FROM services WHERE id=?', ctx.params.id))
+            throw E.notFound('الخدمة غير موجودة');
+        return { areas: db.all(`SELECT a.id,a.name_i18n nameI18n,a.type FROM service_area_rules r JOIN service_areas a ON a.id=r.area_id WHERE r.service_id=? ORDER BY a.type,a.created_at`, ctx.params.id).map((a) => ({ id: a.id, name: tr(a.nameI18n, ctx.locale), type: a.type })) };
+    });
+    r.put('/admin/services/:id/areas', auth, adminLevel('ADMIN'), (ctx) => {
+        if (!db.get('SELECT 1 FROM services WHERE id=?', ctx.params.id))
+            throw E.notFound('الخدمة غير موجودة');
+        const b = parse(s.obj({ areaIds: s.arr(s.str({ max: 64 }), { max: 100 }) }), ctx.body);
+        const valid = new Set(catalog.all().areas.filter(a => a.is_active).map(a => a.id));
+        for (const id of b.areaIds)
+            if (!valid.has(id))
+                throw E.unprocessable('منطقة غير صالحة', 'INVALID_AREA');
+        return db.tx(() => { db.run('DELETE FROM service_area_rules WHERE service_id=?', ctx.params.id); for (const id of new Set(b.areaIds))
+            db.run('INSERT INTO service_area_rules(service_id,area_id,created_at) VALUES(?,?,?)', ctx.params.id, id, iso(app.clock.now())); app.audit.log({ ctx, action: 'service.areas.update', entityType: 'service', entityId: ctx.params.id, after: { areaIds: b.areaIds } }); return { ok: true }; });
+    });
     r.patch('/admin/services/:id', auth, adminLevel('ADMIN'), (ctx) => {
         const old = db.get('SELECT * FROM services WHERE id=?', ctx.params['id']);
         if (!old)
             throw E.notFound('الخدمة غير موجودة');
-        const b = parse(s.obj({ categoryId: s.str({ max: 64, optional: true }), name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), keywords, pricingType: s.oneOf(['FIXED', 'QUOTE'], { optional: true }), basePrice: s.num({ min: 0, optional: true }), defaultPriority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true }), sortOrder: s.int({ min: -100000, max: 100000, optional: true }), formSchema: s.arr(formFieldSchema, { max: 30, optional: true }), requiresInspection: s.bool({ optional: true }), requiresVehicle: s.bool({ optional: true }), supportsWaiting: s.bool({ optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
+        const b = parse(s.obj({ categoryId: s.str({ max: 64, optional: true }), name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), keywords, pricingType: s.oneOf(['FIXED', 'QUOTE'], { optional: true }), basePrice: s.num({ min: 0, optional: true }), defaultPriority: s.oneOf(['LOW', 'NORMAL', 'URGENT'], { optional: true }), sortOrder: s.int({ min: -100000, max: 100000, optional: true }), formSchema: s.arr(formFieldSchema, { max: 30, optional: true }), requiresInspection: s.bool({ optional: true }), requiresVehicle: s.bool({ optional: true }), supportsWaiting: s.bool({ optional: true }), seasonalEnabled: s.bool({ optional: true }), seasonStartAt: s.date({ optional: true }), seasonEndAt: s.date({ optional: true }), deliveryProofType: s.oneOf(['NONE', 'PIN', 'RECIPIENT_CONFIRMATION', 'PHOTO'], { optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
+        if (b.seasonalEnabled && (!b.seasonStartAt || !b.seasonEndAt))
+            throw E.unprocessable('حدد بداية ونهاية الموسم عند تفعيل الخدمة الموسمية', 'SEASON_DATES_REQUIRED');
+        if (b.seasonalEnabled && b.seasonStartAt && b.seasonEndAt && Date.parse(b.seasonStartAt) >= Date.parse(b.seasonEndAt))
+            throw E.unprocessable('نهاية الموسم يجب أن تكون بعد بدايته', 'INVALID_SEASON');
         const pricing = b.pricingType || old.pricing_type;
         const price = pricing === 'QUOTE' ? null : (b.basePrice !== undefined ? b.basePrice : old.base_price);
         if (pricing === 'FIXED' && price === null)
             throw E.unprocessable('السعر الأساسي مطلوب للخدمة ذات السعر الثابت', 'BASE_PRICE_REQUIRED');
         if (b.categoryId && !db.get('SELECT 1 FROM categories WHERE id=?', b.categoryId))
             throw E.unprocessable('القسم غير موجود', 'INVALID_CATEGORY');
-        db.run(`UPDATE services SET category_id=COALESCE(?,category_id),name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),keywords=COALESCE(?,keywords),pricing_type=?,base_price=?,form_schema=COALESCE(?,form_schema),default_priority=COALESCE(?,default_priority),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),requires_inspection=COALESCE(?,requires_inspection),requires_vehicle=COALESCE(?,requires_vehicle),supports_waiting=COALESCE(?,supports_waiting),updated_at=? WHERE id=?`, b.categoryId ?? null, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.keywords ? JSON.stringify(b.keywords) : null, pricing, price, b.formSchema ? JSON.stringify(b.formSchema) : null, b.defaultPriority ?? null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.requiresInspection === undefined ? null : (b.requiresInspection ? 1 : 0), b.requiresVehicle === undefined ? null : (b.requiresVehicle ? 1 : 0), b.supportsWaiting === undefined ? null : (b.supportsWaiting ? 1 : 0), iso(app.clock.now()), old.id);
+        db.run(`UPDATE services SET category_id=COALESCE(?,category_id),name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),keywords=COALESCE(?,keywords),pricing_type=?,base_price=?,form_schema=COALESCE(?,form_schema),default_priority=COALESCE(?,default_priority),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),requires_inspection=COALESCE(?,requires_inspection),requires_vehicle=COALESCE(?,requires_vehicle),supports_waiting=COALESCE(?,supports_waiting),delivery_proof_type=COALESCE(?,delivery_proof_type),seasonal_enabled=COALESCE(?,seasonal_enabled),season_start_at=COALESCE(?,season_start_at),season_end_at=COALESCE(?,season_end_at),updated_at=? WHERE id=?`, b.categoryId ?? null, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.keywords ? JSON.stringify(b.keywords) : null, pricing, price, b.formSchema ? JSON.stringify(b.formSchema) : null, b.defaultPriority ?? null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.requiresInspection === undefined ? null : (b.requiresInspection ? 1 : 0), b.requiresVehicle === undefined ? null : (b.requiresVehicle ? 1 : 0), b.supportsWaiting === undefined ? null : (b.supportsWaiting ? 1 : 0), b.deliveryProofType ?? null, b.seasonalEnabled === undefined ? null : (b.seasonalEnabled ? 1 : 0), b.seasonStartAt ?? null, b.seasonEndAt ?? null, iso(app.clock.now()), old.id);
         catalog.invalidate();
         app.sse.broadcast('sync', { scope: 'catalog' });
         app.audit.log({ ctx, action: 'service.update', entityType: 'service', entityId: old.id, before: { isActive: !!old.is_active, pricingType: old.pricing_type, basePrice: old.base_price }, after: b });

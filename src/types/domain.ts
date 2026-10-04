@@ -33,7 +33,7 @@ export interface UserRow {
 export interface ServiceProviderRow {
   id: string; user_id: string; provider_type: ProviderType; display_name: string; bio: string | null; company_name: string | null;
   verification_status: VerificationStatus; verified_at: string | null; verified_by: string | null; rejection_reason: string | null;
-  suspension_reason: string | null; is_online: 0 | 1; base_lat: number | null; base_lng: number | null;
+  suspension_reason: string | null; specialty: string | null; is_online: 0 | 1; base_lat: number | null; base_lng: number | null;
   rating_sum: number; rating_count: number; rating_avg: number; completed_orders_count: number; created_at: string; updated_at: string;
 }
 export interface CategoryRow {
@@ -43,7 +43,7 @@ export interface CategoryRow {
 export interface ServiceRow {
   id: string; category_id: string; slug: string; name_i18n: string; description_i18n: string | null; icon: string | null;
   keywords: string; pricing_type: PricingType; base_price: number | null; form_schema: string; cancellation_policy_id: string | null;
-  default_priority: Priority; requires_inspection: 0 | 1; requires_vehicle: 0 | 1; supports_waiting: 0 | 1; sort_order: number; is_active: 0 | 1; created_at: string; updated_at: string;
+  default_priority: Priority; delivery_proof_type: 'NONE' | 'PIN' | 'RECIPIENT_CONFIRMATION' | 'PHOTO'; seasonal_enabled: 0 | 1; season_start_at: string | null; season_end_at: string | null; requires_inspection: 0 | 1; requires_vehicle: 0 | 1; supports_waiting: 0 | 1; sort_order: number; is_active: 0 | 1; created_at: string; updated_at: string;
 }
 export interface ServiceAreaRow {
   id: string; parent_id: string | null; name_i18n: string; type: 'COUNTRY' | 'CITY' | 'DISTRICT';
@@ -54,7 +54,7 @@ export interface LocationRow {
 }
 export interface OrderRow {
   id: string; code: string; customer_id: string; service_id: string; provider_id: string | null; status: OrderStatus; priority: Priority;
-  description: string; form_data: string; location_id: string; area_id: string | null; contact_phone: string; scheduled_at: string | null;
+  description: string; form_data: string; location_id: string; location_provided: 0 | 1; area_id: string | null; contact_phone: string; scheduled_at: string | null;
   pricing_type: PricingType; price_snapshot: number | null; agreed_price: number | null; currency: string; payment_method: string;
   customer_notes: string | null; attachments: string; cancelled_by_role: string | null; cancel_reason: string | null; cancellation_fee: number | null;
   wave: number; accepted_at: string | null; started_at: string | null; completed_at: string | null; cancelled_at: string | null;

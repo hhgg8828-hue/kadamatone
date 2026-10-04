@@ -31,6 +31,7 @@ import { registerChatRoutes } from './modules/chat.js';
 import { registerTripRoutes } from './modules/trips.js';
 import { registerTrackingRoutes } from './modules/tracking.js';
 import { registerCustomerExperienceRoutes } from './modules/customer-experience.js';
+import { registerDeliveryProofRoutes } from './modules/delivery-proof.js';
 import { createScheduler, type Scheduler } from './modules/scheduler.js';
 import { CashPayment, type PaymentProvider } from './ports/payment.js';
 
@@ -91,6 +92,7 @@ export function createApp(overrides: ConfigOverrides = {}): App {
   registerTripRoutes(app, r);
   registerTrackingRoutes(app, r);
   registerCustomerExperienceRoutes(app, r);
+  registerDeliveryProofRoutes(app, r);
 
   app.server = http.createServer(createRequestHandler(app as any));
   app.server.requestTimeout = 30_000;

@@ -13,7 +13,7 @@ export function createAssignmentService(app) {
                 const o = db.get('SELECT * FROM orders WHERE id = ?', orderId);
                 if (!['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id)
                     return { offered: 0 };
-                const excludeProviderIds = db.all('SELECT DISTINCT provider_id FROM order_assignments WHERE order_id = ?', orderId).map((x) => x.provider_id);
+                const excludeProviderIds = db.all("SELECT DISTINCT provider_id FROM order_assignments WHERE order_id = ? AND status IN ('REJECTED','EXPIRED','ACCEPTED')", orderId).map((x) => x.provider_id);
                 // نرسل العرض إلى الأقرب فقط؛ عند الرفض/انتهاء المهلة ينتقل إلى التالي الأقرب.
                 const batch = o.pricing_type === 'QUOTE' ? app.settings.get('assignment.batch_size') : 1;
                 const candidates = app.matcher.findCandidates(o, { excludeProviderIds, limit: batch });
@@ -25,10 +25,14 @@ export function createAssignmentService(app) {
                 const nowIso = iso(now);
                 const expiresAt = iso(now + ttlMs);
                 for (const c of candidates) {
-                    db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)', uuid(), o.id, c.providerId, 'OFFERED', wave, c.score, c.distanceKm, nowIso, expiresAt);
+                    const existing = db.get('SELECT id FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, c.providerId);
+                    if (existing)
+                        db.run("UPDATE order_assignments SET status='OFFERED',wave=?,score=?,distance_km=?,offered_at=?,expires_at=?,responded_at=NULL WHERE id=?", wave, c.score, c.distanceKm, nowIso, expiresAt, existing.id);
+                    else
+                        db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)', uuid(), o.id, c.providerId, 'OFFERED', wave, c.score, c.distanceKm, nowIso, expiresAt);
                 }
                 const wasSearching = o.status === 'SEARCHING';
-                db.run('UPDATE orders SET status=?, wave=?, updated_at=?, version=version+1 WHERE id=? AND version=?', 'ASSIGNED', wave, nowIso, o.id, o.version);
+                db.run('UPDATE orders SET status=?, wave=?, search_exhausted_at=NULL, updated_at=?, version=version+1 WHERE id=? AND version=?', 'ASSIGNED', wave, nowIso, o.id, o.version);
                 if (wasSearching)
                     db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', o.id, 'SEARCHING', 'ASSIGNED', null, 'SYSTEM', `wave ${wave}`, nowIso);
                 const svcRow = catalog.all().byService.get(o.service_id);
@@ -40,6 +44,25 @@ export function createAssignmentService(app) {
                 notifiedExhausted.delete(o.id);
                 return { offered: candidates.length };
             });
+        },
+        reassignAfterProviderCancellation(orderId, providerId, reason = 'provider_cancelled') {
+            const result = db.tx(() => {
+                const o = db.get('SELECT * FROM orders WHERE id=?', orderId);
+                if (!o || o.provider_id !== providerId || !['ACCEPTED'].includes(o.status))
+                    return { offered: 0 };
+                const nowIso = iso(app.clock.now());
+                db.run(`UPDATE order_assignments SET status='WITHDRAWN', responded_at=? WHERE order_id=? AND status='OFFERED'`, nowIso, orderId);
+                db.run(`UPDATE order_assignments SET status='REJECTED', responded_at=? WHERE order_id=? AND provider_id=? AND status='ACCEPTED'`, nowIso, orderId, providerId);
+                db.run(`UPDATE orders SET status='SEARCHING', provider_id=NULL, accepted_at=NULL, agreed_price=NULL, search_exhausted_at=NULL, wave=0, updated_at=?, version=version+1 WHERE id=? AND provider_id=? AND status='ACCEPTED'`, nowIso, orderId, providerId);
+                db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', orderId, 'ACCEPTED', 'SEARCHING', null, 'SYSTEM', reason, nowIso);
+                app.notifications.notify(o.customer_id, 'PROVIDER_REASSIGNED', { code: o.code });
+                const p = db.get('SELECT user_id FROM service_providers WHERE id=?', providerId);
+                if (p)
+                    app.notifications.notify(p.user_id, 'ORDER_REASSIGNED', { code: o.code }, { orderId });
+                return { offered: 0 };
+            });
+            const r = svc.assignWave(orderId);
+            return r.offered ? r : result;
         },
         acceptOffer(assignmentId, ctx) {
             const providerId = ctx.user.providerId;
@@ -71,7 +94,7 @@ export function createAssignmentService(app) {
                 const existingQuote = db.get(`SELECT status FROM quotes WHERE order_id=? AND provider_id=? ORDER BY created_at DESC LIMIT 1`, o.id, providerId);
                 if (existingQuote?.status === 'SUBMITTED')
                     throw E.conflict('تم تقديم عرض سعر لهذا الطلب بالفعل، اختر قرار العميل على العرض.', 'QUOTE_ALREADY_SUBMITTED');
-                const res = db.run(`UPDATE orders SET status='ACCEPTED', provider_id=?, agreed_price=price_snapshot, accepted_at=?, updated_at=?, version=version+1
+                const res = db.run(`UPDATE orders SET status='ACCEPTED', provider_id=?, agreed_price=price_snapshot, accepted_at=?, search_exhausted_at=NULL, updated_at=?, version=version+1
                              WHERE id=? AND status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL`, providerId, nowIso, nowIso, o.id);
                 if (!res.changes) {
                     db.run(`UPDATE order_assignments SET status='EXPIRED', responded_at=? WHERE id=?`, nowIso, a.id);
@@ -110,24 +133,34 @@ export function createAssignmentService(app) {
             const now = app.clock.now();
             const nowIso = iso(now);
             const expired = Number(db.run(`UPDATE order_assignments SET status='EXPIRED', responded_at=? WHERE status='OFFERED' AND expires_at <= ?`, nowIso, nowIso).changes);
-            const stuck = db.all(`SELECT o.id, o.wave FROM orders o WHERE o.status IN ('SEARCHING','ASSIGNED') AND o.provider_id IS NULL
+            const stuck = db.all(`SELECT o.id, o.wave, o.search_exhausted_at FROM orders o WHERE o.status IN ('SEARCHING','ASSIGNED') AND o.provider_id IS NULL
            AND NOT EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id = o.id AND a.status = 'OFFERED')`);
             let waved = 0, exhausted = 0;
             const maxWaves = app.settings.get('assignment.max_waves');
+            const retryMs = app.settings.get('assignment.search_retry_minutes') * 60_000;
             for (const o of stuck) {
-                if (o.wave < maxWaves) {
+                if (o.wave < maxWaves && !o.search_exhausted_at) {
                     const r = svc.assignWave(o.id);
                     if (r.offered > 0) {
                         waved++;
                         continue;
                     }
                 }
-                if (!notifiedExhausted.has(o.id)) {
+                if (!o.search_exhausted_at) {
                     const full = db.get('SELECT * FROM orders WHERE id = ?', o.id);
+                    const stamp = iso(app.clock.now());
+                    db.run("UPDATE orders SET status='SEARCHING', search_exhausted_at=?, updated_at=?, version=version+1 WHERE id=?", stamp, stamp, o.id);
                     app.notifications.notify(full.customer_id, 'NO_PROVIDER_FOUND', { code: full.code });
                     app.notifications.notifyAdmins('NO_PROVIDER_FOUND_ADMIN', { code: full.code });
                     notifiedExhausted.add(o.id);
                     exhausted++;
+                    continue;
+                }
+                if (Date.parse(o.search_exhausted_at) + retryMs <= now) {
+                    db.run('UPDATE orders SET wave=0, search_exhausted_at=NULL, updated_at=?, version=version+1 WHERE id=?', nowIso, o.id);
+                    const r = svc.assignWave(o.id);
+                    if (r.offered > 0)
+                        waved++;
                 }
             }
             return { expired, waved, exhausted };
@@ -165,6 +198,9 @@ export function registerAssignmentRoutes(app, r) {
                 throw E.unprocessable(`لا يمكن الانتقال من ${o.status} إلى ${b.to}`, 'INVALID_TRANSITION');
             const updated = orders.applyTransition(o, b.to, 'PROVIDER', ctx);
             if (b.to === 'COMPLETED') {
+                const proof = db.get('SELECT delivery_proof_type FROM services WHERE id=?', o.service_id);
+                if (proof?.delivery_proof_type === 'PIN' && !db.get('SELECT 1 FROM orders WHERE id=? AND delivery_proof_verified_at IS NOT NULL', o.id))
+                    throw E.unprocessable('يجب تأكيد رمز التسليم قبل إنهاء الطلب', 'DELIVERY_PROOF_REQUIRED');
                 db.run('UPDATE service_providers SET completed_orders_count = completed_orders_count + 1, updated_at = ? WHERE id = ?', iso(app.clock.now()), o.provider_id);
                 app.payment.onCompleted(updated);
             }

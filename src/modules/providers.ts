@@ -10,14 +10,14 @@ import type { ServiceProviderRow, Locale, ProviderType, VerificationStatus } fro
 const TIME: Schema = s.str({ pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMessage: 'الوقت بصيغة HH:MM' });
 
 export interface ProviderSummary {
-  id: string; userId: string; fullName: string; displayName: string; providerType: ProviderType; bio: string | null; companyName: string | null;
+  id: string; userId: string; fullName: string; displayName: string; providerType: ProviderType; bio: string | null; companyName: string | null; specialty: string | null;
   avatarUrl: string | null; verificationStatus: VerificationStatus; verified: boolean; rejectionReason: string | null; suspensionReason: string | null;
   isOnline: boolean; baseLocation: { lat: number; lng: number } | null; rating: { avg: number; count: number }; completedOrders: number;
   services: Array<{ serviceId: string; name: string; categoryName: string; customPrice: number | null; experienceYears: number }>;
   areas: Array<{ id: string; name: string }>; availability: Array<{ weekday: number; start: string; end: string }>; createdAt: string;
 }
 export interface ProviderPublicProfile {
-  id: string; displayName: string; providerType: ProviderType; bio: string | null; companyName: string | null; avatarUrl: string | null;
+  id: string; displayName: string; providerType: ProviderType; bio: string | null; companyName: string | null; specialty: string | null; avatarUrl: string | null;
   verified: boolean; rating: { avg: number; count: number }; completedOrders: number; isOnline: boolean;
   services: ProviderSummary['services']; areas: ProviderSummary['areas']; availability: ProviderSummary['availability'];
   workPhotos: (string | null)[]; recentReviews: Array<{ score: number; comment: string; createdAt: string; customerName: string }>;
@@ -48,7 +48,7 @@ export function createProviders(app: App): Providers {
       const availability = db.all<{ weekday: number; start_time: string; end_time: string }>('SELECT weekday, start_time, end_time FROM provider_availability WHERE provider_id = ? AND is_available = 1 ORDER BY weekday, start_time', providerId)
         .map((a) => ({ weekday: a.weekday, start: a.start_time, end: a.end_time }));
       return {
-        id: p.id, userId: p.user_id, fullName: p.full_name, displayName: p.display_name, providerType: p.provider_type, bio: p.bio, companyName: p.company_name,
+        id: p.id, userId: p.user_id, fullName: p.full_name, displayName: p.display_name, providerType: p.provider_type, bio: p.bio, companyName: p.company_name, specialty: p.specialty,
         avatarUrl: fileUrl(p.avatar_file_id), verificationStatus: p.verification_status, verified: p.verification_status === 'VERIFIED',
         rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online,
         baseLocation: p.base_lat === null ? null : { lat: p.base_lat, lng: p.base_lng! },
@@ -67,7 +67,7 @@ export function createProviders(app: App): Providers {
            JOIN reviews rv ON rv.rating_id = ra.id AND rv.status = 'VISIBLE' JOIN users u ON u.id = ra.customer_id
           WHERE ra.provider_id = ? ORDER BY rv.created_at DESC LIMIT 10`, providerId)
         .map((x) => ({ score: x.score, comment: x.comment, createdAt: x.created_at, customerName: String(x.full_name).split(' ')[0] ?? '' }));
-      return { id: base.id, displayName: base.displayName, providerType: base.providerType, bio: base.bio, companyName: base.companyName, avatarUrl: base.avatarUrl,
+      return { id: base.id, displayName: base.displayName, providerType: base.providerType, bio: base.bio, companyName: base.companyName, specialty: base.specialty, avatarUrl: base.avatarUrl,
         verified: base.verified, rating: base.rating, completedOrders: base.completedOrders, isOnline: base.isOnline, services: base.services, areas: base.areas, availability: base.availability, workPhotos: works, recentReviews: reviews };
     },
     earnings(providerId) {
@@ -97,13 +97,13 @@ export function registerProviderRoutes(app: App, r: Router): void {
   r.get('/provider/profile', ...isProvider, (ctx: Ctx) => ({ provider: app.providers.summary(pid(ctx), ctx.locale), documents: app.providers.documents(pid(ctx)) }));
 
   r.patch('/provider/profile', ...isProvider, (ctx: Ctx) => {
-    const b = parse<{ displayName?: string; bio?: string; companyName?: string; baseLocation?: { lat: number; lng: number } }>(s.obj({
-      displayName: s.str({ min: 2, max: 80, optional: true }), bio: s.str({ max: 1000, optional: true }), companyName: s.str({ min: 2, max: 120, optional: true }),
+    const b = parse<{ displayName?: string; bio?: string; companyName?: string; specialty?: string; baseLocation?: { lat: number; lng: number } }>(s.obj({
+      displayName: s.str({ min: 2, max: 80, optional: true }), bio: s.str({ max: 1000, optional: true }), companyName: s.str({ min: 2, max: 120, optional: true }), specialty: s.str({ max: 120, optional: true }),
       baseLocation: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }) }, { optional: true }),
     }), ctx.body);
-    db.run(`UPDATE service_providers SET display_name = COALESCE(?, display_name), bio = COALESCE(?, bio), company_name = COALESCE(?, company_name),
+    db.run(`UPDATE service_providers SET display_name = COALESCE(?, display_name), bio = COALESCE(?, bio), company_name = COALESCE(?, company_name), specialty = COALESCE(?, specialty),
             base_lat = COALESCE(?, base_lat), base_lng = COALESCE(?, base_lng), updated_at = ? WHERE id = ?`,
-      b.displayName ?? null, b.bio ?? null, b.companyName ?? null, b.baseLocation?.lat ?? null, b.baseLocation?.lng ?? null, iso(app.clock.now()), pid(ctx));
+      b.displayName ?? null, b.bio ?? null, b.companyName ?? null, b.specialty ?? null, b.baseLocation?.lat ?? null, b.baseLocation?.lng ?? null, iso(app.clock.now()), pid(ctx));
     return { provider: app.providers.summary(pid(ctx), ctx.locale) };
   });
 

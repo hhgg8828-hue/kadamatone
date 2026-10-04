@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.0",
-  "description": "خدمات (Khadamat) — V60 Fixed updated operational release",
+  "version": "0.6.3",
+  "description": "خدمات (Khadamat) — V63 update over V60 Fixed",
   "private": true,
   "type": "module",
   "engines": {

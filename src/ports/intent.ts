@@ -24,7 +24,7 @@ export class KeywordIntentParser implements IntentParser {
     const matches: Array<{ svc: ServiceRow; cat: CategoryRow; score: number }> = [];
     for (const svc of data.services) {
       const cat = activeCats.get(svc.category_id);
-      if (!svc.is_active || !cat) continue;
+      if (!svc.is_active || !cat || !catalog.getActiveService(svc.id)) continue;
       const terms = new Set<string>();
       for (const k of parseJson<string[]>(svc.keywords, []) ?? []) terms.add(normalizeAr(k));
       for (const lang of ['ar', 'en'] as const) terms.add(normalizeAr(tr(svc.name_i18n, lang)));

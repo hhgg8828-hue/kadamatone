@@ -38,6 +38,18 @@ export function registerCustomerExperienceRoutes(app: App, r: Router): void {
   });
   r.delete('/me/beneficiaries/:id',auth,roles('CUSTOMER'),(ctx:Ctx)=>{const x=db.run('DELETE FROM customer_beneficiaries WHERE id=? AND customer_id=?',ctx.params.id!,ctx.user!.id);if(!x.changes)throw E.notFound('المستفيد غير موجود');return {ok:true};});
 
+
+  r.get('/me/recommendations', auth, roles('CUSTOMER'), (ctx: Ctx) => {
+    const rows = db.all<any>(`SELECT o.service_id serviceId, COUNT(*) uses, MAX(o.created_at) lastUsed
+      FROM orders o WHERE o.customer_id=? AND o.status <> 'CANCELLED' GROUP BY o.service_id ORDER BY uses DESC, lastUsed DESC LIMIT 8`, ctx.user!.id);
+    const searched = db.all<any>(`SELECT service_id serviceId, COUNT(*) uses, MAX(created_at) lastUsed
+      FROM customer_searches WHERE customer_id=? AND service_id IS NOT NULL GROUP BY service_id ORDER BY uses DESC, lastUsed DESC LIMIT 8`, ctx.user!.id);
+    const ids=[...new Set([...rows,...searched].map((x:any)=>x.serviceId).filter(Boolean))];
+    const usage=new Map<string,any>(); for(const x of [...rows,...searched]) { const prev=usage.get(x.serviceId)||{uses:0,lastUsed:x.lastUsed}; prev.uses+=Number(x.uses||0); if(String(x.lastUsed)>String(prev.lastUsed)) prev.lastUsed=x.lastUsed; usage.set(x.serviceId,prev); }
+    const out=ids.map(id=>{const svc=app.catalog.all().byService.get(id);if(!svc||!svc.is_active)return null;const u=usage.get(id);return {...app.catalog.serializeService(svc,ctx.locale),personalUses:u.uses,lastUsed:u.lastUsed};}).filter(Boolean).sort((a:any,b:any)=>b.personalUses-a.personalUses || String(b.lastUsed).localeCompare(String(a.lastUsed))).slice(0,8);
+    return { recommendations: out, source:'customer-only' };
+  });
+
   r.get('/me/searches/recent',auth,roles('CUSTOMER'),(ctx:Ctx)=>({searches:db.all<any>('SELECT query,service_id serviceId,created_at createdAt FROM customer_searches WHERE customer_id=? ORDER BY id DESC LIMIT 10',ctx.user!.id)}));
   r.post('/assist/request',auth,roles('CUSTOMER'),(ctx:Ctx)=>{
     const b=parse<{text:string}>(s.obj({text:s.str({min:2,max:500})}),ctx.body); const result=app.intentParser.parse(b.text,{catalog:app.catalog,locale:ctx.locale});

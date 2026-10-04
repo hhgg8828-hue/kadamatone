@@ -122,12 +122,17 @@ const uniqueOrders = (items) => { const seen = new Set(); return items.filter(x 
 const uniqueBy = (items, key) => { const seen = new Set(); return items.filter(x => { const k = key(x); if (!k || seen.has(k))
     return false; seen.add(k); return true; }); };
 const OFFLINE_QUEUE = 'khadamat_order_queue_v1';
-function queueOrder(body, key) { const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE) || '[]'); q.push({ body, key, createdAt: Date.now() }); localStorage.setItem(OFFLINE_QUEUE, JSON.stringify(q.slice(-20))); }
+function queueOrder(body, key, image) { const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE) || '[]'); q.push({ body, key, image: image || null, createdAt: Date.now() }); localStorage.setItem(OFFLINE_QUEUE, JSON.stringify(q.slice(-10))); }
 async function flushOrderQueue() { if (!navigator.onLine || !state.token)
     return; const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE) || '[]'); if (!q.length)
     return; const left = []; for (const item of q) {
     try {
-        await api('/orders', { method: 'POST', headers: { 'Idempotency-Key': item.key }, body: JSON.stringify(item.body) });
+        let body = { ...item.body };
+        if (item.image && !body.attachmentFileIds?.length) {
+            const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: item.image.name, dataBase64: item.image.dataBase64 }) });
+            body.attachmentFileIds = [up.file.id];
+        }
+        await api('/orders', { method: 'POST', headers: { 'Idempotency-Key': item.key }, body: JSON.stringify(body) });
     }
     catch {
         left.push(item);
@@ -388,10 +393,10 @@ async function openAccount() {
         alert(e.message);
     }
 }
-function authBox(next = page) { const isProvider = next === 'provider'; const isAdmin = next === 'admin'; shell(`<div class="hero"><h1>${isAdmin ? 'دخول لوحة الإدارة' : isProvider ? 'منصة مقدم الخدمة' : 'كل خدمة تحتاجها... في مكان واحد.'}</h1><p class="muted">${isAdmin ? 'هذه الصفحة مخصصة لحسابات الإدارة المعتمدة فقط.' : 'لا تبحث عن مقدم الخدمة، اطلب الخدمة فقط.'}</p></div><div class="card"><div class="nav">${isAdmin ? '' : '<button class="btn" id="tabLogin">دخول</button><button class="btn secondary" id="tabReg">حساب جديد</button>'}</div><div id="authForm"></div><div class="auth-switch">${isAdmin ? '<span class="muted">لا يوجد إنشاء حساب مدير من هذه الصفحة.</span>' : `<span class="muted">${isProvider ? 'تريد طلب خدمة بدل تقديمها؟' : 'هل تريد تقديم خدمة للعملاء؟'}</span> <a class="choose-link" href="${isProvider ? '/' : '/provider.html'}">${isProvider ? 'العودة لواجهة العميل' : 'الدخول إلى منصة مقدم الخدمة'}</a>`}</div></div>`); let mode = 'login'; const draw = () => { const providerReg = next === 'provider'; document.getElementById('authForm').innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" value="${isAdmin ? 'admin@khadamat.local' : ''}" required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn">دخول</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني${providerReg ? " (إلزامي)" : " (اختياري)"}</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" ${providerReg ? "required" : ""}></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div>${providerReg ? `<div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>نبذة مختصرة</label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div>` : ''}<button class="btn">${providerReg ? 'إنشاء حساب مقدم خدمة' : 'إنشاء حساب عميل'}</button><p id="msg"></p></form>`; const form = document.getElementById('form'); form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); const b = {}; f.forEach((v, k) => b[k] = v); try {
+function authBox(next = page) { const isProvider = next === 'provider'; const isAdmin = next === 'admin'; shell(`<div class="hero"><h1>${isAdmin ? 'دخول لوحة الإدارة' : isProvider ? 'منصة مقدم الخدمة' : 'كل خدمة تحتاجها... في مكان واحد.'}</h1><p class="muted">${isAdmin ? 'هذه الصفحة مخصصة لحسابات الإدارة المعتمدة فقط.' : 'لا تبحث عن مقدم الخدمة، اطلب الخدمة فقط.'}</p></div><div class="card"><div class="nav">${isAdmin ? '' : '<button class="btn" id="tabLogin">دخول</button><button class="btn secondary" id="tabReg">حساب جديد</button>'}</div><div id="authForm"></div><div class="auth-switch">${isAdmin ? '<span class="muted">لا يوجد إنشاء حساب مدير من هذه الصفحة.</span>' : `<span class="muted">${isProvider ? 'تريد طلب خدمة بدل تقديمها؟' : 'هل تريد تقديم خدمة للعملاء؟'}</span> <a class="choose-link" href="${isProvider ? '/' : '/provider.html'}">${isProvider ? 'العودة لواجهة العميل' : 'الدخول إلى منصة مقدم الخدمة'}</a>`}</div></div>`); let mode = 'login'; const draw = () => { const providerReg = next === 'provider'; document.getElementById('authForm').innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" value="${isAdmin ? 'admin@khadamat.local' : ''}" required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn">دخول</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني${providerReg ? " (إلزامي)" : " (اختياري)"}</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" ${providerReg ? "required" : ""}></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div>${providerReg ? `<div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>التخصص</label><input name="specialty" maxlength="120" placeholder="مثال: تكييف وتبريد"></div><div class="field"><label>نبذة مختصرة</label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div>` : ''}<button class="btn">${providerReg ? 'إنشاء حساب مقدم خدمة' : 'إنشاء حساب عميل'}</button><p id="msg"></p></form>`; const form = document.getElementById('form'); form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); const b = {}; f.forEach((v, k) => b[k] = v); try {
     const payload = { ...b, role: providerReg ? 'PROVIDER' : 'CUSTOMER', locale: 'ar' };
     if (providerReg) {
-        payload.provider = { providerType: b.providerType, displayName: b.displayName, bio: b.bio };
+        payload.provider = { providerType: b.providerType, displayName: b.displayName, bio: b.bio, specialty: b.specialty };
         if (b.providerType === 'COMPANY') {
             payload.provider.companyName = b.displayName;
         }
@@ -574,6 +579,24 @@ async function openBeneficiaries() { try {
 catch (e) {
     alert(e.message);
 } }
+async function loadPersonalRecommendations() {
+    const box = document.getElementById('personalRecommendations');
+    if (!box)
+        return;
+    try {
+        const j = await api('/me/recommendations');
+        const rs = j.recommendations || [];
+        if (!rs.length) {
+            box.innerHTML = '';
+            return;
+        }
+        box.innerHTML = `<div class="section-heading"><div><h2>مقترحة لك</h2><p class="muted">مبنية على طلباتك وعمليات بحثك أنت فقط.</p></div></div><div class="row" style="flex-wrap:wrap;gap:10px;margin-bottom:14px">${rs.slice(0, 6).map((x) => `<button class="card quick-service" data-personal-service="${esc(x.id)}" type="button"><div class="icon">${esc(x.icon || '🛠️')}</div><b>${esc(x.name)}</b><small class="muted">طلبتها/بحثت عنها ${esc(x.personalUses)} مرة</small></button>`).join('')}</div>`;
+        box.querySelectorAll('[data-personal-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.personalService)));
+    }
+    catch {
+        box.innerHTML = '';
+    }
+}
 function renderCustomer() {
     shell(`<section class="hero">
     <div class="row" style="justify-content:space-between;align-items:center"><div><h1>ماذا تحتاج اليوم؟</h1></div><div class="row"><button class="btn secondary small" id="myLocations" type="button">📍 مواقعي المحفوظة</button><button class="btn secondary small" id="myFavorites" type="button">⭐ المفضلة</button><button class="btn secondary small" id="myBeneficiaries" type="button">👨‍👩‍👧 المستفيدون</button></div></div>
@@ -589,7 +612,7 @@ function renderCustomer() {
       <div id="suggestions" class="suggestions hide"></div>
     </div>
   </section>
-  <div id="customerPriority" class="priority-stack"></div>
+  <div id="customerPriority" class="priority-stack"></div><div id="personalRecommendations"></div>
 
   <nav class="section-nav" aria-label="التنقل">
     <button class="section-tab active" id="servicesTab">الخدمات</button>
@@ -621,6 +644,7 @@ function renderCustomer() {
             document.getElementById('focusOrders')?.addEventListener('click', () => { document.getElementById('ordersTab')?.click(); document.getElementById('ordersSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
         }
     }
+    loadPersonalRecommendations();
     document.getElementById('myLocations')?.addEventListener('click', openSavedLocations);
     document.getElementById('myFavorites')?.addEventListener('click', openFavorites);
     document.getElementById('myBeneficiaries')?.addEventListener('click', openBeneficiaries);
@@ -823,7 +847,7 @@ async function openOrderForm(serviceId, initial = null) {
         await openMotorcycleTripForm(s, savedAddresses);
         return;
     }
-    showModal(`<h2>${esc(s.name)}</h2><form id="orderForm"><div class="field description-field"><label>وصف الطلب</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه بالتفصيل">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}<div class="field location-field"><label>موقع الخدمة</label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ اضغط الزر وسيحدد الجهاز موقعك تلقائيًا.</span></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div><p class="muted">يمكنك اختيار مستفيد محفوظ أو إدخال شخص آخر دون إنشاء نظام طلب منفصل.</p></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div>${s.slug === 'custom-request' ? `<div class="field"><label>صورة مرفقة (اختيارية)</label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">مثال: صورة شامبو أو غرض تريد شراءه وإحضاره.</small></div>` : ''}<div class="order-submit-note"><b>قبل الإرسال</b><span>سنتحقق من الموقع والدقة ونحفظ الإحداثيات نفسها مع الطلب.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
+    showModal(`<h2>${esc(s.name)}</h2><form id="orderForm"><div class="field description-field"><label>وصف الطلب</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه بالتفصيل">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}<div class="field location-field"><label>الموقع <span class="muted">(اختياري)</span></label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div><p class="muted">يمكنك اختيار مستفيد محفوظ أو إدخال شخص آخر دون إنشاء نظام طلب منفصل.</p></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
     document.getElementById('beneficiarySelect')?.addEventListener('change', e => { const v = e.target.value; document.getElementById('otherRecipient')?.classList.toggle('hide-section', v !== '__other__'); });
     document.querySelectorAll('[data-description-suggestion]').forEach(x => x.addEventListener('click', () => { const t = document.getElementById('orderDescription'); if (t) {
         t.value = x.dataset.descriptionSuggestion || '';
@@ -1013,30 +1037,15 @@ async function openOrderForm(serviceId, initial = null) {
         const addressId = String(fd.get('addressId') || '');
         const lat = Number(fd.get('lat')), lng = Number(fd.get('lng')), accuracy = Number(fd.get('accuracy')), confirmed = String(fd.get('locationConfirmed')) === '1';
         const msg = document.getElementById('msg');
-        if (!addressId) {
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-                msg.textContent = 'اختر عنوانًا محفوظًا أو حدّد موقعك الحقيقي من GPS أولًا';
-                msg.className = 'error';
-                return;
-            }
-            if (!Number.isFinite(accuracy)) {
-                msg.textContent = 'لم يتم الحصول على دقة GPS. أعد تحديد الموقع.';
-                msg.className = 'error';
-                return;
-            }
-            if (accuracy > 1000) {
-                msg.textContent = 'الموقع الحالي غير دقيق بما يكفي (' + Math.round(accuracy) + ' متر). فعّل دقة الموقع/GPS ثم أعد تحديد الموقع قبل إرسال الطلب.';
-                msg.className = 'error';
-                return;
-            }
-            if (!confirmed) {
-                msg.textContent = 'راجع النقطة على الخريطة ثم اضغط «تأكيد هذا الموقع» قبل إرسال الطلب';
-                msg.className = 'error';
-                return;
-            }
-        }
         const beneficiaryId = String(document.getElementById('beneficiarySelect')?.value || '');
         const ben = beneficiaries.find((x) => x.id === beneficiaryId);
+        const beneficiaryLocation = !!ben?.location;
+        if (!addressId && !beneficiaryLocation && Number.isFinite(lat) && Number.isFinite(lng)) {
+            if (Number.isFinite(accuracy) && accuracy > 1000) {
+                msg.textContent = 'الموقع غير دقيق حاليًا، لذلك سنرسل الطلب بدونه. يمكنك وصف المكان في الملاحظات.';
+                msg.className = 'muted';
+            }
+        }
         const b = { serviceId, description: String(fd.get('description')), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: s.defaultPriority || 'NORMAL' };
         if (ben) {
             b.recipientName = ben.fullName;
@@ -1055,6 +1064,7 @@ async function openOrderForm(serviceId, initial = null) {
             }
         }
         let attachmentFileIds = [];
+        let offlineImage;
         const customFile = document.getElementById('customImage');
         const file = customFile?.files?.[0] || pendingAssistImage;
         if (file) {
@@ -1064,14 +1074,18 @@ async function openOrderForm(serviceId, initial = null) {
                 return;
             }
             const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(file); });
-            const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: file.name, dataBase64: data }) });
-            attachmentFileIds = [up.file.id];
+            if (navigator.onLine) {
+                const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: file.name, dataBase64: data }) });
+                attachmentFileIds = [up.file.id];
+            }
+            else
+                offlineImage = { name: file.name, dataBase64: data };
             pendingAssistImage = null;
         }
         if (addressId)
             b.addressId = addressId;
-        else
-            b.location = { lat, lng, accuracy, source: 'gps' };
+        else if (!beneficiaryLocation && Number.isFinite(lat) && Number.isFinite(lng) && (!Number.isFinite(accuracy) || accuracy <= 1000))
+            b.location = { lat, lng, accuracy: Number.isFinite(accuracy) ? accuracy : undefined, source: 'gps' };
         if (attachmentFileIds.length)
             b.attachmentFileIds = attachmentFileIds;
         const submitBtn = document.getElementById('submitOrderBtn');
@@ -1080,13 +1094,20 @@ async function openOrderForm(serviceId, initial = null) {
             submitBtn.textContent = 'جارٍ إرسال الطلب...';
         }
         try {
-            await api('/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(b) });
+            const created = await api('/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(b) });
+            if (s.deliveryProofType === 'PIN' && created?.order?.id) {
+                try {
+                    const proof = await api('/orders/' + encodeURIComponent(created.order.id) + '/delivery-proof/issue', { method: 'POST', body: '{}' });
+                    alert('رمز التسليم الخاص بهذا الطلب: ' + proof.pin + '\nاحتفظ به ولا تشاركه إلا مع المستلم عند التسليم.');
+                }
+                catch { }
+            }
             closeModal();
             await customer();
         }
         catch (x) {
             if (!navigator.onLine) {
-                queueOrder(b, idempotencyKey);
+                queueOrder(b, idempotencyKey, offlineImage);
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'حفظ الطلب وإرساله عند عودة الإنترنت';
@@ -1162,11 +1183,11 @@ async function openOrderChat(orderId) {
             const msgs = await load();
             const box = document.getElementById('chatMessages');
             if (box) {
-                box.innerHTML = msgs.length ? msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
+                box.innerHTML = msgs.length ? msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p>${m.location ? `<div class="card" style="margin-top:8px"><b>📍 موقع مرسل</b><p class="muted">${esc(m.location.addressText || 'إحداثيات الموقع')}</p><a class="btn secondary small" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(m.location.lat)}&mlon=${encodeURIComponent(m.location.lng)}#map=18/${encodeURIComponent(m.location.lat)}/${encodeURIComponent(m.location.lng)}">فتح الموقع</a></div>` : ''}</div>`).join('') : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
                 box.scrollTop = box.scrollHeight;
             }
         };
-        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">تواصل مع ${isProvider ? 'العميل' : 'مقدم الخدمة'} بخصوص هذا الطلب فقط.</p></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" required placeholder="اكتب رسالتك هنا..."></textarea><button class="btn" id="sendChat">إرسال</button></form></div>`);
+        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">تواصل داخل الطلب فقط. لا نعرض أرقام الهاتف تلقائيًا.</p></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div></form></div>`);
         await render();
         document.querySelectorAll('[data-chat-quick]').forEach(x => x.addEventListener('click', () => { const body = document.getElementById('chatBody'); if (body) {
             body.value = x.dataset.chatQuick || '';
@@ -1184,6 +1205,27 @@ async function openOrderChat(orderId) {
         finally {
             btn.disabled = false;
         } });
+        document.getElementById('sendChatLocation')?.addEventListener('click', async () => {
+            const btn = document.getElementById('sendChatLocation');
+            if (!navigator.geolocation) {
+                alert('المتصفح لا يدعم تحديد الموقع');
+                return;
+            }
+            btn.disabled = true;
+            try {
+                const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }));
+                const body = document.getElementById('chatBody').value.trim();
+                await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', body: JSON.stringify({ body, location: { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy } }) });
+                document.getElementById('chatBody').value = '';
+                await render();
+            }
+            catch (e) {
+                alert(e.message);
+            }
+            finally {
+                btn.disabled = false;
+            }
+        });
         const onLive = async (ev) => { const d = ev.detail; if (d?.orderId === orderId)
             await render(); };
         window.addEventListener('khadamat:chat', onLive);
@@ -1681,8 +1723,18 @@ function bindProviderLiveActions() {
     catch (e) {
         alert(e.message);
     } }));
+    document.querySelectorAll('[data-provider-cancel]').forEach(x => x.addEventListener('click', async () => { const b = x; if (!confirm('سيتم إعادة البحث عن مقدم خدمة بديل لهذا الطلب. هل تريد الاعتذار عن الطلب؟'))
+        return; b.disabled = true; try {
+        await api('/orders/' + encodeURIComponent(b.dataset.providerCancel || '') + '/cancel', { method: 'POST', body: JSON.stringify({ reason: 'اعتذار مقدم الخدمة قبل بدء التنفيذ' }) });
+        await provider();
+    }
+    catch (e) {
+        b.disabled = false;
+        alert(e.message);
+    } }));
 }
-function providerOrder(o) { const map = { ACCEPTED: 'ON_THE_WAY', ON_THE_WAY: 'IN_PROGRESS', IN_PROGRESS: 'COMPLETED' }; const next = map[o.status]; const label = next === 'ON_THE_WAY' ? 'في الطريق' : next === 'IN_PROGRESS' ? 'بدء الخدمة' : 'إكمال الطلب'; return `<div class="card order-card"><button class="order-card-main" data-provider-order="${esc(o.id)}" type="button"><div class="row"><b>${esc(o.code)}</b><span class="status status-${esc(String(o.status).toLowerCase())}">${esc(statusAr(o.status))}</span></div><p>${esc(o.service.name)} — ${esc(o.description)}</p>${o.location ? `<small class="muted">📍 موقع محفوظ مع الطلب</small>` : ''}</button>${next ? `<div style="margin-top:10px"><button class="btn" type="button" data-id="${esc(o.id)}" data-status="${next}">${label}</button></div>` : ''}</div>`; }
+function providerOrder(o) { const map = { ACCEPTED: 'ON_THE_WAY', ON_THE_WAY: 'IN_PROGRESS', IN_PROGRESS: 'COMPLETED' }; const next = map[o.status]; const label = next === 'ON_THE_WAY' ? 'في الطريق' : next === 'IN_PROGRESS' ? 'بدء الخدمة' : 'إكمال الطلب'; return `<div class="card order-card"><button class="order-card-main" data-provider-order="${esc(o.id)}" type="button"><div class="row"><b>${esc(o.code)}</b><span class="status status-${esc(String(o.status).toLowerCase())}">${esc(statusAr(o.status))}</span></div><p>${esc(o.service.name)} — ${esc(o.description)}</p>${o.location ? `<small class="muted">📍 موقع محفوظ مع الطلب</small>` : '<small class="muted">📍 العميل لم يحدد موقعًا بعد — استخدم المحادثة لطلب الموقع.</small>'}</button>${next ? `<div style="margin-top:10px"><button class="btn" type="button" data-id="${esc(o.id)}" data-status="${next}">${label}</button>${o.status === 'ACCEPTED' ? ` <button class="btn danger secondary" type="button" data-provider-cancel="${esc(o.id)}">اعتذار وإعادة البحث</button>` : ''}</div>` : ''}</div>`; }
+// o.customer?.phone is intentionally not rendered to providers; communication stays inside order chat.
 async function openProviderOrder(id) { try {
     const j = await api('/orders/' + id);
     const o = j.order;
@@ -1691,7 +1743,7 @@ async function openProviderOrder(id) { try {
     const lat = Number(loc.lat), lng = Number(loc.lng);
     const mapUrl = hasLoc ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}` : '';
     const g = hasLoc ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}&travelmode=driving` : '';
-    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}${o.customer?.phone ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">📞 ${esc(o.customer.phone)}</p><a class="btn secondary small" href="tel:${esc(o.customer.phone)}">اتصال</a></div>` : ''}${o.customer ? `<button class="btn secondary" id="providerChatBtn" type="button">💬 محادثة مع العميل</button>` : ''}${o.trip && o.status === 'IN_PROGRESS' ? `<div class="row"><button class="btn secondary" id="startWaitBtn" type="button">⏱️ بدء الانتظار</button><button class="btn secondary" id="stopWaitBtn" type="button">⏹️ إنهاء الانتظار</button></div>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ متابعة الشكوى</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
+    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`)}</p></div>` : ''}${o.customer ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">التواصل عبر محادثة الطلب داخل خدمات.</p></div>` : ''}${o.customer ? `<button class="btn secondary" id="providerChatBtn" type="button">💬 محادثة مع العميل</button>` : ''}${o.service?.deliveryProofType === 'PIN' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>🔐 تأكيد التسليم</b><p class="muted">أدخل رمز التسليم الذي يقدمه المستلم قبل إنهاء الطلب.</p><div class="row"><input id="deliveryPinInput" inputmode="numeric" maxlength="6" placeholder="رمز من 6 أرقام"><button class="btn" id="verifyDeliveryPin" type="button">تأكيد الرمز</button></div></div>` : ''}${o.trip && o.status === 'IN_PROGRESS' ? `<div class="row"><button class="btn secondary" id="startWaitBtn" type="button">⏱️ بدء الانتظار</button><button class="btn secondary" id="stopWaitBtn" type="button">⏹️ إنهاء الانتظار</button></div>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ متابعة الشكوى</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
     if (hasLoc) {
         const el = document.getElementById('providerOrderMap');
         const L = window.L;
@@ -1703,6 +1755,15 @@ async function openProviderOrder(id) { try {
         }
     }
     document.getElementById('providerChatBtn')?.addEventListener('click', () => openOrderChat(id));
+    document.getElementById('verifyDeliveryPin')?.addEventListener('click', async () => { const btn = document.getElementById('verifyDeliveryPin'); const pin = document.getElementById('deliveryPinInput').value.trim(); btn.disabled = true; try {
+        await api('/provider/orders/' + encodeURIComponent(id) + '/delivery-proof/verify', { method: 'POST', body: JSON.stringify({ pin }) });
+        btn.textContent = '✓ تم تأكيد التسليم';
+        alert('تم تأكيد التسليم ويمكن الآن إنهاء الطلب.');
+    }
+    catch (e) {
+        btn.disabled = false;
+        alert(e.message);
+    } });
     document.getElementById('startWaitBtn')?.addEventListener('click', async () => { try {
         await api('/trips/' + encodeURIComponent(id) + '/wait', { method: 'POST', body: JSON.stringify({ action: 'START' }) });
         alert('بدأ احتساب وقت الانتظار');
@@ -1806,7 +1867,7 @@ async function admin() {
       ${activeTab === 'overview' ? `<div class="card" style="border:2px solid #2563eb"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">🔐 طلبات التوثيق</h2><p class="muted">طلبات مقدمي الخدمات التي تنتظر مراجعة الإدارة</p></div><div class="stat">${esc(stats.pendingProviders)}</div></div><button class="btn" id="openVerificationQueue" type="button">فتح طلبات التوثيق والموافقة عليها</button></div><div class="grid"><div class="card"><div class="stat">${esc(stats.users)}</div><div>مستخدمون</div></div><div class="card"><div class="stat">${esc(stats.providers)}</div><div>مقدمو خدمات</div></div><div class="card"><div class="stat">${esc(stats.pendingProviders)}</div><div>بانتظار التوثيق</div></div><div class="card"><div class="stat">${esc(stats.activeOrders)}</div><div>طلبات نشطة</div></div><div class="card"><div class="stat">${esc(stats.completedOrders)}</div><div>طلبات مكتملة</div></div><div class="card"><div class="stat">${esc(stats.cancelledOrders)}</div><div>طلبات ملغاة</div></div><div class="card"><div class="stat">${esc(stats.complaints)}</div><div>شكاوى مفتوحة</div></div><div class="card"><div class="stat">${esc(cats.length)}</div><div>أقسام الكتالوج</div></div><div class="card"><div class="stat">${esc(allServices.length)}</div><div>خدمات الكتالوج</div></div></div><h2>طلبات التوثيق</h2><div>${(ps.providers || []).slice(0, 5).map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
       ${activeTab === 'providers' ? `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">مقدمو الخدمات</h2><select id="providerStatusFilter">${providerStatuses.map(x => `<option value="${x}" ${providerStatus === x ? 'selected' : ''}>${esc(x === 'PENDING' ? 'بانتظار التوثيق' : x === 'VERIFIED' ? 'موثق' : x === 'REJECTED' ? 'مرفوض' : 'موقوف')}</option>`).join('')}</select></div></div><div>${(ps.providers || []).map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد نتائج.</div>'}</div>` : ''}
       ${activeTab === 'verification' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">طلبات توثيق الحسابات</h2><p class="muted">راجع الهوية والترخيص ثم اعتمد الحساب أو ارفضه مع ذكر السبب.</p></div><span class="status">${esc(stats.pendingProviders)} بانتظار المراجعة</span></div></div><div>${(ps.providers || []).filter((p) => p.verificationStatus === 'PENDING').map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
-      ${activeTab === 'catalog' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">كتالوج الخدمات</h2><p class="muted">إدارة الأقسام والخدمات والأسعار والحالة ومخطط بيانات الطلب.</p></div><button class="btn" id="newCategory">+ قسم جديد</button></div></div><div>${cats.map((cat) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(cat.icon || '🛠️')} ${esc(cat.name)}</b><div class="muted">${esc(cat.slug)} · ${cat.isActive ? 'نشط' : 'معطل'} · ${esc(cat.moduleType || 'STANDARD')}</div></div><button class="btn secondary small" data-edit-category="${esc(cat.id)}">تعديل القسم</button></div><div class="row" style="margin-top:10px;flex-wrap:wrap">${(cat.services || []).map((sv) => `<button class="card" style="text-align:right;min-width:240px;flex:1" data-edit-service="${esc(sv.id)}"><b>${esc(sv.icon || '🛠️')} ${esc(sv.name)}</b><small class="muted">${esc(sv.pricingType === 'FIXED' ? 'سعر ثابت' : 'عرض سعر')} · ${sv.basePrice === null ? 'حسب العرض' : esc(sv.basePrice + ' ' + sv.currency)} · ${sv.isActive === false ? 'معطلة' : 'نشطة'}</small></button>`).join('') || '<span class="muted">لا توجد خدمات.</span>'}</div></div>`).join('')}</div>` : ''}
+      ${activeTab === 'catalog' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">كتالوج الخدمات</h2><p class="muted">إدارة الأقسام والخدمات والأسعار والحالة ومخطط بيانات الطلب.</p></div><button class="btn" id="newCategory">+ قسم جديد</button></div></div><div>${cats.map((cat) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(cat.icon || '🛠️')} ${esc(cat.name)}</b><div class="muted">${esc(cat.slug)} · ${cat.isActive ? 'نشط' : 'معطل'} · ${esc(cat.moduleType || 'STANDARD')}</div></div><button class="btn secondary small" data-edit-category="${esc(cat.id)}">تعديل القسم</button></div><div class="row" style="margin-top:10px;flex-wrap:wrap">${(cat.services || []).map((sv) => `<div class="card" style="text-align:right;min-width:240px;flex:1"><b>${esc(sv.icon || '🛠️')} ${esc(sv.name)}</b><small class="muted">${esc(sv.pricingType === 'FIXED' ? 'سعر ثابت' : 'عرض سعر')} · ${sv.basePrice === null ? 'حسب العرض' : esc(sv.basePrice + ' ' + sv.currency)} · ${sv.isActive === false ? 'معطلة' : 'نشطة'}</small><div class="row" style="margin-top:8px"><button class="btn secondary small" data-edit-service="${esc(sv.id)}" type="button">تعديل</button><button class="btn secondary small" data-service-areas="${esc(sv.id)}" type="button">مناطق الخدمة</button></div></div>`).join('') || '<span class="muted">لا توجد خدمات.</span>'}</div></div>`).join('')}</div>` : ''}
       ${activeTab === 'areas' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">المناطق التشغيلية</h2><p class="muted">المناطق مساعدة للمطابقة وليست شرطًا لطلب العميل إذا كانت الإحداثيات صالحة.</p></div><button class="btn" id="newArea">+ منطقة جديدة</button></div></div><div class="card"><div class="admin-table-wrap"><table class="table"><thead><tr><th>الاسم</th><th>النوع</th><th>المركز</th><th>النطاق</th><th>الحالة</th><th></th></tr></thead><tbody>${(areas.areas || []).map((a) => `<tr><td>${esc(a.name)}</td><td>${esc(a.type)}</td><td>${Number(a.centerLat).toFixed(5)} , ${Number(a.centerLng).toFixed(5)}</td><td>${esc(a.radiusKm)} كم</td><td>${a.isActive ? 'نشطة' : 'معطلة'}</td><td><button class="btn secondary small" data-edit-area="${esc(a.id)}">تعديل</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا توجد مناطق.</td></tr>'}</tbody></table></div></div>` : ''}
       ${activeTab === 'settings' ? `<div class="card"><h2>إعدادات المنصة</h2><p class="muted">تُحفظ الإعدادات في قاعدة البيانات. التعديل متاح لـ SUPER_ADMIN فقط.</p></div><div>${(settings.settings || []).map((x) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(x.key)}</b><p class="muted">${esc(x.description)}</p><small>القيمة الحالية: <code>${esc(JSON.stringify(x.value))}</code> · الافتراضي: <code>${esc(JSON.stringify(x.default))}</code></small></div>${state.user.adminLevel === 'SUPER_ADMIN' ? `<button class="btn secondary small" data-edit-setting="${esc(x.key)}">تعديل</button>` : ''}</div></div>`).join('')}</div>` : ''}
       ${activeTab === 'account' ? `<div class="card"><h2>إعدادات حساب الإدارة</h2><p class="muted">يمكنك تغيير البريد الإلكتروني وكلمة المرور الخاصة بحسابك.</p><button class="btn" id="openAdminAccountSettings" type="button">فتح إعدادات الحساب</button></div>` : ''}
@@ -1863,6 +1924,7 @@ async function admin() {
             document.getElementById('newCategory')?.addEventListener('click', () => openCategoryEditor(null, draw));
             document.querySelectorAll('[data-edit-category]').forEach(x => x.addEventListener('click', () => openCategoryEditor(cats.find((z) => z.id === x.dataset.editCategory), draw)));
             document.querySelectorAll('[data-edit-service]').forEach(x => x.addEventListener('click', () => openServiceEditor(allServices.find((z) => z.id === x.dataset.editService), cats, draw)));
+            document.querySelectorAll('[data-service-areas]').forEach(x => x.addEventListener('click', () => openServiceAreas(x.dataset.serviceAreas, areas.areas || [], draw)));
             document.getElementById('newArea')?.addEventListener('click', () => openAreaEditor(null, areas.areas || [], draw));
             document.querySelectorAll('[data-edit-area]').forEach(x => x.addEventListener('click', () => openAreaEditor((areas.areas || []).find((z) => z.id === x.dataset.editArea), areas.areas || [], draw)));
             document.querySelectorAll('[data-verify-vehicle]').forEach(x => x.addEventListener('click', async () => { try {
@@ -1935,9 +1997,26 @@ function openCategoryEditor(cat, refresh) {
         alert(x.message);
     } });
 }
+async function openServiceAreas(serviceId, areas, refresh) { try {
+    const j = await api('/admin/services/' + encodeURIComponent(serviceId) + '/areas');
+    const selected = new Set((j.areas || []).map((x) => x.id));
+    showModal(`<h2>مناطق الخدمة</h2><p class="muted">عند تحديد مناطق، لن تُسند الخدمة إلا لطلبات تقع داخلها. اتركها فارغة إذا كانت الخدمة متاحة في كل المناطق.</p><div class="grid">${areas.map((a) => `<label class="card"><input type="checkbox" data-service-area="${esc(a.id)}" ${selected.has(a.id) ? 'checked' : ''}> ${esc(a.name)} <small class="muted">${esc(a.type)}</small></label>`).join('')}</div><button class="btn" id="saveServiceAreas" type="button">حفظ المناطق</button>`);
+    document.getElementById('saveServiceAreas')?.addEventListener('click', async () => { const ids = Array.from(document.querySelectorAll('[data-service-area]:checked')).map(x => x.dataset.serviceArea); const btn = document.getElementById('saveServiceAreas'); btn.disabled = true; try {
+        await api('/admin/services/' + encodeURIComponent(serviceId) + '/areas', { method: 'PUT', body: JSON.stringify({ areaIds: ids }) });
+        closeModal();
+        await refresh();
+    }
+    catch (e) {
+        btn.disabled = false;
+        alert(e.message);
+    } });
+}
+catch (e) {
+    alert(e.message);
+} }
 function openServiceEditor(sv, cats, refresh) {
     const formSchema = sv?.formSchema || [];
-    showModal(`<h2>${sv ? 'تعديل الخدمة' : 'إضافة خدمة'}</h2><form id="serviceEditor"><div class="grid"><div class="field"><label>القسم</label><select name="categoryId" required>${cats.map((c) => `<option value="${esc(c.id)}" ${sv?.categoryId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>Slug</label><input name="slug" value="${esc(sv?.slug || '')}" ${sv ? 'disabled' : ''} required></div><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(sv?.nameI18n?.ar || sv?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(sv?.nameI18n?.en || '')}"></div><div class="field"><label>الأيقونة</label><input name="icon" value="${esc(sv?.icon || '')}"></div><div class="field"><label>نوع التسعير</label><select name="pricingType"><option value="FIXED" ${sv?.pricingType === 'FIXED' ? 'selected' : ''}>سعر ثابت</option><option value="QUOTE" ${sv?.pricingType === 'QUOTE' ? 'selected' : ''}>عرض سعر</option></select></div><div class="field"><label>السعر الأساسي</label><input name="basePrice" type="number" min="0" step="0.01" value="${esc(sv?.basePrice ?? '')}"></div><div class="row"><label class="card"><input type="checkbox" name="requiresInspection" ${sv?.requiresInspection ? 'checked' : ''}> تحتاج معاينة</label><label class="card"><input type="checkbox" name="requiresVehicle" ${sv?.requiresVehicle ? 'checked' : ''}> تحتاج مركبة</label><label class="card"><input type="checkbox" name="supportsWaiting" ${sv?.supportsWaiting ? 'checked' : ''}> تدعم الانتظار</label></div><div class="field"><label>الأولوية</label><select name="defaultPriority"><option value="LOW" ${sv?.defaultPriority === 'LOW' ? 'selected' : ''}>منخفضة</option><option value="NORMAL" ${!sv || sv?.defaultPriority === 'NORMAL' ? 'selected' : ''}>عادية</option><option value="URGENT" ${sv?.defaultPriority === 'URGENT' ? 'selected' : ''}>عاجلة</option></select></div>${sv ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${sv.isActive !== false ? 'selected' : ''}>نشطة</option><option value="false" ${sv.isActive === false ? 'selected' : ''}>معطلة</option></select></div>` : ''}</div><div class="field"><label>الوصف</label><textarea name="description">${esc(sv?.descriptionI18n?.ar || sv?.description || '')}</textarea></div><div class="field"><label>مخطط نموذج الطلب JSON</label><textarea name="formSchema" style="min-height:180px;font-family:monospace">${esc(JSON.stringify(formSchema, null, 2))}</textarea><small class="muted">يجب أن يكون مصفوفة حقول صحيحة حسب مخطط الخدمة.</small></div><button class="btn">حفظ الخدمة</button></form>`);
+    showModal(`<h2>${sv ? 'تعديل الخدمة' : 'إضافة خدمة'}</h2><form id="serviceEditor"><div class="grid"><div class="field"><label>القسم</label><select name="categoryId" required>${cats.map((c) => `<option value="${esc(c.id)}" ${sv?.categoryId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>Slug</label><input name="slug" value="${esc(sv?.slug || '')}" ${sv ? 'disabled' : ''} required></div><div class="field"><label>الاسم بالعربية</label><input name="ar" value="${esc(sv?.nameI18n?.ar || sv?.name || '')}" required></div><div class="field"><label>الاسم بالإنجليزية</label><input name="en" value="${esc(sv?.nameI18n?.en || '')}"></div><div class="field"><label>الأيقونة</label><input name="icon" value="${esc(sv?.icon || '')}"></div><div class="field"><label>نوع التسعير</label><select name="pricingType"><option value="FIXED" ${sv?.pricingType === 'FIXED' ? 'selected' : ''}>سعر ثابت</option><option value="QUOTE" ${sv?.pricingType === 'QUOTE' ? 'selected' : ''}>عرض سعر</option></select></div><div class="field"><label>السعر الأساسي</label><input name="basePrice" type="number" min="0" step="0.01" value="${esc(sv?.basePrice ?? '')}"></div><div class="row"><label class="card"><input type="checkbox" name="requiresInspection" ${sv?.requiresInspection ? 'checked' : ''}> تحتاج معاينة</label><label class="card"><input type="checkbox" name="requiresVehicle" ${sv?.requiresVehicle ? 'checked' : ''}> تحتاج مركبة</label><label class="card"><input type="checkbox" name="supportsWaiting" ${sv?.supportsWaiting ? 'checked' : ''}> تدعم الانتظار</label></div><div class="field"><label>إثبات التسليم</label><select name="deliveryProofType"><option value="NONE" ${!sv?.deliveryProofType || sv?.deliveryProofType === 'NONE' ? 'selected' : ''}>لا يوجد</option><option value="PIN" ${sv?.deliveryProofType === 'PIN' ? 'selected' : ''}>رمز PIN</option><option value="RECIPIENT_CONFIRMATION" ${sv?.deliveryProofType === 'RECIPIENT_CONFIRMATION' ? 'selected' : ''}>تأكيد المستلم</option><option value="PHOTO" ${sv?.deliveryProofType === 'PHOTO' ? 'selected' : ''}>صورة إثبات</option></select></div><div class="field"><label>الخدمة الموسمية</label><label class="card"><input type="checkbox" name="seasonalEnabled" ${sv?.seasonalEnabled ? 'checked' : ''}> تفعيل الموسم</label></div><div class="grid"><div class="field"><label>بداية الموسم</label><input name="seasonStartAt" type="datetime-local" value="${esc(sv?.seasonStartAt ? new Date(sv.seasonStartAt).toISOString().slice(0, 16) : '')}"></div><div class="field"><label>نهاية الموسم</label><input name="seasonEndAt" type="datetime-local" value="${esc(sv?.seasonEndAt ? new Date(sv.seasonEndAt).toISOString().slice(0, 16) : '')}"></div></div><div class="field"><label>الأولوية</label><select name="defaultPriority"><option value="LOW" ${sv?.defaultPriority === 'LOW' ? 'selected' : ''}>منخفضة</option><option value="NORMAL" ${!sv || sv?.defaultPriority === 'NORMAL' ? 'selected' : ''}>عادية</option><option value="URGENT" ${sv?.defaultPriority === 'URGENT' ? 'selected' : ''}>عاجلة</option></select></div>${sv ? `<div class="field"><label>الحالة</label><select name="isActive"><option value="true" ${sv.isActive !== false ? 'selected' : ''}>نشطة</option><option value="false" ${sv.isActive === false ? 'selected' : ''}>معطلة</option></select></div>` : ''}</div><div class="field"><label>الوصف</label><textarea name="description">${esc(sv?.descriptionI18n?.ar || sv?.description || '')}</textarea></div><div class="field"><label>مخطط نموذج الطلب JSON</label><textarea name="formSchema" style="min-height:180px;font-family:monospace">${esc(JSON.stringify(formSchema, null, 2))}</textarea><small class="muted">يجب أن يكون مصفوفة حقول صحيحة حسب مخطط الخدمة.</small></div><button class="btn">حفظ الخدمة</button></form>`);
     const form = document.getElementById('serviceEditor');
     form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); let fs; try {
         fs = JSON.parse(String(f.get('formSchema') || '[]'));
@@ -1945,7 +2024,7 @@ function openServiceEditor(sv, cats, refresh) {
     catch {
         alert('مخطط JSON غير صالح');
         return;
-    } const body = { categoryId: String(f.get('categoryId')), name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, description: { ar: String(f.get('description') || '') }, icon: String(f.get('icon') || ''), pricingType: String(f.get('pricingType')), defaultPriority: String(f.get('defaultPriority')), basePrice: String(f.get('basePrice') || '') === '' ? undefined : Number(f.get('basePrice')), formSchema: fs, requiresInspection: f.has('requiresInspection'), requiresVehicle: f.has('requiresVehicle'), supportsWaiting: f.has('supportsWaiting') }; if (!sv)
+    } const body = { categoryId: String(f.get('categoryId')), name: { ar: String(f.get('ar')), en: String(f.get('en') || '') }, description: { ar: String(f.get('description') || '') }, icon: String(f.get('icon') || ''), pricingType: String(f.get('pricingType')), defaultPriority: String(f.get('defaultPriority')), basePrice: String(f.get('basePrice') || '') === '' ? undefined : Number(f.get('basePrice')), formSchema: fs, requiresInspection: f.has('requiresInspection'), requiresVehicle: f.has('requiresVehicle'), supportsWaiting: f.has('supportsWaiting'), deliveryProofType: String(f.get('deliveryProofType') || 'NONE'), seasonalEnabled: f.has('seasonalEnabled'), seasonStartAt: String(f.get('seasonStartAt') || '') || undefined, seasonEndAt: String(f.get('seasonEndAt') || '') || undefined }; if (!sv)
         body.slug = String(f.get('slug'));
     else
         body.isActive = String(f.get('isActive')) === 'true'; try {
