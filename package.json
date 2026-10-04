@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.6",
-  "description": "خدمات (Khadamat) — V65 operational completion over V64.1",
+  "version": "0.6.8",
+  "description": "خدمات (Khadamat) — V65.2 voice and automatic visual intent",
   "private": true,
   "type": "module",
   "engines": {

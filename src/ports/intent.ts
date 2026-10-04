@@ -75,8 +75,11 @@ export class HybridIntentParser implements IntentParser {
   private circuitOpenUntil = 0;
   constructor(private readonly config: Config) {}
 
-  private shouldAskAi(base: IntentResult): boolean {
+  private shouldAskAi(base: IntentResult, hasImage = false): boolean {
     if (!this.config.aiIntentAuto || !this.config.aiIntentUrl || !this.config.aiIntentKey) return false;
+    // An attached image is a first-class signal: always send it to the visual intent layer.
+    // Never let a weak text-only local match bypass visual analysis.
+    if (hasImage) return true;
     if (Date.now() < this.circuitOpenUntil) return false;
     // Clear, single-intent requests do not need a network round-trip.
     // AI is invoked automatically when the local parser signals ambiguity or a compound request.
@@ -91,7 +94,7 @@ export class HybridIntentParser implements IntentParser {
       name: tr(s.name_i18n, locale),
       keywords: parseJson<string[]>(s.keywords, []) || [],
     }));
-    const system = `أنت محلل نية داخل تطبيق خدمات يمني. مهمتك تحديد الخدمة أو الخدمات الموجودة فعلًا في الكتالوج من طلب العميل. لا تخترع خدمة أو معرفًا غير موجود. إذا كان الطلب مركبًا أعد أكثر من معرف بالترتيب. إذا كان غير واضح أعد قائمة فارغة. أعد JSON فقط بالشكل: {"serviceIds":["id"],"confidence":0.0}. افهم العربية والفصحى واللهجة اليمنية والسياق مثل القرية والمدينة والشراء والإحضار والنقل والإصلاح والحصاد والحرث.`;
+    const system = `أنت محلل نية داخل تطبيق خدمات يمني. مهمتك تحديد الخدمة أو الخدمات الموجودة فعلًا في الكتالوج من طلب العميل. لا تخترع خدمة أو معرفًا غير موجود. إذا كانت هناك صورة مرفقة فاعتبر محتوى الصورة دليلًا أساسيًا على الشيء المطلوب، ولا تضف خدمة غير مرتبطة بما يظهر في الصورة لمجرد وجود تشابه ضعيف في الكلمات. إذا كانت الصورة تظهر دواء أو علبة دواء أو وصفة دوائية وكان الطلب هو الشراء أو الإحضار، فاختر خدمة شراء وإحضار الدواء (pharmacy-purchase) إن كانت موجودة في الكتالوج. لا تستنتج عامل بناء أو صيانة أو خدمة أخرى من صورة دواء. إذا لم يذكر النص بوضوح أكثر من حاجة مستقلة، أعد خدمة واحدة فقط حتى لو وجدت خدمات مشابهة في الكتالوج. لا تعتبر كلمات واجهة مثل بحث أو اقتراح دليلًا على طلب مركب. أعد أكثر من معرف فقط عندما يذكر العميل صراحة حاجتين أو أكثر مستقلتين. إذا كان غير واضح أعد قائمة فارغة. أعد JSON فقط بالشكل: {"serviceIds":["id"],"confidence":0.0}. افهم العربية والفصحى واللهجة اليمنية والسياق مثل القرية والمدينة والشراء والإحضار والنقل والإصلاح والحصاد والحرث.`;
     const userContent: any[] = [{ type: 'text', text: `الطلب: ${text}\nالكتالوج:\n${JSON.stringify(catalog)}` }];
     if (ctx.image) userContent.push({ type: 'image_url', image_url: { url: `data:${ctx.image.mime};base64,${ctx.image.dataBase64}` } });
     const body = {
@@ -117,7 +120,7 @@ export class HybridIntentParser implements IntentParser {
 
   async parse(text:string, ctx:{catalog:Catalog;locale?:Locale;image?:{mime:string;dataBase64:string}}):Promise<IntentResult>{
     const base=deterministic(text,ctx);
-    if (!this.shouldAskAi(base)) return base;
+    if (!this.shouldAskAi(base, Boolean(ctx.image))) return base;
     try {
       const ai = await this.callAi(text, ctx);
       this.failures = 0;
@@ -125,16 +128,25 @@ export class HybridIntentParser implements IntentParser {
       if (!ai) return {...base,source:'RULES_AI_FALLBACK'};
       const byId = new Map(ctx.catalog.all().services.filter(s => s.is_active).map(s => [s.id, s]));
       const cats = new Map(ctx.catalog.all().categories.filter(c => c.is_active).map(c => [c.id, c]));
-      const aiMatches: IntentMatch[] = ai.serviceIds.map(id => {
+      // When an image is present and the customer did not explicitly ask for
+      // multiple independent needs, trust the visual AI result as a single intent.
+      // This prevents unrelated catalog matches (e.g. construction worker) from
+      // leaking into a medicine-photo request.
+      const aiServiceIds = ctx.image && !base.extracted.compound ? ai.serviceIds.slice(0, 1) : ai.serviceIds;
+      const aiMatches: IntentMatch[] = aiServiceIds.map(id => {
         const svc = byId.get(id); const cat = svc ? cats.get(svc.category_id) : undefined;
         if (!svc || !cat) return null;
         return { serviceId:svc.id,serviceSlug:svc.slug,serviceName:tr(svc.name_i18n,ctx.locale||'ar'),categoryId:cat.id,categorySlug:cat.slug,categoryName:tr(cat.name_i18n,ctx.locale||'ar'),score:Math.max(1,ai.confidence*10),confidence:Math.max(ai.confidence,0.55),icon:svc.icon };
       }).filter(Boolean) as IntentMatch[];
       if (!aiMatches.length) return {...base,source:'RULES_AI_FALLBACK'};
       const ids = new Set(aiMatches.map(m=>m.serviceId));
-      const merged = [...aiMatches, ...base.matches.filter(m=>!ids.has(m.serviceId))].slice(0,6);
-      const steps = aiMatches.slice(0,3).map(m=>({serviceId:m.serviceId,serviceSlug:m.serviceSlug,serviceName:m.serviceName,reason:'اقتراح المساعد الذكي',confidence:m.confidence}));
-      return {...base,matches:merged,clarification:null,steps,source:'AI'};
+      // With an image, visual AI is authoritative. Do not merge unrelated local
+      // text matches into the result (e.g. construction worker + medicine photo).
+      const merged = ctx.image
+        ? aiMatches.slice(0, 6)
+        : [...aiMatches, ...base.matches.filter(m=>!ids.has(m.serviceId))].slice(0,6);
+      const steps = aiMatches.slice(0,3).map(m=>({serviceId:m.serviceId,serviceSlug:m.serviceSlug,serviceName:m.serviceName,reason:ctx.image ? 'يتوافق مع محتوى الصورة والطلب' : 'اقتراح المساعد الذكي',confidence:m.confidence}));
+      return {...base,matches:merged,clarification:null,extracted:{...base.extracted,compound:ctx.image ? aiMatches.length>1 : aiMatches.length>1},steps,source:'AI'};
     } catch {
       this.failures += 1;
       if (this.failures >= 3) this.circuitOpenUntil = Date.now() + this.config.aiIntentCircuitCooldownMs;

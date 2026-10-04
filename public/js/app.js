@@ -525,36 +525,22 @@ const DESCRIPTION_SUGGESTIONS = {
     'government-errands': ['أحتاج من ينهي معاملة حكومية نيابة عني', 'أحتاج متابعة معاملة في جهة حكومية', 'أحتاج مساعدة في إنجاز هذه المعاملة'],
 };
 async function openAskMe() {
-    showModal(`<div class="ask-me"><h2>🛎️ اطلب لي</h2><p class="muted">قل لنا ما تحتاجه أو اكتبه بكلمات بسيطة، وسنقترح الخدمة الأقرب.</p><div class="field"><label>ماذا تريد أن نطلب لك؟</label><textarea id="askText" maxlength="500" rows="4" placeholder="مثال: أريد واحد يشتري لي دواء ويوصله للبيت"></textarea></div><div class="row"><button class="btn secondary" id="askVoice" type="button">🎤 تحدث</button><button class="btn secondary" id="askImage" type="button">📷 صورة</button><button class="btn" id="askAnalyze" type="button">بحث واقتراح</button></div><input id="askImageFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div id="askResults" style="margin-top:12px"></div></div>`);
+    showModal(`<div class="ask-me"><h2>🛎️ اطلب لي</h2><p class="muted">قل لنا ما تحتاجه أو اكتبه بكلمات بسيطة. عند إرفاق صورة سنفحصها تلقائيًا ونقترح الخدمة المناسبة دون الحاجة للضغط على «بحث واقتراح».</p><div class="field"><label>ماذا تريد أن نطلب لك؟</label><textarea id="askText" maxlength="500" rows="4" placeholder="مثال: أريد واحد يشتري لي دواء ويوصله للبيت"></textarea></div><div class="row"><button class="btn secondary" id="askVoice" type="button">🎤 تحدث</button><button class="btn secondary" id="askImage" type="button">📷 صورة</button><button class="btn" id="askAnalyze" type="button">بحث واقتراح</button></div><small id="askVoiceStatus" class="muted"></small><input id="askImageFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div id="askResults" style="margin-top:12px"></div></div>`);
     const textEl = document.getElementById('askText');
-    document.getElementById('askVoice')?.addEventListener('click', () => {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) {
-            alert('التحدث الصوتي غير مدعوم في هذا المتصفح. يمكنك كتابة الطلب.');
+    const box = document.getElementById('askResults');
+    const analyzeBtn = document.getElementById('askAnalyze');
+    const voiceBtn = document.getElementById('askVoice');
+    const voiceStatus = document.getElementById('askVoiceStatus');
+    let recognition = null;
+    let listening = false;
+    const analyzeAsk = async (auto = false) => {
+        const q = textEl.value.trim();
+        if (q.length < 2 && !pendingAssistImage && !pendingAssistImageFileId) {
+            box.innerHTML = '<div class="error">اكتب أو تحدث بما تحتاجه أولًا، أو أرفق صورة.</div>';
             return;
         }
-        const rec = new SR();
-        rec.lang = 'ar-YE';
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-        rec.onresult = (e) => { textEl.value = e.results?.[0]?.[0]?.transcript || ''; };
-        rec.onerror = () => alert('تعذر التقاط الصوت، حاول مرة أخرى.');
-        rec.start();
-    });
-    document.getElementById('askImage')?.addEventListener('click', () => document.getElementById('askImageFile')?.click());
-    document.getElementById('askImageFile')?.addEventListener('change', () => { const f = document.getElementById('askImageFile').files?.[0]; if (f) {
-        pendingAssistImage = f;
-        textEl.value = textEl.value.trim() || 'أريد طلب خدمة بناءً على الصورة المرفقة';
-        (document.getElementById('askResults')).innerHTML = '<div class="notice">تم اختيار الصورة. بعد تحديد الخدمة يمكنك إرفاقها مع الطلب.</div>';
-    } });
-    document.getElementById('askAnalyze')?.addEventListener('click', async () => {
-        const btn = document.getElementById('askAnalyze'), q = textEl.value.trim(), box = document.getElementById('askResults');
-        if (q.length < 2) {
-            box.innerHTML = '<div class="error">اكتب أو تحدث بما تحتاجه أولًا.</div>';
-            return;
-        }
-        btn.disabled = true;
-        btn.textContent = 'جارٍ الفهم...';
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = auto ? 'جارٍ الفحص التلقائي...' : 'جارٍ الفهم...';
         try {
             let imageFileId = pendingAssistImageFileId;
             if (!imageFileId && pendingAssistImage && navigator.onLine) {
@@ -564,7 +550,8 @@ async function openAskMe() {
                 pendingAssistImageFileId = imageFileId;
                 pendingAssistImage = null;
             }
-            const j = await api('/assist/request', { method: 'POST', body: JSON.stringify({ text: q, ...(imageFileId ? { imageFileId } : {}) }) });
+            const finalText = textEl.value.trim() || 'حلل الصورة المرفقة وحدد الخدمة المناسبة';
+            const j = await api('/assist/request', { method: 'POST', body: JSON.stringify({ text: finalText, ...(imageFileId ? { imageFileId } : {}) }) });
             const matches = j.matches || [];
             if (j.clarification?.options?.length) {
                 box.innerHTML = `<div class="card"><b>${esc(j.clarification.question || 'ماذا تقصد؟')}</b><div style="margin-top:10px">${j.clarification.options.slice(0, 3).map((o) => `<button class="suggestion" data-ask-service="${esc(o.serviceId)}" type="button"><span>🛠️</span><span><b>${esc(o.label)}</b></span><span>←</span></button>`).join('')}</div></div>`;
@@ -572,7 +559,7 @@ async function openAskMe() {
             }
             else if (j.recommended) {
                 const steps = (j.steps || []).slice(0, 3);
-                box.innerHTML = `<div class="card"><b>${j.extracted?.compound ? 'فهمنا أن طلبك يجمع أكثر من حاجة' : 'أقرب خدمة مقترحة'}</b><p>${esc(j.recommended.icon || '🛠️')} ${esc(j.recommended.serviceName)}</p>${steps.length > 1 ? `<div class="notice">${steps.map((x) => esc(x.serviceName)).join(' + ')}</div>` : ''}<small class="muted">${esc(j.recommended.categoryName)} · ${j.source === 'AI' ? 'مساعد ذكي' : 'فهم ذكي'}</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;
+                box.innerHTML = `<div class="card"><b>${j.extracted?.compound ? 'فهمنا أن طلبك يجمع أكثر من حاجة' : 'أقرب خدمة مقترحة'}</b><p>${esc(j.recommended.icon || '🛠️')} ${esc(j.recommended.serviceName)}</p>${steps.length > 1 ? `<div class="notice">${steps.map((x) => esc(x.serviceName)).join(' + ')}</div>` : ''}<small class="muted">${esc(j.recommended.categoryName)} · ${j.source === 'AI' ? 'فحص ذكي للصورة والطلب' : 'فهم ذكي'}</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;
                 document.getElementById('askUse')?.addEventListener('click', () => openOrderForm(j.recommended.serviceId));
                 document.getElementById('askMore')?.addEventListener('click', () => renderAskMatches(matches, j.customService));
             }
@@ -583,10 +570,63 @@ async function openAskMe() {
             box.innerHTML = `<div class="error">${esc(e.message)}</div>`;
         }
         finally {
-            btn.disabled = false;
-            btn.textContent = 'بحث واقتراح';
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = 'بحث واقتراح';
+        }
+    };
+    voiceBtn.addEventListener('click', () => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            voiceStatus.textContent = 'التحدث الصوتي غير مدعوم في هذا المتصفح. جرّب Chrome على الهاتف أو اكتب الطلب.';
+            return;
+        }
+        if (listening) {
+            recognition?.stop();
+            return;
+        }
+        recognition = new SR();
+        recognition.lang = 'ar-YE';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 3;
+        listening = true;
+        voiceBtn.textContent = '⏹️ إيقاف التسجيل';
+        voiceStatus.textContent = 'استمع... تحدث الآن بوضوح، ويمكنك استخدام اللهجة اليمنية.';
+        recognition.onresult = (e) => { let finalText = ''; let interim = ''; for (let i = e.resultIndex; i < e.results.length; i++) {
+            const t = e.results[i]?.[0]?.transcript || '';
+            if (e.results[i].isFinal)
+                finalText += t + ' ';
+            else
+                interim += t + ' ';
+        } if (finalText.trim())
+            textEl.value = (textEl.value.trim() ? textEl.value.trim() + ' ' : '') + finalText.trim(); voiceStatus.textContent = interim ? `أسمع: ${interim}` : 'تم التقاط الصوت.'; };
+        recognition.onerror = (e) => { voiceStatus.textContent = e?.error === 'not-allowed' ? 'اسمح للمتصفح باستخدام الميكروفون ثم حاول مرة أخرى.' : 'تعذر التقاط الصوت، حاول مرة أخرى.'; };
+        recognition.onend = () => { listening = false; voiceBtn.textContent = '🎤 تحدث'; if (!String(voiceStatus.textContent || '').startsWith('تم'))
+            voiceStatus.textContent = 'انتهى التسجيل.'; };
+        try {
+            recognition.start();
+        }
+        catch {
+            listening = false;
+            voiceBtn.textContent = '🎤 تحدث';
+            voiceStatus.textContent = 'تعذر تشغيل الميكروفون، حاول مرة أخرى.';
         }
     });
+    document.getElementById('askImage')?.addEventListener('click', () => document.getElementById('askImageFile')?.click());
+    document.getElementById('askImageFile')?.addEventListener('change', async () => {
+        const f = document.getElementById('askImageFile').files?.[0];
+        if (!f)
+            return;
+        pendingAssistImage = f;
+        if (!textEl.value.trim())
+            textEl.value = 'أريد طلب خدمة بناءً على الصورة المرفقة';
+        box.innerHTML = '<div class="notice">📷 تم استلام الصورة. جارٍ فحصها تلقائيًا لتحديد الخدمة المناسبة...</div>';
+        if (navigator.onLine)
+            await analyzeAsk(true);
+        else
+            box.innerHTML = '<div class="notice">تم حفظ الصورة. لا يوجد اتصال الآن؛ اضغط «بحث واقتراح» بعد عودة الإنترنت لفحصها.</div>';
+    });
+    document.getElementById('askAnalyze')?.addEventListener('click', () => analyzeAsk(false));
 }
 function renderAskMatches(matches, customService) { const box = document.getElementById('askResults'); if (!box)
     return; if (!matches.length) {

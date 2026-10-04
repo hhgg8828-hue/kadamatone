@@ -40,7 +40,7 @@ function securityHeaders(config) {
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Permissions-Policy': 'geolocation=(self), camera=(self), microphone=()',
+        'Permissions-Policy': 'geolocation=(self), camera=(self), microphone=(self)',
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Content-Security-Policy': [
             "default-src 'self'",

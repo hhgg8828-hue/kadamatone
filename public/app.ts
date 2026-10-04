@@ -152,23 +152,67 @@ const DESCRIPTION_SUGGESTIONS:Record<string,string[]>={
 };
 
 async function openAskMe(){
-  showModal(`<div class="ask-me"><h2>🛎️ اطلب لي</h2><p class="muted">قل لنا ما تحتاجه أو اكتبه بكلمات بسيطة، وسنقترح الخدمة الأقرب.</p><div class="field"><label>ماذا تريد أن نطلب لك؟</label><textarea id="askText" maxlength="500" rows="4" placeholder="مثال: أريد واحد يشتري لي دواء ويوصله للبيت"></textarea></div><div class="row"><button class="btn secondary" id="askVoice" type="button">🎤 تحدث</button><button class="btn secondary" id="askImage" type="button">📷 صورة</button><button class="btn" id="askAnalyze" type="button">بحث واقتراح</button></div><input id="askImageFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div id="askResults" style="margin-top:12px"></div></div>`);
+  showModal(`<div class="ask-me"><h2>🛎️ اطلب لي</h2><p class="muted">قل لنا ما تحتاجه أو اكتبه بكلمات بسيطة. عند إرفاق صورة سنفحصها تلقائيًا ونقترح الخدمة المناسبة دون الحاجة للضغط على «بحث واقتراح».</p><div class="field"><label>ماذا تريد أن نطلب لك؟</label><textarea id="askText" maxlength="500" rows="4" placeholder="مثال: أريد واحد يشتري لي دواء ويوصله للبيت"></textarea></div><div class="row"><button class="btn secondary" id="askVoice" type="button">🎤 تحدث</button><button class="btn secondary" id="askImage" type="button">📷 صورة</button><button class="btn" id="askAnalyze" type="button">بحث واقتراح</button></div><small id="askVoiceStatus" class="muted"></small><input id="askImageFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div id="askResults" style="margin-top:12px"></div></div>`);
   const textEl=document.getElementById('askText') as HTMLTextAreaElement;
-  document.getElementById('askVoice')?.addEventListener('click',()=>{
+  const box=document.getElementById('askResults')!;
+  const analyzeBtn=document.getElementById('askAnalyze') as HTMLButtonElement;
+  const voiceBtn=document.getElementById('askVoice') as HTMLButtonElement;
+  const voiceStatus=document.getElementById('askVoiceStatus')!;
+  let recognition:any=null;
+  let listening=false;
+
+  const analyzeAsk=async(auto=false)=>{
+    const q=textEl.value.trim();
+    if(q.length<2 && !pendingAssistImage && !pendingAssistImageFileId){box.innerHTML='<div class="error">اكتب أو تحدث بما تحتاجه أولًا، أو أرفق صورة.</div>';return}
+    analyzeBtn.disabled=true; analyzeBtn.textContent=auto?'جارٍ الفحص التلقائي...':'جارٍ الفهم...';
+    try{
+      let imageFileId=pendingAssistImageFileId;
+      if(!imageFileId && pendingAssistImage && navigator.onLine){
+        const data=await new Promise<string>((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(String(fr.result));fr.onerror=()=>reject(new Error('تعذر قراءة الصورة'));fr.readAsDataURL(pendingAssistImage!)});
+        const up=await api('/files',{method:'POST',body:JSON.stringify({purpose:'order_attachment',name:pendingAssistImage.name,dataBase64:data})});
+        imageFileId=up.file.id; pendingAssistImageFileId=imageFileId; pendingAssistImage=null;
+      }
+      const finalText=textEl.value.trim() || 'حلل الصورة المرفقة وحدد الخدمة المناسبة';
+      const j=await api('/assist/request',{method:'POST',body:JSON.stringify({text:finalText,...(imageFileId?{imageFileId}:{})})});
+      const matches=j.matches||[];
+      if(j.clarification?.options?.length){
+        box.innerHTML=`<div class="card"><b>${esc(j.clarification.question||'ماذا تقصد؟')}</b><div style="margin-top:10px">${j.clarification.options.slice(0,3).map((o:any)=>`<button class="suggestion" data-ask-service="${esc(o.serviceId)}" type="button"><span>🛠️</span><span><b>${esc(o.label)}</b></span><span>←</span></button>`).join('')}</div></div>`;
+        box.querySelectorAll('[data-ask-service]').forEach(x=>x.addEventListener('click',()=>openOrderForm((x as HTMLElement).dataset.askService!)));
+      } else if(j.recommended){
+        const steps=(j.steps||[]).slice(0,3);
+        box.innerHTML=`<div class="card"><b>${j.extracted?.compound?'فهمنا أن طلبك يجمع أكثر من حاجة':'أقرب خدمة مقترحة'}</b><p>${esc(j.recommended.icon||'🛠️')} ${esc(j.recommended.serviceName)}</p>${steps.length>1?`<div class="notice">${steps.map((x:any)=>esc(x.serviceName)).join(' + ')}</div>`:''}<small class="muted">${esc(j.recommended.categoryName)} · ${j.source==='AI'?'فحص ذكي للصورة والطلب':'فهم ذكي'}</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;
+        document.getElementById('askUse')?.addEventListener('click',()=>openOrderForm(j.recommended.serviceId));
+        document.getElementById('askMore')?.addEventListener('click',()=>renderAskMatches(matches,j.customService));
+      } else renderAskMatches(matches,j.customService)
+    }catch(e){box.innerHTML=`<div class="error">${esc((e as Error).message)}</div>`}
+    finally{analyzeBtn.disabled=false;analyzeBtn.textContent='بحث واقتراح'}
+  };
+
+  voiceBtn.addEventListener('click',()=>{
     const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
-    if(!SR){alert('التحدث الصوتي غير مدعوم في هذا المتصفح. يمكنك كتابة الطلب.');return}
-    const rec=new SR();rec.lang='ar-YE';rec.interimResults=false;rec.maxAlternatives=1;rec.onresult=(e:any)=>{textEl.value=e.results?.[0]?.[0]?.transcript||''};rec.onerror=()=>alert('تعذر التقاط الصوت، حاول مرة أخرى.');rec.start();
+    if(!SR){voiceStatus.textContent='التحدث الصوتي غير مدعوم في هذا المتصفح. جرّب Chrome على الهاتف أو اكتب الطلب.';return}
+    if(listening){recognition?.stop();return}
+    recognition=new SR(); recognition.lang='ar-YE'; recognition.interimResults=true; recognition.continuous=false; recognition.maxAlternatives=3; listening=true;
+    voiceBtn.textContent='⏹️ إيقاف التسجيل'; voiceStatus.textContent='استمع... تحدث الآن بوضوح، ويمكنك استخدام اللهجة اليمنية.';
+    recognition.onresult=(e:any)=>{let finalText='';let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i]?.[0]?.transcript||'';if(e.results[i].isFinal)finalText+=t+' ';else interim+=t+' ';}if(finalText.trim())textEl.value=(textEl.value.trim()?textEl.value.trim()+' ':'')+finalText.trim();voiceStatus.textContent=interim?`أسمع: ${interim}`:'تم التقاط الصوت.';};
+    recognition.onerror=(e:any)=>{voiceStatus.textContent=e?.error==='not-allowed'?'اسمح للمتصفح باستخدام الميكروفون ثم حاول مرة أخرى.':'تعذر التقاط الصوت، حاول مرة أخرى.';};
+    recognition.onend=()=>{listening=false;voiceBtn.textContent='🎤 تحدث';if(!String(voiceStatus.textContent||'').startsWith('تم'))voiceStatus.textContent='انتهى التسجيل.';};
+    try{recognition.start();}catch{listening=false;voiceBtn.textContent='🎤 تحدث';voiceStatus.textContent='تعذر تشغيل الميكروفون، حاول مرة أخرى.';}
   });
+
   document.getElementById('askImage')?.addEventListener('click',()=>document.getElementById('askImageFile')?.click());
-  document.getElementById('askImageFile')?.addEventListener('change',()=>{const f=(document.getElementById('askImageFile') as HTMLInputElement).files?.[0];if(f){pendingAssistImage=f;textEl.value=textEl.value.trim()||'أريد طلب خدمة بناءً على الصورة المرفقة';(document.getElementById('askResults')!).innerHTML='<div class="notice">تم اختيار الصورة. بعد تحديد الخدمة يمكنك إرفاقها مع الطلب.</div>'}});
-  document.getElementById('askAnalyze')?.addEventListener('click',async()=>{
-    const btn=document.getElementById('askAnalyze') as HTMLButtonElement,q=textEl.value.trim(),box=document.getElementById('askResults')!;if(q.length<2){box.innerHTML='<div class="error">اكتب أو تحدث بما تحتاجه أولًا.</div>';return}btn.disabled=true;btn.textContent='جارٍ الفهم...';
-    try{let imageFileId=pendingAssistImageFileId; if(!imageFileId && pendingAssistImage && navigator.onLine){const data=await new Promise<string>((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(String(fr.result));fr.onerror=()=>reject(new Error('تعذر قراءة الصورة'));fr.readAsDataURL(pendingAssistImage!)});const up=await api('/files',{method:'POST',body:JSON.stringify({purpose:'order_attachment',name:pendingAssistImage.name,dataBase64:data})});imageFileId=up.file.id;pendingAssistImageFileId=imageFileId; pendingAssistImage=null;} const j=await api('/assist/request',{method:'POST',body:JSON.stringify({text:q,...(imageFileId?{imageFileId}:{})})});const matches=j.matches||[];
-      if(j.clarification?.options?.length){box.innerHTML=`<div class="card"><b>${esc(j.clarification.question||'ماذا تقصد؟')}</b><div style="margin-top:10px">${j.clarification.options.slice(0,3).map((o:any)=>`<button class="suggestion" data-ask-service="${esc(o.serviceId)}" type="button"><span>🛠️</span><span><b>${esc(o.label)}</b></span><span>←</span></button>`).join('')}</div></div>`;box.querySelectorAll('[data-ask-service]').forEach(x=>x.addEventListener('click',()=>openOrderForm((x as HTMLElement).dataset.askService!)));}
-      else if(j.recommended){const steps=(j.steps||[]).slice(0,3);box.innerHTML=`<div class="card"><b>${j.extracted?.compound?'فهمنا أن طلبك يجمع أكثر من حاجة':'أقرب خدمة مقترحة'}</b><p>${esc(j.recommended.icon||'🛠️')} ${esc(j.recommended.serviceName)}</p>${steps.length>1?`<div class="notice">${steps.map((x:any)=>esc(x.serviceName)).join(' + ')}</div>`:''}<small class="muted">${esc(j.recommended.categoryName)} · ${j.source==='AI'?'مساعد ذكي':'فهم ذكي'}</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;document.getElementById('askUse')?.addEventListener('click',()=>openOrderForm(j.recommended.serviceId));document.getElementById('askMore')?.addEventListener('click',()=>renderAskMatches(matches,j.customService));}
-      else renderAskMatches(matches,j.customService)}catch(e){box.innerHTML=`<div class="error">${esc((e as Error).message)}</div>`}finally{btn.disabled=false;btn.textContent='بحث واقتراح'}
+  document.getElementById('askImageFile')?.addEventListener('change',async()=>{
+    const f=(document.getElementById('askImageFile') as HTMLInputElement).files?.[0];
+    if(!f)return;
+    pendingAssistImage=f;
+    if(!textEl.value.trim())textEl.value='أريد طلب خدمة بناءً على الصورة المرفقة';
+    box.innerHTML='<div class="notice">📷 تم استلام الصورة. جارٍ فحصها تلقائيًا لتحديد الخدمة المناسبة...</div>';
+    if(navigator.onLine) await analyzeAsk(true);
+    else box.innerHTML='<div class="notice">تم حفظ الصورة. لا يوجد اتصال الآن؛ اضغط «بحث واقتراح» بعد عودة الإنترنت لفحصها.</div>';
   });
+  document.getElementById('askAnalyze')?.addEventListener('click',()=>analyzeAsk(false));
 }
+
 function renderAskMatches(matches:any[],customService?:string){const box=document.getElementById('askResults');if(!box)return;if(!matches.length){box.innerHTML='<div class="card"><b>لم نجد خدمة مطابقة مباشرة</b><p class="muted">يمكنك إرسال طلب خاص وسيصل إلى الإدارة للتعامل معه.</p><button class="btn" id="askCustom" type="button">➕ طلب خدمة غير موجودة</button></div>';document.getElementById('askCustom')?.addEventListener('click',()=>customService?openOrderForm(customService):openOrderFormBySlug('custom-request'));return}box.innerHTML=`<div class="card"><b>هل تقصد؟</b>${matches.slice(0,5).map(m=>`<button class="suggestion" data-ask-service="${esc(m.serviceId)}" type="button"><span>${esc(m.icon||'🛠️')}</span><span><b>${esc(m.serviceName)}</b><small>${esc(m.categoryName)}</small></span><span>←</span></button>`).join('')}${customService?'<button class="btn secondary" id="askCustom" type="button">➕ طلب خدمة غير موجودة</button>':''}</div>`;box.querySelectorAll('[data-ask-service]').forEach(x=>x.addEventListener('click',()=>openOrderForm((x as HTMLElement).dataset.askService!)));document.getElementById('askCustom')?.addEventListener('click',()=>customService?openOrderForm(customService):openOrderFormBySlug('custom-request'))}
 async function openFavorites(){try{const j=await api('/me/favorites/providers');showModal(`<h2>⭐ مقدمو الخدمة المفضلون</h2>${(j.providers||[]).map((p:any)=>`<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(p.displayName)}</b><p class="muted">⭐ ${esc(p.rating||0)} · ${esc(p.verificationStatus)}</p></div><button class="btn" data-fav-provider="${esc(p.id)}" type="button">إزالة</button></div></div>`).join('')||'<div class="empty">لا توجد حسابات مفضلة بعد.</div>'}`);document.querySelectorAll('[data-fav-provider]').forEach(x=>x.addEventListener('click',async()=>{await api('/me/favorites/providers/'+(x as HTMLElement).dataset.favProvider,{method:'DELETE'});openFavorites()}))}catch(e){alert((e as Error).message)}}
 async function openBeneficiaries(){try{const j=await api('/me/beneficiaries');showModal(`<h2>👨‍👩‍👧 المستفيدون</h2><p class="muted">احفظ أفراد الأسرة أو أي شخص تطلب له الخدمة باستمرار.</p><button class="btn" id="addBeneficiary">+ إضافة مستفيد</button><div style="margin-top:12px">${(j.beneficiaries||[]).map((b:any)=>`<div class="card"><b>${esc(b.label)}</b><p>${esc(b.fullName)} · ${esc(b.phone)}</p><button class="btn danger small" data-del-beneficiary="${esc(b.id)}" type="button">حذف</button></div>`).join('')||'<div class="empty">لا يوجد مستفيدون محفوظون.</div>'}</div>`);document.getElementById('addBeneficiary')?.addEventListener('click',()=>{showModal(`<h2>إضافة مستفيد</h2><form id="beneficiaryForm"><input name="label" placeholder="أبي / أمي / شخص آخر" required maxlength="40"><input name="fullName" placeholder="الاسم" required maxlength="80"><input name="phone" placeholder="الهاتف" required maxlength="24"><button class="btn">حفظ</button></form>`);document.getElementById('beneficiaryForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget as HTMLFormElement);try{await api('/me/beneficiaries',{method:'POST',body:JSON.stringify({label:String(f.get('label')),fullName:String(f.get('fullName')),phone:String(f.get('phone'))})});openBeneficiaries()}catch(x){alert((x as Error).message)}})});document.querySelectorAll('[data-del-beneficiary]').forEach(x=>x.addEventListener('click',async()=>{await api('/me/beneficiaries/'+(x as HTMLElement).dataset.delBeneficiary,{method:'DELETE'});openBeneficiaries()}))}catch(e){alert((e as Error).message)}}
