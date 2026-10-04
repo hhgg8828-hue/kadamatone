@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { startApp, registerUser } from './helpers.js';
+const svc = (t, slug) => t.app.catalog.all().services.find((x) => x.slug === slug);
+test('V66.3: catalog bootstrap يجلب الخدمات مع الأقسام في طلب واحد', async () => { const t = await startApp(); try {
+    const r = await t.api('GET', '/api/v1/catalog/bootstrap');
+    assert.equal(r.status, 200, r.text);
+    assert.ok(r.body.categories.length > 0);
+    assert.ok(r.body.services.some((x) => x.slug === 'motorcycle-trips'));
+}
+finally {
+    await t.close();
+} });
+test('V66.3: قدرات مقدم الخدمة تُحفظ وتُقرأ', async () => { const t = await startApp(); try {
+    const p = await registerUser(t.api, { role: 'PROVIDER', provider: { providerType: 'DRIVER', displayName: 'قدرات اختبار' } });
+    const r = await t.api('PUT', '/api/v1/provider/capabilities', { token: p.body.accessToken, body: { capabilities: ['trip:passenger', 'trip:medicine'] } });
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.body.capabilities.map((x) => x.capabilityKey), ['trip:medicine', 'trip:passenger']);
+    const g = await t.api('GET', '/api/v1/provider/capabilities', { token: p.body.accessToken });
+    assert.equal(g.status, 200);
+    assert.equal(g.body.capabilities.length, 2);
+}
+finally {
+    await t.close();
+} });
+test('V66.3: جلسة مساعد الطلب تحفظ الرسائل والمسودة وتطرح سؤالًا واحدًا', async () => { const t = await startApp(); try {
+    const c = await registerUser(t.api);
+    const r = await t.api('POST', '/api/v1/assist/session', { token: c.body.accessToken, body: { text: 'أريد واحد يشتري لي دواء' } });
+    assert.equal(r.status, 200, r.text);
+    assert.ok(r.body.sessionId);
+    assert.equal(r.body.messages, undefined);
+    const g = await t.api('GET', `/api/v1/assist/session/${r.body.sessionId}`, { token: c.body.accessToken });
+    assert.equal(g.status, 200);
+    assert.equal(g.body.messages.length, 2);
+    assert.equal(g.body.messages.filter((m) => m.role === 'CUSTOMER').length, 1);
+    assert.equal(g.body.messages.filter((m) => m.role === 'ASSISTANT').length, 1);
+    assert.ok(g.body.draft.serviceId);
+}
+finally {
+    await t.close();
+} });
+test('V66.3: قدرة المشوار تمنع التوجيه لمقدم لا يملك القدرة عندما تكون قدراته محددة', async () => { const t = await startApp(); try {
+    const c = await registerUser(t.api);
+    const p1 = await registerUser(t.api, { role: 'PROVIDER', provider: { providerType: 'DRIVER', displayName: 'شراء فقط' } });
+    const p2 = await registerUser(t.api, { role: 'PROVIDER', provider: { providerType: 'DRIVER', displayName: 'شخص' } });
+    const service = svc(t, 'motorcycle-trips');
+    for (const p of [p1, p2]) {
+        const pid = t.app.db.get('SELECT id FROM service_providers WHERE user_id=?', p.body.user.id).id;
+        t.app.db.run("UPDATE service_providers SET verification_status='VERIFIED',is_online=1,base_lat=13.9759,base_lng=44.1709 WHERE id=?", pid);
+        t.app.db.run('INSERT INTO provider_services(provider_id,service_id,experience_years,is_active) VALUES(?,?,?,1)', pid, service.id, 1);
+    }
+    const id1 = t.app.db.get('SELECT id FROM service_providers WHERE user_id=?', p1.body.user.id).id;
+    const id2 = t.app.db.get('SELECT id FROM service_providers WHERE user_id=?', p2.body.user.id).id;
+    const now = new Date().toISOString();
+    t.app.db.run('INSERT INTO provider_capabilities(id,provider_id,capability_key,created_at,updated_at) VALUES(?,?,?,?,?)', 'cap1', id1, 'trip:purchase', now, now);
+    t.app.db.run('INSERT INTO provider_capabilities(id,provider_id,capability_key,created_at,updated_at) VALUES(?,?,?,?,?)', 'cap2', id2, 'trip:passenger', now, now);
+    const order = await t.api('POST', '/api/v1/trips', { token: c.body.accessToken, headers: { 'Idempotency-Key': 'cap-trip-1' }, body: { origin: { lat: 13.9759, lng: 44.1709 }, destination: { lat: 13.98, lng: 44.18 }, purpose: 'PASSENGER', description: 'مشوار شخص', contactPhone: c.creds.phone } });
+    assert.equal(order.status, 201, order.text);
+    const offers = await t.api('GET', '/api/v1/provider/offers', { token: p2.body.accessToken });
+    assert.ok(offers.body.offers.some((x) => x.orderId === order.body.order.id));
+    const bad = await t.api('GET', '/api/v1/provider/offers', { token: p1.body.accessToken });
+    assert.equal(bad.body.offers.some((x) => x.orderId === order.body.order.id), false);
+}
+finally {
+    await t.close();
+} });
+test('V66.3: إنشاء الطلب يمكنه ربط جلسة مساعد الطلب بنفس Order ID', async () => { const t = await startApp(); try {
+    const c = await registerUser(t.api);
+    const a = await t.api('POST', '/api/v1/assist/session', { token: c.body.accessToken, body: { text: 'أريد توصيل مستند' } });
+    assert.equal(a.status, 200, a.text);
+    const service = svc(t, 'document-delivery');
+    const o = await t.api('POST', '/api/v1/orders', { token: c.body.accessToken, headers: { 'Idempotency-Key': 'assist-link-1' }, body: { serviceId: service.id, description: 'توصيل مستند من جلسة المساعد', contactPhone: c.creds.phone, assistantSessionId: a.body.sessionId } });
+    assert.equal(o.status, 201, o.text);
+    const row = t.app.db.get('SELECT assistant_session_id FROM orders WHERE id=?', o.body.order.id);
+    assert.equal(row.assistant_session_id, a.body.sessionId);
+    const sess = t.app.db.get('SELECT status FROM assistant_sessions WHERE id=?', a.body.sessionId);
+    assert.equal(sess.status, 'CONFIRMED');
+}
+finally {
+    await t.close();
+} });
+//# sourceMappingURL=v66_3.test.js.map

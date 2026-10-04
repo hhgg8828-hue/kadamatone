@@ -214,6 +214,7 @@ export function registerCatalogAdminRoutes(app: App, r: App['router']): void {
 export function registerCatalogRoutes(app: App, r: App['router']): void {
   const { catalog } = app;
   r.get('/categories', (ctx: Ctx) => ({ categories: catalog.tree(ctx.query['lang'] === 'en' ? 'en' : ctx.locale) }));
+  r.get('/catalog/bootstrap', (ctx: Ctx) => { const locale = ctx.query['lang'] === 'en' ? 'en' : ctx.locale; const data = catalog.all(); return { categories: catalog.tree(locale), services: data.services.filter(x=>x.is_active).map(x=>catalog.serializeService(x, locale)) }; });
   r.get('/categories/:slug/services', (ctx: Ctx) => {
     const data = catalog.all();
     const c = data.categories.find((x) => x.slug === ctx.params['slug'] && x.is_active);

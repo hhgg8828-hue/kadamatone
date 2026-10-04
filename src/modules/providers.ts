@@ -154,6 +154,9 @@ export function registerProviderRoutes(app: App, r: Router): void {
     });
   });
 
+  r.get('/provider/capabilities',...isProvider,(ctx:Ctx)=>({capabilities:db.all<any>('SELECT capability_key capabilityKey,is_active isActive FROM provider_capabilities WHERE provider_id=? ORDER BY capability_key',pid(ctx))}));
+  r.put('/provider/capabilities',...isProvider,(ctx:Ctx)=>{ const b=parse<any>(s.obj({capabilities:s.arr(s.str({min:2,max:80}),{max:50})}),ctx.body); const now=iso(app.clock.now()); return db.tx(()=>{ db.run('DELETE FROM provider_capabilities WHERE provider_id=?',pid(ctx)); for(const key of new Set(b.capabilities.map((x:string)=>x.trim().toLowerCase()).filter(Boolean))) db.run('INSERT INTO provider_capabilities(id,provider_id,capability_key,created_at,updated_at) VALUES(?,?,?,?,?)',uuid(),pid(ctx),key,now,now); return {capabilities:db.all<any>('SELECT capability_key capabilityKey,is_active isActive FROM provider_capabilities WHERE provider_id=? ORDER BY capability_key',pid(ctx))}; }); });
+
   r.put('/provider/areas', ...isProvider, (ctx: Ctx) => {
     const b = parse<{ areaIds: string[] }>(s.obj({ areaIds: s.arr(s.str({ max: 64 }), { max: 100 }) }), ctx.body);
     return db.tx(() => {

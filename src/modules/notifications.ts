@@ -106,6 +106,7 @@ export function registerNotificationRoutes(app: App, r: Router): void {
     db.run(`INSERT INTO notification_subscriptions(id,user_id,endpoint,p256dh,auth,platform,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(user_id,endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,platform=excluded.platform,updated_at=excluded.updated_at`, uuid(), ctx.user!.id, b.endpoint, b.p256dh || null, b.auth || null, b.platform || 'WEB', now, now);
     return { ok: true };
   });
+  r.get('/notifications/subscriptions/status', auth, (ctx: Ctx) => ({ webPush: !!db.get('SELECT 1 FROM notification_subscriptions WHERE user_id=?', ctx.user!.id), count: Number(db.get<{c:number}>('SELECT COUNT(*) c FROM notification_subscriptions WHERE user_id=?',ctx.user!.id)?.c||0) }));
   r.delete('/notifications/subscriptions', auth, (ctx: Ctx) => {
     const endpoint = String(ctx.query['endpoint'] || '');
     if (!endpoint) throw E.unprocessable('حدد عنوان الاشتراك', 'ENDPOINT_REQUIRED');

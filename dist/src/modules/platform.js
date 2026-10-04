@@ -30,7 +30,7 @@ export function registerPlatformRoutes(app, r) {
     r.get('/admin/areas', auth, adminLevel('SUPPORT'), (ctx) => ({ areas: catalog.all().areas.map((a) => catalog.serializeArea(a, ctx.locale, true)) }));
     r.post('/admin/areas', auth, adminLevel('ADMIN'), (ctx) => {
         const b = parse(s.obj({
-            name: I18N, type: s.oneOf(['COUNTRY', 'CITY', 'DISTRICT']), localityType: s.oneOf(['COUNTRY', 'CITY', 'DISTRICT', 'DIRECTORATE', 'ISOLATION', 'VILLAGE', 'NEIGHBORHOOD'], { optional: true, default: 'DISTRICT' }), parentId: s.str({ max: 64, optional: true }),
+            name: I18N, type: s.oneOf(['COUNTRY', 'CITY', 'DISTRICT']), localityType: s.oneOf(['COUNTRY', 'GOVERNORATE', 'CITY', 'DISTRICT', 'DIRECTORATE', 'ISOLATION', 'VILLAGE', 'NEIGHBORHOOD'], { optional: true, default: 'DISTRICT' }), parentId: s.str({ max: 64, optional: true }),
             centerLat: s.num({ min: -90, max: 90 }), centerLng: s.num({ min: -180, max: 180 }), radiusKm: s.num({ min: 0.1, max: 5000, optional: true, default: 25 }),
         }), ctx.body);
         return db.tx(() => {
@@ -46,7 +46,7 @@ export function registerPlatformRoutes(app, r) {
     });
     r.patch('/admin/areas/:id', auth, adminLevel('ADMIN'), (ctx) => {
         const b = parse(s.obj({
-            name: { ...I18N, optional: true }, localityType: s.oneOf(['COUNTRY', 'CITY', 'DISTRICT', 'DIRECTORATE', 'ISOLATION', 'VILLAGE', 'NEIGHBORHOOD'], { optional: true }), isActive: s.bool({ optional: true }), centerLat: s.num({ min: -90, max: 90, optional: true }),
+            name: { ...I18N, optional: true }, localityType: s.oneOf(['COUNTRY', 'GOVERNORATE', 'CITY', 'DISTRICT', 'DIRECTORATE', 'ISOLATION', 'VILLAGE', 'NEIGHBORHOOD'], { optional: true }), isActive: s.bool({ optional: true }), centerLat: s.num({ min: -90, max: 90, optional: true }),
             centerLng: s.num({ min: -180, max: 180, optional: true }), radiusKm: s.num({ min: 0.1, max: 5000, optional: true }),
         }), ctx.body);
         return db.tx(() => {

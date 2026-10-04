@@ -45,7 +45,7 @@ export interface ServiceRow {
   keywords: string; pricing_type: PricingType; base_price: number | null; form_schema: string; cancellation_policy_id: string | null;
   default_priority: Priority; delivery_proof_type: 'NONE' | 'PIN' | 'RECIPIENT_CONFIRMATION' | 'PHOTO'; seasonal_enabled: 0 | 1; season_start_at: string | null; season_end_at: string | null; requires_inspection: 0 | 1; requires_vehicle: 0 | 1; supports_waiting: 0 | 1; sort_order: number; is_active: 0 | 1; created_at: string; updated_at: string;
 }
-export type LocalityType = 'COUNTRY' | 'CITY' | 'DISTRICT' | 'DIRECTORATE' | 'ISOLATION' | 'VILLAGE' | 'NEIGHBORHOOD';
+export type LocalityType = 'COUNTRY' | 'GOVERNORATE' | 'CITY' | 'DISTRICT' | 'DIRECTORATE' | 'ISOLATION' | 'VILLAGE' | 'NEIGHBORHOOD';
 export interface ServiceAreaRow {
   id: string; parent_id: string | null; name_i18n: string; type: 'COUNTRY' | 'CITY' | 'DISTRICT'; locality_type: LocalityType;
   center_lat: number; center_lng: number; radius_km: number; is_active: 0 | 1; created_at: string; updated_at: string;

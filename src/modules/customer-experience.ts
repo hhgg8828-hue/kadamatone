@@ -51,6 +51,31 @@ export function registerCustomerExperienceRoutes(app: App, r: Router): void {
   });
 
   r.get('/me/searches/recent',auth,roles('CUSTOMER'),(ctx:Ctx)=>({searches:db.all<any>('SELECT query,service_id serviceId,created_at createdAt FROM customer_searches WHERE customer_id=? ORDER BY id DESC LIMIT 10',ctx.user!.id)}));
+
+  r.post('/assist/session',auth,roles('CUSTOMER'),async (ctx:Ctx)=>{
+    const b=parse<any>(s.obj({sessionId:s.str({max:64,optional:true}),text:s.str({min:1,max:500}),imageFileId:s.str({max:64,optional:true})}),ctx.body);
+    let session=b.sessionId?db.get<any>('SELECT * FROM assistant_sessions WHERE id=? AND customer_id=? AND status=\'ACTIVE\'',b.sessionId,ctx.user!.id):null;
+    const now=iso(app.clock.now());
+    if(!session){ const id=uuid(); db.run('INSERT INTO assistant_sessions(id,customer_id,status,draft_json,created_at,updated_at) VALUES(?,?,?,?,?,?)',id,ctx.user!.id,'ACTIVE','{}',now,now); session=db.get<any>('SELECT * FROM assistant_sessions WHERE id=?',id); }
+    let image: {mime:string;dataBase64:string}|undefined;
+    if(b.imageFileId){ const f=db.get<any>("SELECT id,mime,storage_key,size FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'",b.imageFileId,ctx.user!.id); if(!f) throw E.notFound('الصورة غير موجودة'); if(f.size>5*1024*1024) throw E.unprocessable('حجم الصورة كبير','FILE_TOO_LARGE'); image={mime:f.mime,dataBase64:app.storage.read(f.storage_key).toString('base64')}; }
+    db.run('INSERT INTO assistant_messages(id,session_id,role,body,image_file_id,created_at) VALUES(?,?,?,?,?,?)',uuid(),session.id,'CUSTOMER',b.text,b.imageFileId||null,now);
+    const prior=JSON.parse(session.draft_json||'{}');
+    const result=await app.intentParser.parse(b.text,{catalog:app.catalog,locale:ctx.locale,image});
+    const top=result.matches[0];
+    const draft={...prior,rawText:[...(prior.rawText||[]),b.text].slice(-8),serviceId:top?.serviceId||prior.serviceId||null,serviceName:top?.serviceName||prior.serviceName||null,imageFileId:b.imageFileId||prior.imageFileId||null,purchaseIntent:result.extracted.purchaseIntent,priority:result.priority};
+    let question:string|null=null;
+    if(!draft.serviceId) question='ما الذي تريد تنفيذه؟ يمكنك كتابة اسم الغرض أو إرسال صورة له.';
+    else if(result.extracted.purchaseIntent && !draft.destinationText) question='أين تريد توصيله؟';
+    else if(result.clarification?.question) question=result.clarification.question;
+    else if(!draft.confirmed) question='فهمت طلبك. هل تريد إرسال الطلب الآن؟';
+    const reply=question==='فهمت طلبك. هل تريد إرسال الطلب الآن؟'?`فهمت أنك تريد ${draft.serviceName||'تنفيذ هذه المهمة'}. هل تريد إرسال الطلب الآن؟`:question||'فهمت طلبك. أعطني المعلومة الناقصة وسأكمل الطلب.';
+    db.run('UPDATE assistant_sessions SET draft_json=?,updated_at=? WHERE id=?',JSON.stringify(draft),now,session.id);
+    db.run('INSERT INTO assistant_messages(id,session_id,role,body,created_at) VALUES(?,?,?,?,?)',uuid(),session.id,'ASSISTANT',reply,now);
+    return {sessionId:session.id,reply,question,draft,result,ready:Boolean(draft.serviceId&&question?.includes('إرسال الطلب'))};
+  });
+  r.get('/assist/session/:id',auth,roles('CUSTOMER'),(ctx:Ctx)=>{ const x=db.get<any>('SELECT * FROM assistant_sessions WHERE id=? AND customer_id=?',ctx.params.id!,ctx.user!.id); if(!x)throw E.notFound('جلسة المساعد غير موجودة'); return {sessionId:x.id,status:x.status,draft:JSON.parse(x.draft_json||'{}'),messages:db.all<any>('SELECT role,body,image_file_id imageFileId,created_at createdAt FROM assistant_messages WHERE session_id=? ORDER BY created_at,id',x.id)}; });
+
   r.post('/assist/request',auth,roles('CUSTOMER'),async (ctx:Ctx)=>{
     const b=parse<{text:string;imageFileId?:string}>(s.obj({text:s.str({min:2,max:500}),imageFileId:s.str({max:64,optional:true})}),ctx.body); let image: {mime:string;dataBase64:string}|undefined; if(b.imageFileId){ const f=db.get<any>("SELECT id,mime,storage_key,size,purpose FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'",b.imageFileId,ctx.user!.id); if(!f) throw E.notFound('الصورة غير موجودة'); if(f.size>5*1024*1024) throw E.unprocessable('حجم الصورة كبير','FILE_TOO_LARGE'); image={mime:f.mime,dataBase64:app.storage.read(f.storage_key).toString('base64')}; } const result=await app.intentParser.parse(b.text,{catalog:app.catalog,locale:ctx.locale,image});
     const top=result.matches[0]; db.run('INSERT INTO customer_searches(customer_id,query,service_id,created_at) VALUES(?,?,?,?)',ctx.user!.id,b.text,top?.serviceId||null,iso(app.clock.now()));

@@ -91,7 +91,7 @@ export function registerAuthRoutes(app: App, r: Router): void {
     const hash = await hashPassword(b.password);
     const userRow = db.tx(() => {
       if (db.get('SELECT 1 FROM users WHERE phone = ?', phone)) throw E.conflict('رقم الهاتف مسجل مسبقًا', 'PHONE_TAKEN');
-      if (b.email && db.get('SELECT 1 FROM users WHERE email = ?', b.email)) throw E.conflict('البريد الإلكتروني مسجل مسبقًا', 'EMAIL_TAKEN');
+      if (b.email && db.get('SELECT 1 FROM users WHERE email = ?', b.email)) throw E.conflict('البريد الإلكتروني مستخدم بالفعل', 'EMAIL_TAKEN');
       const id = uuid(), now = iso(app.clock.now());
       db.run('INSERT INTO users(id,role_id,full_name,phone,email,password_hash,locale,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
         id, b.role === 'PROVIDER' ? 2 : 1, b.fullName, phone, b.email || null, hash, b.locale, now, now);

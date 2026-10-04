@@ -11,6 +11,7 @@ const createOrderSchema = s.obj({
     serviceId: s.str({ min: 1, max: 64 }),
     description: s.str({ min: 5, max: 1000 }),
     location: { ...locationSchema, optional: true },
+    areaId: s.str({ max: 64, optional: true }),
     addressId: s.str({ max: 64, optional: true }),
     contactPhone: s.str({ min: 8, max: 24 }),
     scheduledAt: s.date({ optional: true }),
@@ -18,7 +19,7 @@ const createOrderSchema = s.obj({
     formData: s.any({ optional: true }),
     notes: s.str({ max: 500, optional: true }),
     attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 10, optional: true }),
-    recipientName: s.str({ max: 80, optional: true }), recipientPhone: s.str({ max: 24, optional: true }), recipientUserId: s.str({ max: 64, optional: true }),
+    recipientName: s.str({ max: 80, optional: true }), recipientPhone: s.str({ max: 24, optional: true }), recipientUserId: s.str({ max: 64, optional: true }), assistantSessionId: s.str({ max: 64, optional: true }),
 });
 const isParticipant = (o, ctx) => {
     if (!ctx.user)
@@ -124,10 +125,19 @@ export function registerOrderRoutes(app, r) {
                 }
             }
             const activeCount = db.get(`SELECT COUNT(*) c FROM orders WHERE customer_id = ? AND status IN ('PENDING','SEARCHING','ASSIGNED','ACCEPTED','ON_THE_WAY','IN_PROGRESS')`, ctx.user.id).c;
+            if (b.assistantSessionId && !db.get("SELECT 1 FROM assistant_sessions WHERE id=? AND customer_id=?", b.assistantSessionId, ctx.user.id))
+                throw E.unprocessable('جلسة مساعد الطلب غير صالحة', 'INVALID_ASSISTANT_SESSION');
             if (activeCount >= app.settings.get('orders.max_active_per_customer'))
                 throw E.unprocessable('لديك عدد كبير من الطلبات النشطة حاليًا', 'TOO_MANY_ACTIVE_ORDERS');
             let locRow;
             let locationProvided = true;
+            let selectedAreaId = null;
+            if (b.areaId) {
+                const area = catalog.all().areas.find((a) => a.id === b.areaId && a.is_active);
+                if (!area)
+                    throw E.unprocessable('القرية أو المنطقة المحددة غير صالحة', 'INVALID_AREA');
+                selectedAreaId = area.id;
+            }
             if (b.addressId) {
                 const addr = db.get('SELECT location_id FROM addresses WHERE id = ? AND user_id = ?', b.addressId, ctx.user.id);
                 if (!addr)
@@ -135,12 +145,16 @@ export function registerOrderRoutes(app, r) {
                 locRow = db.get('SELECT * FROM locations WHERE id = ?', addr.location_id);
             }
             else if (b.location) {
-                locRow = app.locations.create(b.location, { requireArea: false });
+                locRow = app.locations.create({ ...b.location, areaId: b.location.areaId || selectedAreaId || undefined }, { requireArea: false });
+                if (selectedAreaId)
+                    locRow = { ...locRow, area_id: selectedAreaId };
             }
             else {
                 locRow = db.get('SELECT * FROM locations WHERE id=?', 'no-location');
                 const systemArea = db.get("SELECT id FROM service_areas WHERE id IN ('system-yemen','yemen-unmapped') AND is_active=1 ORDER BY CASE id WHEN 'system-yemen' THEN 0 ELSE 1 END LIMIT 1");
-                if (locRow && systemArea && locRow.area_id !== systemArea.id)
+                if (locRow && selectedAreaId)
+                    locRow = { ...locRow, area_id: selectedAreaId };
+                else if (locRow && systemArea && locRow.area_id !== systemArea.id)
                     locRow = { ...locRow, area_id: systemArea.id };
                 if (!locRow)
                     throw E.unprocessable('تعذر حفظ الطلب بدون موقع حاليًا', 'LOCATION_PLACEHOLDER_MISSING');
@@ -179,9 +193,11 @@ export function registerOrderRoutes(app, r) {
             const code = genCode(db, now);
             const attachments = (b.attachmentFileIds || []).filter((fid) => db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user.id));
             db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,
-                pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,created_at,updated_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id, b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get('platform.currency'), b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName || null, b.recipientPhone || null, b.recipientUserId || null, locationProvided ? 1 : 0, nowIso, nowIso);
+                pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id, b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get('platform.currency'), b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName || null, b.recipientPhone || null, b.recipientUserId || null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user.id, 'CUSTOMER', nowIso);
+            if (b.assistantSessionId)
+                db.run("UPDATE assistant_sessions SET status='CONFIRMED',updated_at=? WHERE id=? AND customer_id=?", nowIso, b.assistantSessionId, ctx.user.id);
             let o = db.get('SELECT * FROM orders WHERE id = ?', id);
             o = orders.applyTransition(o, 'SEARCHING', 'SYSTEM', ctx, { reason: 'auto' });
             app.notifications.notify(ctx.user.id, 'ORDER_RECEIVED', { code: o.code });

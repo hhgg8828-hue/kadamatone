@@ -38,8 +38,8 @@ export function registerPlatformRoutes(app: App, r: Router): void {
   r.get('/admin/areas', auth, adminLevel('SUPPORT'), (ctx: Ctx) => ({ areas: catalog.all().areas.map((a) => catalog.serializeArea(a, ctx.locale, true)) }));
 
   r.post('/admin/areas', auth, adminLevel('ADMIN'), (ctx: Ctx) => {
-    const b = parse<{ name: { ar: string; en?: string }; type: 'COUNTRY' | 'CITY' | 'DISTRICT'; localityType: 'COUNTRY'|'CITY'|'DISTRICT'|'DIRECTORATE'|'ISOLATION'|'VILLAGE'|'NEIGHBORHOOD'; parentId?: string; centerLat: number; centerLng: number; radiusKm: number }>(s.obj({
-      name: I18N, type: s.oneOf(['COUNTRY', 'CITY', 'DISTRICT']), localityType: s.oneOf(['COUNTRY','CITY','DISTRICT','DIRECTORATE','ISOLATION','VILLAGE','NEIGHBORHOOD'], { optional: true, default: 'DISTRICT' }), parentId: s.str({ max: 64, optional: true }),
+    const b = parse<{ name: { ar: string; en?: string }; type: 'COUNTRY' | 'CITY' | 'DISTRICT'; localityType: 'COUNTRY'|'GOVERNORATE'|'CITY'|'DISTRICT'|'DIRECTORATE'|'ISOLATION'|'VILLAGE'|'NEIGHBORHOOD'; parentId?: string; centerLat: number; centerLng: number; radiusKm: number }>(s.obj({
+      name: I18N, type: s.oneOf(['COUNTRY', 'CITY', 'DISTRICT']), localityType: s.oneOf(['COUNTRY','GOVERNORATE','CITY','DISTRICT','DIRECTORATE','ISOLATION','VILLAGE','NEIGHBORHOOD'], { optional: true, default: 'DISTRICT' }), parentId: s.str({ max: 64, optional: true }),
       centerLat: s.num({ min: -90, max: 90 }), centerLng: s.num({ min: -180, max: 180 }), radiusKm: s.num({ min: 0.1, max: 5000, optional: true, default: 25 }),
     }), ctx.body);
     return db.tx(() => {
@@ -55,8 +55,8 @@ export function registerPlatformRoutes(app: App, r: Router): void {
   });
 
   r.patch('/admin/areas/:id', auth, adminLevel('ADMIN'), (ctx: Ctx) => {
-    const b = parse<{ name?: { ar: string; en?: string }; localityType?: 'COUNTRY'|'CITY'|'DISTRICT'|'DIRECTORATE'|'ISOLATION'|'VILLAGE'|'NEIGHBORHOOD'; isActive?: boolean; centerLat?: number; centerLng?: number; radiusKm?: number }>(s.obj({
-      name: { ...I18N, optional: true } as Schema, localityType: s.oneOf(['COUNTRY','CITY','DISTRICT','DIRECTORATE','ISOLATION','VILLAGE','NEIGHBORHOOD'], { optional: true }), isActive: s.bool({ optional: true }), centerLat: s.num({ min: -90, max: 90, optional: true }),
+    const b = parse<{ name?: { ar: string; en?: string }; localityType?: 'COUNTRY'|'GOVERNORATE'|'CITY'|'DISTRICT'|'DIRECTORATE'|'ISOLATION'|'VILLAGE'|'NEIGHBORHOOD'; isActive?: boolean; centerLat?: number; centerLng?: number; radiusKm?: number }>(s.obj({
+      name: { ...I18N, optional: true } as Schema, localityType: s.oneOf(['COUNTRY','GOVERNORATE','CITY','DISTRICT','DIRECTORATE','ISOLATION','VILLAGE','NEIGHBORHOOD'], { optional: true }), isActive: s.bool({ optional: true }), centerLat: s.num({ min: -90, max: 90, optional: true }),
       centerLng: s.num({ min: -180, max: 180, optional: true }), radiusKm: s.num({ min: 0.1, max: 5000, optional: true }),
     }), ctx.body);
     return db.tx(() => {

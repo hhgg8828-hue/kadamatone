@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.10",
-  "description": "خدمات (Khadamat) — V66.1 comprehensive audit fixes, locality coverage, nearby providers and chat attachments",
+  "version": "0.6.12",
+  "description": "خدمات (Khadamat) — V66.3 performance, smart dispatch, capabilities and assistant-linked orders",
   "private": true,
   "type": "module",
   "engines": {
