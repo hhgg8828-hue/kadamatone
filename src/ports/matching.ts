@@ -42,9 +42,13 @@ export class NearestRatedMatcher implements Matcher {
     let requiredCapability: string | null = null;
     const form=(()=>{ try{return JSON.parse(order.form_data||'{}')}catch{return {}} })() as any;
     if (serviceSlug === 'motorcycle-trips') { const purpose=String(form.purpose||''); requiredCapability = purpose==='PASSENGER'?'trip:passenger': purpose==='MEDICINE'?'trip:medicine': purpose==='ITEM_PURCHASE'?'trip:purchase': purpose==='PARCEL'||purpose==='HOME_PICKUP'?'trip:delivery': purpose==='RESTAURANT_PICKUP'?'trip:restaurant': purpose==='DOCUMENT_DELIVERY'?'trip:documents':purpose==='TECHNICIAN_PICKUP'?'trip:worker':purpose==='STORE_SHOPPING'?'trip:shopping':purpose==='SMALL_CARGO'?'trip:cargo':null; }
+    else if (serviceSlug === 'passenger-transport') requiredCapability='trip:passenger';
     else if (serviceSlug === 'pharmacy-purchase') requiredCapability='purchase:pharmacy';
-    else if (['purchase-and-delivery','shopping-delivery'].includes(serviceSlug)) requiredCapability='purchase:store';
+    else if (['purchase-and-delivery','shopping-delivery','shopping-for-me'].includes(serviceSlug)) requiredCapability='purchase:store';
     else if (serviceSlug === 'document-delivery') requiredCapability='delivery:item';
+    else if (serviceSlug === 'seasonal-plowing') requiredCapability='agri:plowing';
+    else if (serviceSlug === 'seasonal-harvest') requiredCapability='agri:harvest';
+    else if (serviceSlug === 'seasonal-crop-transport') requiredCapability='agri:crop-transport';
     const rows = db.all<any>(`SELECT sp.id,sp.base_lat,sp.base_lng,sp.rating_avg,sp.completed_orders_count,
         GROUP_CONCAT(DISTINCT psa.area_id) provider_area_ids,
         GROUP_CONCAT(DISTINCT pc.capability_key) capability_keys,

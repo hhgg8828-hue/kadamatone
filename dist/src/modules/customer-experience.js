@@ -97,14 +97,16 @@ export function registerCustomerExperienceRoutes(app, r) {
             }
         }
         if (!top && result.extracted.purchaseIntent) {
-            const fallback = app.catalog.all().services.find(x => x.is_active && ['shopping-delivery', 'purchase-and-delivery', 'pharmacy-purchase'].includes(x.slug));
+            const desired = result.extracted.structured.taskType === 'PURCHASE_PHARMACY' ? 'pharmacy-purchase' : result.extracted.structured.taskType === 'SHOPPING' ? 'shopping-for-me' : 'purchase-and-delivery';
+            const fallback = app.catalog.all().services.find(x => x.is_active && x.slug === desired);
             if (fallback) {
                 const cat = app.catalog.all().byCategory.get(fallback.category_id);
                 top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.60, confidence: 0.60, icon: fallback.icon };
             }
         }
-        if (result.extracted.purchaseIntent && top && !['shopping-delivery', 'purchase-and-delivery', 'pharmacy-purchase', 'motorcycle-trips'].includes(top.serviceSlug)) {
-            const fallback = app.catalog.all().services.find(x => x.is_active && x.slug === (/صيدلية|دواء|علاج/.test(b.text) ? 'pharmacy-purchase' : 'purchase-and-delivery'));
+        if (result.extracted.purchaseIntent && top && !['shopping-delivery', 'shopping-for-me', 'purchase-and-delivery', 'pharmacy-purchase', 'motorcycle-trips'].includes(top.serviceSlug)) {
+            const desired = result.extracted.structured.taskType === 'PURCHASE_PHARMACY' ? 'pharmacy-purchase' : result.extracted.structured.taskType === 'SHOPPING' ? 'shopping-for-me' : 'purchase-and-delivery';
+            const fallback = app.catalog.all().services.find(x => x.is_active && x.slug === desired);
             if (fallback) {
                 const cat = app.catalog.all().byCategory.get(fallback.category_id);
                 top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: Math.max(top.score, 0.60), confidence: Math.max(top.confidence, 0.60), icon: fallback.icon };
@@ -114,8 +116,8 @@ export function registerCustomerExperienceRoutes(app, r) {
         const priorHasService = Boolean(prior.serviceId);
         const destinationCandidate = priorHasService && prior.purchaseIntent && !confirmation && b.text.trim().length >= 3 && !/^(نعم|ايوه|أيوه|تمام|موافق|ارسل|أرسل|نفذ)/i.test(b.text.trim()) ? b.text.trim() : null;
         const purchaseIntent = Boolean(result.extracted.purchaseIntent || prior.purchaseIntent);
-        const inferredTaskType = result.extracted.purchaseIntent ? (/صيدلية|دواء|علاج/.test(b.text) ? 'PURCHASE_PHARMACY' : 'PURCHASE_AND_DELIVERY') : null;
-        const draft = { ...prior, rawText: [...(prior.rawText || []), b.text].slice(-8), serviceId: top?.serviceId || prior.serviceId || null, serviceName: top?.serviceName || prior.serviceName || null, imageFileId: b.imageFileId || prior.imageFileId || null, purchaseIntent, priority: result.priority, destinationText: prior.destinationText || destinationCandidate || null, taskType: prior.taskType || inferredTaskType, requiredCapabilities: inferredTaskType === 'PURCHASE_PHARMACY' ? ['purchase:pharmacy', 'delivery:item'] : inferredTaskType ? ['purchase:store', 'delivery:item'] : [], confirmed: prior.confirmed || confirmation };
+        const inferredTaskType = result.extracted.structured.taskType !== 'UNKNOWN' ? result.extracted.structured.taskType : null;
+        const draft = { ...prior, rawText: [...(prior.rawText || []), b.text].slice(-8), serviceId: top?.serviceId || prior.serviceId || null, serviceName: top?.serviceName || prior.serviceName || null, imageFileId: b.imageFileId || prior.imageFileId || null, purchaseIntent, priority: result.priority, destinationText: prior.destinationText || destinationCandidate || null, taskType: prior.taskType || inferredTaskType, requiredCapabilities: result.extracted.structured.requiredCapabilities || [], item: result.extracted.structured.item || prior.item || null, quantity: result.extracted.structured.quantity || prior.quantity || null, deliveryText: result.extracted.structured.deliveryText || prior.deliveryText || null, pickupText: result.extracted.structured.pickupText || prior.pickupText || null, confirmed: prior.confirmed || confirmation };
         let question = null;
         if (!draft.serviceId)
             question = 'ما الذي تريد تنفيذه؟ يمكنك كتابة اسم الغرض أو إرسال صورة له.';
@@ -127,7 +129,7 @@ export function registerCustomerExperienceRoutes(app, r) {
             question = 'فهمت طلبك. هل تريد إرسال الطلب الآن؟';
         const reply = question === 'فهمت طلبك. هل تريد إرسال الطلب الآن؟' ? `فهمت أنك تريد ${draft.serviceName || 'تنفيذ هذه المهمة'}. هل تريد إرسال الطلب الآن؟` : question || 'فهمت طلبك. أعطني المعلومة الناقصة وسأكمل الطلب.';
         db.run('UPDATE assistant_sessions SET draft_json=?,updated_at=? WHERE id=?', JSON.stringify(draft), now, session.id);
-        db.run('INSERT INTO intent_audit(id,customer_id,assistant_session_id,original_text,image_attached,predicted_service_id,predicted_confidence,parser_source,selected_service_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)', uuid(), ctx.user.id, session.id, b.text, b.imageFileId ? 1 : 0, draft.serviceId || null, top?.confidence || null, result.source, draft.serviceId || null, now, now);
+        db.run('INSERT INTO intent_audit(id,customer_id,assistant_session_id,original_text,image_attached,predicted_service_id,predicted_confidence,parser_source,selected_service_id,analysis_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', uuid(), ctx.user.id, session.id, b.text, b.imageFileId ? 1 : 0, draft.serviceId || null, top?.confidence || null, result.source, draft.serviceId || null, JSON.stringify(result.extracted.structured), now, now);
         db.run('INSERT INTO assistant_messages(id,session_id,role,body,created_at) VALUES(?,?,?,?,?)', uuid(), session.id, 'ASSISTANT', reply, now);
         return { sessionId: session.id, reply, question, draft, result, ready: Boolean(draft.serviceId && question?.includes('إرسال الطلب')) };
     });
@@ -147,15 +149,17 @@ export function registerCustomerExperienceRoutes(app, r) {
         const result = await app.intentParser.parse(b.text, { catalog: app.catalog, locale: ctx.locale, image });
         let top = result.matches[0];
         if (result.extracted.purchaseIntent) {
-            const desired = /صيدلية|دواء|علاج/.test(b.text) ? 'pharmacy-purchase' : 'purchase-and-delivery';
+            const desired = result.extracted.structured.taskType === 'PURCHASE_PHARMACY' ? 'pharmacy-purchase' : result.extracted.structured.taskType === 'SHOPPING' ? 'shopping-for-me' : 'purchase-and-delivery';
             const fallback = app.catalog.all().services.find(x => x.is_active && x.slug === desired);
             if (fallback) {
                 const cat = app.catalog.all().byCategory.get(fallback.category_id);
                 top = { serviceId: fallback.id, serviceSlug: fallback.slug, serviceName: tr(fallback.name_i18n, ctx.locale), categoryId: fallback.category_id, categorySlug: cat?.slug || '', categoryName: tr(cat?.name_i18n, ctx.locale), score: 0.60, confidence: 0.60, icon: fallback.icon };
             }
         }
-        db.run('INSERT INTO customer_searches(customer_id,query,service_id,created_at) VALUES(?,?,?,?)', ctx.user.id, b.text, top?.serviceId || null, iso(app.clock.now()));
-        return { ...result, matches: top ? [top, ...result.matches.filter(x => x.serviceId !== top.serviceId)] : result.matches, recommended: top && top.confidence >= 0.40 ? top : null, customService: app.catalog.all().services.find(x => x.slug === 'custom-request')?.id || null };
+        const auditNow = iso(app.clock.now());
+        db.run('INSERT INTO customer_searches(customer_id,query,service_id,created_at) VALUES(?,?,?,?)', ctx.user.id, b.text, top?.serviceId || null, auditNow);
+        db.run('INSERT INTO intent_audit(id,customer_id,original_text,image_attached,predicted_service_id,predicted_confidence,parser_source,selected_service_id,analysis_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)', uuid(), ctx.user.id, b.text, b.imageFileId ? 1 : 0, top?.serviceId || null, top?.confidence || null, result.source, top?.serviceId || null, JSON.stringify(result.extracted.structured), auditNow, auditNow);
+        return { ...result, matches: top ? (b.imageFileId ? [top] : [top, ...result.matches.filter(x => x.serviceId !== top.serviceId)]) : result.matches, recommended: top && top.confidence >= 0.40 ? top : null, customService: app.catalog.all().services.find(x => x.slug === 'custom-request')?.id || null };
     });
     r.get('/orders/:id/purchase-change', auth, (ctx) => {
         const o = db.get('SELECT * FROM orders WHERE id=?', ctx.params.id);

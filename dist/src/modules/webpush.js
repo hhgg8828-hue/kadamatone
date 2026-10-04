@@ -1,9 +1,8 @@
 import crypto from 'node:crypto';
 const text = (v) => Buffer.from(v);
 const b64u = (v) => {
-    if (typeof v === 'string')
-        return Buffer.from(v, 'utf8').toString('base64url');
-    return Buffer.from(v).toString('base64url');
+    const bytes = typeof v === 'string' ? Buffer.from(v) : Buffer.from(v);
+    return bytes.toString('base64url');
 };
 const fromB64u = (v) => Buffer.from(v, 'base64url');
 function hkdfExtract(salt, ikm) {

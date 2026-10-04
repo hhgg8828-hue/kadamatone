@@ -4,8 +4,8 @@ import { randomToken } from '../core/security.js';
 
 const text = (v: string) => Buffer.from(v);
 const b64u = (v: Buffer | Uint8Array | string) => {
-  if (typeof v === 'string') return Buffer.from(v, 'utf8').toString('base64url');
-  return Buffer.from(v as any).toString('base64url');
+  const bytes = typeof v === 'string' ? Buffer.from(v) : Buffer.from(v);
+  return bytes.toString('base64url');
 };
 const fromB64u = (v: string) => Buffer.from(v, 'base64url');
 
@@ -63,7 +63,8 @@ function encryptPayload(subscription: { p256dh: string; auth: string }, payload:
   const padded = Buffer.concat([payload, Buffer.from([2])]);
   const cipher = crypto.createCipheriv('aes-128-gcm', cek, nonce);
   const encrypted = Buffer.concat([cipher.update(padded), cipher.final(), cipher.getAuthTag()]);
-  const recordSize = Buffer.alloc(4); recordSize.writeUInt32BE(4096, 0);
+  const recordSize = Buffer.alloc(4);
+  recordSize.writeUInt32BE(4096, 0);
   const body = Buffer.concat([salt, recordSize, Buffer.from([serverPublic.length]), serverPublic, encrypted]);
   return { body, serverPublic: b64u(serverPublic) };
 }

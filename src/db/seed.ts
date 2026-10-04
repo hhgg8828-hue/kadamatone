@@ -34,7 +34,7 @@ export async function seedBase(db: Db, config: Config) {
       });
     });
     // إعدادات تشغيلية للخدمات التي تتطلب إثبات تسليم: تُطبق بعد إنشاء seed للخدمات لأن migrations تسبق seedBase.
-    db.run("UPDATE services SET delivery_proof_type='PIN' WHERE slug IN ('parcel-delivery','shopping-delivery','document-delivery','motorcycle-trips','pharmacy-purchase','purchase-and-delivery')");
+    db.run("UPDATE services SET delivery_proof_type='PIN' WHERE slug IN ('parcel-delivery','shopping-delivery','shopping-for-me','document-delivery','motorcycle-trips','pharmacy-purchase','purchase-and-delivery')");
     // طلب خدمة غير موجودة يجب أن يُزرع بعد الأقسام لأن migrations تُطبق قبل seedBase.
     if (!db.get('SELECT 1 FROM services WHERE slug=?','custom-request')) {
       const cat=db.get<{id:string}>('SELECT id FROM categories WHERE slug=?','delivery');

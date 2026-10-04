@@ -258,7 +258,7 @@ export function registerCatalogRoutes(app, r) {
     r.get('/catalog/bootstrap', (ctx) => {
         const locale = ctx.query['lang'] === 'en' ? 'en' : ctx.locale;
         const data = catalog.all();
-        const now = iso(Date.now());
+        const now = iso(app.clock.now());
         const temporaryServices = app.db.all(`SELECT * FROM temporary_services WHERE is_active=1 AND start_at<=? AND end_at>? ORDER BY priority DESC, sort_order ASC, start_at ASC`, now, now).map((x) => ({
             id: x.id, linkedServiceId: x.linked_service_id, name: tr(parseJson(x.name_i18n), locale), title: tr(parseJson(x.title_i18n), locale), description: tr(parseJson(x.description_i18n || '{}'), locale), icon: x.icon, categoryId: x.category_id, startAt: x.start_at, endAt: x.end_at, sortOrder: x.sort_order, priority: Number(x.priority || 0), requestFlow: x.request_flow || 'SERVICE', actionValue: x.action_value || x.linked_service_id, actionLabel: tr(parseJson(x.action_label_i18n || '{}'), locale), areaIds: parseJson(x.area_ids_json || '[]'), maxOrders: x.max_orders, pricing: parseJson(x.pricing_json || '{}'), targetCapabilities: parseJson(x.target_capabilities_json || '[]') || []
         }));

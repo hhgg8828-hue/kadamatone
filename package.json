@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.16",
-  "description": "خدمات (Khadamat) — V66.7 execution, intent-to-capability matching, prioritized temporary services, compound tasks, smart timeline and map fallback",
+  "version": "0.6.17",
+  "description": "خدمات (Khadamat) — V66.8 shopping service, hybrid intent engine, capability matching, simplified trips, temporary campaign management and RTL hardening",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,7 +19,7 @@
     "test": "npm run build && node --test --test-concurrency=1 \"dist/test/**/*.test.js\""
   },
   "devDependencies": {
-    "typescript": "^5.8.0",
-    "@types/node": "^22.0.0"
+    "typescript": "5.8.3",
+    "@types/node": "22.0.0"
   }
 }
