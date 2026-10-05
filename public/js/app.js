@@ -186,11 +186,6 @@ async function startRealtime() {
 const perfApiStats = [];
 function recordApiTiming(path, ms, status) { if (perfApiStats.length >= 200)
     perfApiStats.shift(); perfApiStats.push({ path, ms, status, at: new Date().toISOString() }); }
-window.addEventListener('khadamat:complaint-message', (ev) => { const d = ev.detail || {}; const active = document.querySelector('.complaint-modal'); if (!active)
-    return; const id = active.querySelector('[data-complaint-id]')?.dataset.complaintId; if (page === 'admin' && id)
-    openAdminComplaint(id).catch(() => { });
-else if (page === 'customer' && d.orderId)
-    openOrderComplaint(String(d.orderId), true).catch(() => { }); });
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function applyFieldPlaceholders(scope = document) { const map = { fullName: 'مثال: محمد أحمد', phone: 'مثال: 777123456', email: 'مثال: name@example.com', password: 'أدخل كلمة المرور', identifier: 'رقم الهاتف أو البريد الإلكتروني', displayName: 'مثال: مؤسسة الصيانة الحديثة', specialty: 'مثال: كهرباء وتكييف', bio: 'اكتب نبذة مختصرة عن خبرتك وخدماتك', contactPhone: 'مثال: 777123456', description: 'اكتب ما تحتاجه بالتفصيل', notes: 'أي ملاحظات أو تفاصيل إضافية', recipientName: 'اسم المستفيد', recipientPhone: 'هاتف المستفيد', label: 'مثال: المنزل', address: 'مثال: شارع 30 بجوار...', ar: 'الاسم بالعربية', en: 'الاسم بالإنجليزية' }; scope.querySelectorAll('input,textarea').forEach(el => { if (el.placeholder)
     return; const key = el.name || el.id; if (map[key])
@@ -201,6 +196,28 @@ const newIdempotencyKey = () => { try {
 catch {
     return 'order-' + Date.now() + '-' + Math.random().toString(36).slice(2);
 } };
+const MESSAGE_OUTBOX = 'khadamat_message_outbox_v1';
+function readMessageOutbox() { try {
+    return JSON.parse(localStorage.getItem(MESSAGE_OUTBOX) || '[]');
+}
+catch {
+    return [];
+} }
+function writeMessageOutbox(items) { localStorage.setItem(MESSAGE_OUTBOX, JSON.stringify(items.slice(-100))); }
+function queueChatMessage(orderId, payload, key) { const q = readMessageOutbox(); if (!q.some((x) => x.orderId === orderId && x.key === key))
+    q.push({ orderId, payload, key, queuedAt: Date.now() }); writeMessageOutbox(q); }
+async function flushMessageOutbox() { if (!navigator.onLine || !state.token)
+    return; const q = readMessageOutbox(); if (!q.length)
+    return; const left = []; let sent = 0; for (const item of q) {
+    try {
+        await api('/orders/' + encodeURIComponent(item.orderId) + '/messages', { method: 'POST', headers: { 'Idempotency-Key': item.key }, body: JSON.stringify(item.payload) });
+        sent++;
+    }
+    catch {
+        left.push(item);
+    }
+} writeMessageOutbox(left); if (sent)
+    toast('تمت مزامنة الرسائل', `تم إرسال ${sent} رسالة محفوظة بعد عودة الاتصال.`); }
 const uniqueOrders = (items) => { const seen = new Set(); return items.filter(x => { const id = String(x?.id || ''); if (!id || seen.has(id))
     return false; seen.add(id); return true; }); };
 const uniqueBy = (items, key) => { const seen = new Set(); return items.filter(x => { const k = key(x); if (!k || seen.has(k))
@@ -223,7 +240,7 @@ async function flushOrderQueue() { if (!navigator.onLine || !state.token)
     }
 } localStorage.setItem(OFFLINE_QUEUE, JSON.stringify(left)); if (q.length !== left.length)
     toast('تمت المزامنة', 'تم إرسال الطلبات المحفوظة بعد عودة الإنترنت.'); }
-window.addEventListener('online', () => { flushOrderQueue().catch(() => { }); });
+window.addEventListener('online', () => { flushOrderQueue().catch(() => { }); flushMessageOutbox().catch(() => { }); });
 async function api(path, opts = {}, retry = true) { const started = performance.now(); const h = new Headers(opts.headers || {}); h.set('Content-Type', 'application/json'); if (state.token)
     h.set('Authorization', `Bearer ${state.token}`); let r; try {
     r = await fetch('/api/v1' + path, { ...opts, headers: h });
@@ -500,10 +517,24 @@ async function openAccount() {
         const j = await api('/auth/me');
         const u = j.user || state.user || {};
         const isProvider = u.role === 'PROVIDER';
-        showModal(`<h2>حسابي</h2><form id="accountForm"><div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" disabled></div><div class="field"><label>الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form>`);
+        showModal(`<h2>حسابي</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" disabled></div><div class="field"><label>الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form>`);
         document.getElementById('accountForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const msg = document.getElementById('accountMsg'); try {
             if (isProvider) {
+                const avatar = document.getElementById('providerAvatarFile')?.files?.[0];
+                let avatarFileId;
+                if (avatar) {
+                    if (avatar.size > 5 * 1024 * 1024)
+                        throw new Error('حجم الصورة يتجاوز 5MB');
+                    const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(avatar); });
+                    const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'avatar', name: avatar.name, dataBase64: data }) });
+                    avatarFileId = up.file.id;
+                }
                 await api('/provider/profile', { method: 'PATCH', body: JSON.stringify({ displayName: String(f.get('displayName') || ''), bio: String(f.get('bio') || '') }) });
+                if (avatarFileId) {
+                    const me = await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ avatarFileId }) });
+                    state.user = me.user;
+                    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ accessToken: state.token, user: state.user }));
+                }
             }
             else {
                 await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ fullName: String(f.get('fullName') || '') }) });
@@ -576,6 +607,18 @@ async function handleNotificationDeepLink() {
     }
     catch { }
 }
+async function fetchAllCustomerOrders() {
+    const all = [];
+    let cursor = '';
+    for (let i = 0; i < 20; i++) {
+        const q = await api('/orders?limit=100' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''));
+        all.push(...(q.orders || []));
+        if (!q.nextCursor)
+            break;
+        cursor = q.nextCursor;
+    }
+    return uniqueOrders(all);
+}
 async function customer() {
     if (!state.user) {
         authBox();
@@ -589,7 +632,7 @@ async function customer() {
     try {
         const [catalogPayload, o] = await Promise.all([api('/catalog/bootstrap'), api('/orders')]);
         state.cats = catalogPayload.categories || [];
-        state.orders = uniqueOrders((o.orders || []).filter((x) => x.status !== 'CANCELLED'));
+        state.orders = await fetchAllCustomerOrders();
         state.services = catalogPayload.services || [];
         state.temporaryServices = catalogPayload.temporaryServices || [];
         state.campaigns = catalogPayload.campaigns || [];
@@ -597,8 +640,7 @@ async function customer() {
         handleNotificationDeepLink().catch(() => { });
         stopPollers();
         customerPollTimer = window.setInterval(async () => { try {
-            const o = await api('/orders');
-            state.orders = uniqueOrders((o.orders || []).filter((x) => x.status !== 'CANCELLED'));
+            state.orders = await fetchAllCustomerOrders();
             const box = document.getElementById('orders');
             if (box)
                 box.innerHTML = state.orders.length ? state.orders.map(orderCard).join('') : '<div class="card empty">لا توجد طلبات حتى الآن<br><span class="muted">ابدأ باختيار خدمة من القائمة أعلاه</span></div>';
@@ -841,7 +883,7 @@ function renderCustomer() {
     <div class="section-heading"><div><h2>الخدمات</h2><p class="muted">اختر القسم ثم اختر الخدمة التي تحتاجها</p></div></div>
     ${(state.temporaryServices || []).length ? `<div class="temporary-priority card"><div class="section-heading"><div><h2>🔥 متاح الآن</h2><p class="muted">خدمات ومناسبات مرتبطة بوقت محدد</p></div></div><div class="grid">${state.temporaryServices.map((x) => `<button class="card service temporary-service-card" data-temp-id="${esc(x.id)}" type="button"><div class="icon">${esc(x.icon || '🎉')}</div><b>${esc(x.title || x.name)}</b><p>${esc(x.description || '')}</p><small class="muted">ينتهي ${esc(formatDateTime(x.endAt))}</small><span class="choose-link">${esc(x.actionLabel || 'اطلب الآن')} ←</span></button>`).join('')}</div></div>` : ''}<div class="grid category-grid" id="cats">${state.cats.map(c => `<button class="card service category-card" data-cat="${esc(c.slug)}" type="button"><div class="icon">${esc(c.icon || '🛠️')}</div><b>${esc(c.name)}</b><p class="muted">اطلب الخدمة وسنبحث لك عن مقدم خدمة مناسب</p><span class="choose-link">عرض الخدمات ←</span></button>`).join('')}</div>
     <div class="card ask-me-hero" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;align-items:center"><div><h2>🛎️ اطلب لي</h2><p class="muted">لا تعرف اسم الخدمة؟ قل لنا ماذا تحتاج وسنقترحها لك.</p></div><button class="btn" id="askMeBtn" type="button">اطلب لي</button></div></div><div class="section-heading quick-heading"><div><h2>خدمات سريعة</h2><p class="muted">خدمات متاحة الآن ويمكنك طلبها مباشرة</p></div></div><div class="row" style="margin-bottom:12px;flex-wrap:wrap"><button class="btn secondary" id="customRequestBtn" type="button">✨ طلب خدمة غير موجودة</button><button class="btn secondary" id="safetyCentersBtn" type="button">🛡️ مراكز الأمان</button></div>
-    <div class="grid quick-services">${pickQuickServices(state.services).map(s => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join('')}</div>${(state.temporaryServices || []).length ? `<div class="section-heading" style="margin-top:18px"><div><h2>⏳ خدمات ومناسبات مؤقتة</h2><p class="muted">عروض موسمية متاحة الآن</p></div></div><div class="grid">${state.temporaryServices.map((x) => `<button class="card service" data-temp-service="${esc(x.linkedServiceId)}" type="button"><div class="icon">${esc(x.icon || '🎉')}</div><b>${esc(x.title || x.name)}</b><p>${esc(x.description || '')}</p><span class="choose-link">${esc(x.actionLabel || 'اطلب الآن')} ←</span></button>`).join('')}</div>` : ''}
+    <div class="quick-services-strip"><div class="quick-services" id="quickServices">${pickQuickServices(state.services, 8).map(s => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join('')}</div>${state.services.length > 8 ? '<button class="btn secondary small" id="showMoreServices" type="button">عرض المزيد من الخدمات</button>' : ''}</div>${(state.temporaryServices || []).length ? `<div class="section-heading" style="margin-top:18px"><div><h2>⏳ خدمات ومناسبات مؤقتة</h2><p class="muted">عروض موسمية متاحة الآن</p></div></div><div class="grid">${state.temporaryServices.map((x) => `<button class="card service" data-temp-id="${esc(x.id)}" type="button"><div class="icon">${esc(x.icon || '🎉')}</div><b>${esc(x.title || x.name)}</b><p>${esc(x.description || '')}</p><span class="choose-link">${esc(x.actionLabel || 'اطلب الآن')} ←</span></button>`).join('')}</div>` : ''}
   </section>
 
   <section id="ordersSection" class="hide-section">
@@ -925,8 +967,23 @@ function renderCustomer() {
         suggestions.className = 'suggestions hide';
     } }, { once: false });
     document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => openCategory(x.dataset.cat)));
-    document.querySelectorAll('[data-campaign-action]').forEach(x => x.addEventListener('click', () => { const z = x; const t = z.dataset.campaignAction || 'NONE'; const v = z.dataset.campaignValue || ''; if (t === 'SERVICE' && v)
+    document.querySelectorAll('[data-campaign-action]').forEach(x => x.addEventListener('click', async () => { const z = x; const t = z.dataset.campaignAction || 'NONE'; const v = z.dataset.campaignValue || ''; if (t === 'SERVICE' && v)
         openOrderForm(v);
+    else if (t === 'ORDER' && v)
+        openOrderForm(v);
+    else if (t === 'TRIP' && v)
+        openOrderFormBySlug(v);
+    else if (t === 'INTERNAL' && v) {
+        if (v.startsWith('/') || v.startsWith('http'))
+            location.href = v;
+        else if (v === 'orders') {
+            document.getElementById('ordersTab')?.click();
+            document.getElementById('ordersSection')?.scrollIntoView({ behavior: 'smooth' });
+        }
+        else if (v === 'services') {
+            document.getElementById('servicesTab')?.click();
+        }
+    }
     else if (t === 'URL' && v)
         location.href = v; }));
     document.querySelectorAll('[data-temp-id]').forEach(x => x.addEventListener('click', () => { const z = state.temporaryServices.find((v) => v.id === x.dataset.tempId); if (!z)
@@ -939,6 +996,8 @@ function renderCustomer() {
     else
         openOrderForm(z.linkedServiceId); }));
     document.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService)));
+    document.getElementById('showMoreServices')?.addEventListener('click', () => { const box = document.getElementById('quickServices'); if (!box)
+        return; const more = state.services.slice(8); box.innerHTML += more.map((s) => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join(''); box.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService))); document.getElementById('showMoreServices').remove(); });
     document.getElementById('request').onclick = () => openCategory('');
     document.getElementById('servicesTab').onclick = () => switchCustomerSection('services');
     document.getElementById('ordersTab').onclick = () => switchCustomerSection('orders');
@@ -1517,49 +1576,85 @@ async function openOrderChat(orderId) {
     try {
         const load = async () => { const j = await api('/orders/' + encodeURIComponent(orderId) + '/messages?limit=100'); return j.messages || []; };
         const isProvider = state.user?.role === 'PROVIDER';
-        const quick = isProvider
-            ? ['أنا في الطريق', 'وصلت إلى الموقع', 'أحتاج موقعك بالضبط', 'سأتأخر قليلًا', 'أنا عندك الآن']
-            : ['أين وصلت؟', 'أنا بانتظارك', 'هل أنت قريب؟', 'هذا هو موقعي', 'سأتأخر قليلًا'];
+        const quick = isProvider ? ['أنا في الطريق', 'وصلت إلى الموقع', 'أحتاج موقعك بالضبط', 'سأتأخر قليلًا', 'أنا عندك الآن'] : ['أين وصلت؟', 'أنا بانتظارك', 'هل أنت قريب؟', 'هذا هو موقعي', 'سأتأخر قليلًا'];
+        const pending = () => readMessageOutbox().filter((x) => x.orderId === orderId).sort((a, b) => a.queuedAt - b.queuedAt);
         const render = async () => {
-            const msgs = await load();
+            const [msgs] = await Promise.all([load(), flushMessageOutbox().catch(() => { })]);
+            const queued = pending();
             const box = document.getElementById('chatMessages');
             if (box) {
-                box.innerHTML = msgs.length ? msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p>${m.attachments?.length ? `<div class="card" style="margin-top:8px"><b>📎 المرفقات</b><div class="row" style="margin-top:6px">${m.attachments.map((a) => `<button type="button" class="btn secondary small" data-chat-file="${esc(a.url)}">فتح المرفق</button>`).join('')}</div></div>` : ''}${m.location ? `<div class="card" style="margin-top:8px"><b>📍 موقع مرسل</b><p class="muted">${esc(m.location.addressText || 'إحداثيات الموقع')}</p><a class="btn secondary small" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(m.location.lat)}&mlon=${encodeURIComponent(m.location.lng)}#map=18/${encodeURIComponent(m.location.lat)}/${encodeURIComponent(m.location.lng)}">فتح الموقع</a></div>` : ''}</div>`).join('') : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
+                const serverHtml = msgs.map((m) => `<div class="chat-bubble ${m.senderId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(m.senderName || m.senderRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p>${m.attachments?.length ? `<div class="card" style="margin-top:8px"><b>📎 المرفقات</b><div class="row" style="margin-top:6px">${m.attachments.map((a) => `<button type="button" class="btn secondary small" data-chat-file="${esc(a.url)}">فتح المرفق</button>`).join('')}</div></div>` : ''}${m.location ? `<div class="card" style="margin-top:8px"><b>📍 موقع مرسل</b><p class="muted">${esc(m.location.addressText || 'إحداثيات الموقع')}</p><a class="btn secondary small" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(m.location.lat)}&mlon=${encodeURIComponent(m.location.lng)}#map=18/${encodeURIComponent(m.location.lat)}/${encodeURIComponent(m.location.lng)}">فتح الموقع</a></div>` : ''}</div>`).join('');
+                const pendingHtml = queued.map((x) => `<div class="chat-bubble mine chat-pending"><div class="chat-meta"><b>أنت</b><small>جارٍ الإرسال...</small></div><p>${esc(x.payload.body || '📍 الموقع المرسل')}</p></div>`).join('');
+                box.innerHTML = (serverHtml || pendingHtml) ? serverHtml + pendingHtml : '<div class="chat-empty">💬 لا توجد رسائل بعد. ابدأ المحادثة من هنا.</div>';
                 box.scrollTop = box.scrollHeight;
                 box.querySelectorAll('[data-chat-file]').forEach((x) => x.addEventListener('click', () => openPrivateFile(String(x.dataset.chatFile || ''))));
             }
         };
-        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">تواصل داخل الطلب فقط. لا نعرض أرقام الهاتف تلقائيًا.</p></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
+        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">محادثة واحدة مرتبطة بهذا الطلب. الرسائل تتحدث مباشرة وتُحفظ عند ضعف الاتصال.</p></div><span class="chat-live-badge">● مباشر</span></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
         await render();
         document.querySelectorAll('[data-chat-quick]').forEach(x => x.addEventListener('click', () => { const body = document.getElementById('chatBody'); if (body) {
             body.value = x.dataset.chatQuick || '';
             body.focus();
         } }));
-        document.getElementById('chatForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('sendChat'); const body = document.getElementById('chatBody').value.trim(); const selectedFile = document.getElementById('chatFile')?.files?.[0]; if (!body && !selectedFile)
-            return; btn.disabled = true; try {
-            let attachmentFileIds = [];
-            const f = document.getElementById('chatFile')?.files?.[0];
-            if (f) {
-                if (f.size > 5 * 1024 * 1024)
-                    throw new Error('حجم الملف يتجاوز 5MB');
-                const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الملف')); fr.readAsDataURL(f); });
-                const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: f.name, dataBase64: data }) });
-                attachmentFileIds = [up.file.id];
-            }
-            if (!body && !attachmentFileIds.length)
+        document.getElementById('chatForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('sendChat');
+            const bodyEl = document.getElementById('chatBody');
+            const body = bodyEl.value.trim();
+            const selectedFile = document.getElementById('chatFile')?.files?.[0];
+            if (!body && !selectedFile)
                 return;
-            await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify({ body, attachmentFileIds }) });
-            document.getElementById('chatBody').value = '';
-            document.getElementById('chatFile').value = '';
-            document.getElementById('chatFileStatus').textContent = '';
-            await render();
-        }
-        catch (x) {
-            alert(x.message);
-        }
-        finally {
-            btn.disabled = false;
-        } });
+            btn.disabled = true;
+            try {
+                let attachmentFileIds = [];
+                const f = selectedFile;
+                if (f) {
+                    if (!navigator.onLine)
+                        throw new Error('المرفقات تحتاج اتصالًا بالإنترنت. أرسل الرسالة النصية الآن وسيتم مزامنتها تلقائيًا.');
+                    if (f.size > 5 * 1024 * 1024)
+                        throw new Error('حجم الملف يتجاوز 5MB');
+                    const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الملف')); fr.readAsDataURL(f); });
+                    const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: f.name, dataBase64: data }) });
+                    attachmentFileIds = [up.file.id];
+                }
+                if (!body && !attachmentFileIds.length)
+                    return;
+                const key = newIdempotencyKey();
+                const payload = { body, attachmentFileIds };
+                if (!navigator.onLine) {
+                    queueChatMessage(orderId, payload, key);
+                    bodyEl.value = '';
+                    document.getElementById('chatFile').value = '';
+                    await render();
+                    toast('تم حفظ الرسالة', 'سيتم إرسالها تلقائيًا عند عودة الإنترنت.');
+                    return;
+                }
+                try {
+                    await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(payload) });
+                    bodyEl.value = '';
+                    document.getElementById('chatFile').value = '';
+                    document.getElementById('chatFileStatus').textContent = '';
+                    await render();
+                }
+                catch (err) {
+                    if (!navigator.onLine) {
+                        queueChatMessage(orderId, payload, key);
+                        bodyEl.value = '';
+                        document.getElementById('chatFile').value = '';
+                        await render();
+                        toast('تم حفظ الرسالة', 'سيتم إعادة الإرسال عند عودة الإنترنت.');
+                    }
+                    else
+                        throw err;
+                }
+            }
+            catch (x) {
+                alert(x.message);
+            }
+            finally {
+                btn.disabled = false;
+            }
+        });
         document.getElementById('sendChatLocation')?.addEventListener('click', async () => {
             const btn = document.getElementById('sendChatLocation');
             if (!navigator.geolocation) {
@@ -1569,10 +1664,30 @@ async function openOrderChat(orderId) {
             btn.disabled = true;
             try {
                 const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }));
-                const body = document.getElementById('chatBody').value.trim();
-                await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify({ body, location: { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy } }) });
-                document.getElementById('chatBody').value = '';
-                await render();
+                const lat = Number(pos.coords.latitude), lng = Number(pos.coords.longitude), accuracy = Number(pos.coords.accuracy);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180)
+                    throw new Error('تعذر الحصول على إحداثيات موقع صالحة');
+                const payload = { body: '📍 الموقع المرسل', location: { lat, lng, accuracy: Number.isFinite(accuracy) ? Math.max(0, accuracy) : undefined } };
+                const key = newIdempotencyKey();
+                if (!navigator.onLine) {
+                    queueChatMessage(orderId, payload, key);
+                    await render();
+                    toast('تم حفظ الموقع', 'سيتم إرسال موقعك عند عودة الإنترنت.');
+                    return;
+                }
+                try {
+                    await api('/orders/' + encodeURIComponent(orderId) + '/messages', { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(payload) });
+                    await render();
+                }
+                catch (err) {
+                    if (!navigator.onLine) {
+                        queueChatMessage(orderId, payload, key);
+                        await render();
+                        toast('تم حفظ الموقع', 'سيتم إرساله عند عودة الإنترنت.');
+                    }
+                    else
+                        throw err;
+                }
             }
             catch (e) {
                 alert(e.message);
@@ -1583,15 +1698,21 @@ async function openOrderChat(orderId) {
         });
         const onLive = async (ev) => { const d = ev.detail; if (d?.orderId === orderId)
             await render(); };
+        const onDirect = async (ev) => { const d = ev.detail; if (d?.orderId === orderId)
+            await render(); };
         window.addEventListener('khadamat:chat', onLive);
+        window.addEventListener('khadamat:chat-message', onDirect);
+        window.addEventListener('online', onDirect);
         const timer = window.setInterval(async () => { if (!document.getElementById('chatMessages')) {
             clearInterval(timer);
             window.removeEventListener('khadamat:chat', onLive);
+            window.removeEventListener('khadamat:chat-message', onDirect);
+            window.removeEventListener('online', onDirect);
             return;
         } try {
             await render();
         }
-        catch { } }, 7000);
+        catch { } }, 5000);
     }
     catch (e) {
         alert(e.message);
@@ -1695,7 +1816,7 @@ async function openOrder(id) {
         document.getElementById('viewProviderProfile')?.addEventListener('click', async () => { try {
             const pp = await api('/providers/' + encodeURIComponent(o.provider.id));
             const p = pp.provider;
-            showModal(`<div class="card"><h2>${esc(p.displayName)}</h2><p>${esc(p.bio || 'مقدم خدمة موثق في منصة خدمات')}</p><p>⭐ ${esc(p.rating.avg)} (${esc(p.rating.count)} تقييم)</p><p>طلبات مكتملة: ${esc(p.completedOrders)}</p>${p.services?.length ? `<h3>الخدمات</h3><p>${p.services.map((x) => esc(x.name)).join(' · ')}</p>` : ''}</div>`);
+            showModal(`<div class="card provider-public-profile">${p.avatarUrl ? `<img class="provider-profile-avatar" src="${esc(p.avatarUrl)}" alt="صورة ${esc(p.displayName)}">` : ''}<h2>${esc(p.displayName)}</h2><p>${esc(p.bio || 'مقدم خدمة موثق في منصة خدمات')}</p><p>⭐ ${esc(p.rating.avg)} (${esc(p.rating.count)} تقييم)</p><p>طلبات مكتملة: ${esc(p.completedOrders)}</p>${p.services?.length ? `<h3>الخدمات</h3><p>${p.services.map((x) => esc(x.name)).join(' · ')}</p>` : ''}</div>`);
         }
         catch (e) {
             alert(e.message);
@@ -1835,14 +1956,38 @@ async function openOrderComplaint(orderId, followExisting = false) {
         const c = j.complaint;
         const msgs = j.messages || [];
         if (c) {
-            showModal(`<div class="complaint-modal" data-complaint-id="${esc(c.id)}"><h2>الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> ${esc(c.status)} · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>${esc(c.description)}</b></div><h3>المراسلات</h3>${msgs.map((m) => `<div class="card"><b>${esc(m.authorRole)}</b><p>${esc(m.body)}</p><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div>`).join('') || '<p class="muted">لا توجد ردود بعد.</p>'}${!['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status) ? `<form id="complaintReplyForm"><div class="field"><label>ردك</label><textarea name="body" minlength="1" maxlength="1000" required></textarea></div><button class="btn">إرسال الرد</button></form>` : ''}`);
-            document.getElementById('complaintReplyForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); try {
-                await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', body: JSON.stringify({ body: String(f.get('body')) }) });
-                await openOrderComplaint(orderId, true);
+            const roleMap = { CUSTOMER: 'العميل', PROVIDER: 'مقدم الخدمة', ADMIN: 'الإدارة' };
+            const renderThread = (items) => { const box = document.getElementById('customerComplaintThread'); if (!box)
+                return; box.innerHTML = items.map((m) => `<div class="chat-bubble ${m.authorId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(roleMap[m.authorRole] || m.authorRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') || '<p class="muted">لا توجد ردود بعد.</p>'; box.scrollTop = box.scrollHeight; };
+            showModal(`<div class="complaint-modal" data-complaint-id="${esc(c.id)}"><div class="chat-header"><div><h2>💬 محادثة الدعم ${esc(c.code)}</h2><p class="muted">هذه المحادثة مرتبطة بالشكوى والطلب نفسه وتُحدّث مباشرة.</p></div><span class="chat-live-badge">● مباشر</span></div><div class="card"><b>وصف الشكوى</b><p>${esc(c.description)}</p></div><div id="customerComplaintThread" class="chat-messages complaint-thread"></div>${!['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status) ? `<form id="complaintReplyForm" class="chat-form"><textarea name="body" minlength="1" maxlength="1000" required placeholder="اكتب ردك..."> </textarea><button class="btn">إرسال</button></form>` : `<div class="notice success">تم إنهاء هذه الشكوى.</div>`}</div>`);
+            renderThread(msgs);
+            document.getElementById('complaintReplyForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const btn = form.querySelector('button'); const body = String(new FormData(form).get('body') || '').trim(); if (!body)
+                return; btn.disabled = true; try {
+                await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify({ body }) });
+                const latest = await api('/complaints/' + encodeURIComponent(c.id));
+                renderThread(latest.messages || []);
+                form.querySelector('textarea').value = '';
             }
             catch (e) {
                 alert(e.message);
+            }
+            finally {
+                btn.disabled = false;
             } });
+            const onComplaint = async (ev) => { const d = ev.detail; if (d?.complaintId === c.id) {
+                const latest = await api('/complaints/' + encodeURIComponent(c.id));
+                renderThread(latest.messages || []);
+            } };
+            window.addEventListener('khadamat:complaint-message', onComplaint);
+            const timer = window.setInterval(async () => { if (!document.querySelector('.complaint-modal')) {
+                clearInterval(timer);
+                window.removeEventListener('khadamat:complaint-message', onComplaint);
+                return;
+            } try {
+                const latest = await api('/complaints/' + encodeURIComponent(c.id));
+                renderThread(latest.messages || []);
+            }
+            catch { } }, 5000);
             return;
         }
         if (followExisting)
@@ -1906,10 +2051,10 @@ async function provider() {
         return;
     }
     try {
-        const [p, o, e, catalogPayload, capabilities, vehicleData, offers, providerNotifications] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/earnings'), api('/catalog/bootstrap'), api('/provider/capabilities').catch(() => ({ capabilities: [] })), api('/provider/vehicles').catch(() => ({ vehicles: [] })), api('/provider/offers'), api('/notifications?limit=8').catch(() => ({ notifications: [] }))]);
+        const [p, o, e, catalogPayload, capabilities, vehicleData, offers, providerNotifications] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/earnings'), api('/catalog/bootstrap'), api('/provider/capabilities').catch(() => ({ capabilities: [] })), api('/provider/vehicles').catch(() => ({ vehicles: [] })), api('/provider/offers'), api('/notifications?limit=5').catch(() => ({ notifications: [] }))]);
         const allServices = (catalogPayload.services || []).map((svc) => ({ ...svc, categoryName: catalogPayload.categories?.find((c) => c.id === svc.categoryId)?.name || '', categoryIcon: catalogPayload.categories?.find((c) => c.id === svc.categoryId)?.icon || '' }));
         const selected = new Set((p.provider.services || []).map((s) => s.serviceId));
-        shell(`<div class="hero"><h1>لوحة مقدم الخدمة</h1><p>${esc(p.provider.displayName)} — ${esc(verifyAr(p.provider.verificationStatus))}</p><div class="row"><span class="status" id="providerConnectionStatus">${p.provider.isOnline ? '🟢 متصل' : '⚪ غير متصل'}</span><span class="status" id="providerAcceptingStatus">${p.provider.acceptingOrders ? 'يستقبل الطلبات' : 'لا يستقبل الطلبات'}</span><button class="btn" id="online" type="button">${p.provider.isOnline ? 'قطع الاتصال' : 'بدء الاتصال'}</button><button class="btn secondary" id="acceptingOrders" type="button" ${p.provider.isOnline ? '' : 'disabled'}>${p.provider.acceptingOrders ? 'إيقاف استقبال الطلبات' : 'بدء استقبال الطلبات'}</button>${p.provider.verificationStatus !== 'VERIFIED' ? '<button class="btn secondary" id="goVerification" type="button">🔐 توثيق الحساب</button>' : ''}</div>${p.provider.verificationStatus !== 'VERIFIED' ? '<div class="notice" style="margin-top:12px">لا يمكنك استقبال الطلبات قبل اعتماد الهوية والترخيص من الإدارة. ارفع الوثيقتين من قسم «توثيق الحساب» ثم انتظر المراجعة.</div>' : ''}</div>
+        shell(`<div class="hero provider-hero"><div class="provider-hero-head">${p.provider.avatarUrl ? `<img class="provider-avatar" src="${esc(p.provider.avatarUrl)}" alt="صورة مقدم الخدمة">` : '<div class="provider-avatar provider-avatar-empty">👤</div>'}<div><h1>لوحة مقدم الخدمة</h1><p>${esc(p.provider.displayName)} — ${esc(verifyAr(p.provider.verificationStatus))}</p></div></div><div class="row"><span class="status" id="providerConnectionStatus">${p.provider.isOnline ? '🟢 متصل' : '⚪ غير متصل'}</span><span class="status" id="providerAcceptingStatus">${p.provider.acceptingOrders ? 'يستقبل الطلبات' : 'لا يستقبل الطلبات'}</span><button class="btn" id="online" type="button">${p.provider.isOnline ? 'قطع الاتصال' : 'بدء الاتصال'}</button><button class="btn secondary" id="acceptingOrders" type="button" ${p.provider.isOnline ? '' : 'disabled'}>${p.provider.acceptingOrders ? 'إيقاف استقبال الطلبات' : 'بدء استقبال الطلبات'}</button>${p.provider.verificationStatus !== 'VERIFIED' ? '<button class="btn secondary" id="goVerification" type="button">🔐 توثيق الحساب</button>' : ''}</div>${p.provider.verificationStatus !== 'VERIFIED' ? '<div class="notice" style="margin-top:12px">لا يمكنك استقبال الطلبات قبل اعتماد الهوية والترخيص من الإدارة. ارفع الوثيقتين من قسم «توثيق الحساب» ثم انتظر المراجعة.</div>' : ''}</div>
       <div id="providerPriority" class="priority-stack"></div>
       <div class="card provider-notification-workspace"><div class="row" style="justify-content:space-between"><div><h2>🔔 متابعات وإشعارات الطلبات</h2><p class="muted">كل طلب جديد أو رسالة جديدة تظهر هنا. اضغط على الرسالة لفتح الطلب والمحادثة مباشرة.</p></div><button class="btn secondary small" id="providerOpenAllNotifications" type="button">كل الإشعارات</button></div><div id="providerNotificationPanel"></div></div>
       <div class="grid"><div class="card"><div class="stat">${esc(e.completedOrders)}</div><div>طلبات مكتملة</div></div><div class="card"><div class="stat">${esc(e.net)} ${esc(e.currency)}</div><div>صافي تقديري</div></div><div class="card"><div class="stat">${esc(e.pendingOrders)}</div><div>طلبات قيد التنفيذ</div></div></div>
@@ -1931,11 +2076,16 @@ async function provider() {
         const capSet = new Set((capabilities.capabilities || []).map((x) => x.capabilityKey));
         const capBox = document.getElementById('capabilityEditor');
         if (capBox)
-            capBox.innerHTML = capabilityOptions.map((x) => `<label class="card"><input type="checkbox" data-capability="${esc(x[0])}" ${capSet.has(x[0]) ? 'checked' : ''}> ${esc(x[1])}</label>`).join('');
+            capBox.innerHTML = `<details class="capability-dropdown"><summary><span>اختر القدرات التي تستطيع تنفيذها</span><b id="capabilityCount">${capSet.size} محددة</b></summary><div class="capability-options">${capabilityOptions.map((x) => `<label><input type="checkbox" data-capability="${esc(x[0])}" ${capSet.has(x[0]) ? 'checked' : ''}> <span>${esc(x[1])}</span></label>`).join('')}</div></details><div class="selected-capabilities" id="selectedCapabilities">${capabilityOptions.filter((x) => capSet.has(x[0])).map((x) => `<span class="status">${esc(x[1])}</span>`).join('') || '<span class="muted">لم تختر أي قدرة بعد.</span>'}</div>`;
+        capBox?.querySelectorAll('[data-capability]').forEach(x => x.addEventListener('change', () => { const keys = Array.from(capBox.querySelectorAll('[data-capability]:checked')).map(z => z.dataset.capability).filter(Boolean); const count = capBox.querySelector('#capabilityCount'); if (count)
+            count.textContent = `${keys.length} محددة`; const selected = capBox.querySelector('#selectedCapabilities'); if (selected)
+            selected.innerHTML = keys.map(k => { const o = capabilityOptions.find((z) => z[0] === k); return o ? `<span class="status">${esc(o[1])}</span>` : ''; }).join('') || '<span class="muted">لم تختر أي قدرة بعد.</span>'; }));
         document.getElementById('saveCapabilities')?.addEventListener('click', async () => { const btn = document.getElementById('saveCapabilities'); const msg = document.getElementById('capabilityMsg'); btn.disabled = true; try {
             const keys = Array.from(document.querySelectorAll('[data-capability]:checked')).map(x => x.dataset.capability).filter(Boolean);
-            await api('/provider/capabilities', { method: 'PUT', body: JSON.stringify({ capabilities: keys }) });
-            msg.textContent = 'تم حفظ القدرات.';
+            const saved = await api('/provider/capabilities', { method: 'PUT', body: JSON.stringify({ capabilities: keys }) });
+            const savedKeys = new Set((saved.capabilities || []).map((x) => x.capabilityKey));
+            capBox.querySelectorAll('[data-capability]').forEach(x => x.checked = savedKeys.has(x.dataset.capability || ''));
+            msg.textContent = 'تم حفظ القدرات المحددة فقط.';
             msg.className = 'success';
         }
         catch (e) {
@@ -2435,7 +2585,7 @@ async function admin() {
             document.getElementById('newArea')?.addEventListener('click', () => openAreaEditor(null, areas.areas || [], draw));
             document.querySelectorAll('[data-edit-area]').forEach(x => x.addEventListener('click', () => openAreaEditor((areas.areas || []).find((z) => z.id === x.dataset.editArea), areas.areas || [], draw)));
             document.querySelectorAll('[data-verify-vehicle]').forEach(x => x.addEventListener('click', async () => { try {
-                await api('/admin/vehicles/' + x.dataset.verifyVehicle, { method: 'PATCH', body: JSON.stringify({ status: 'VERIFIED' }) });
+                await api('/admin/vehicles/' + encodeURIComponent(x.dataset.verifyVehicle || '') + '/verification', { method: 'PATCH', body: JSON.stringify({ status: 'VERIFIED' }) });
                 await draw();
             }
             catch (e) {
@@ -2443,7 +2593,7 @@ async function admin() {
             } }));
             document.querySelectorAll('[data-reject-vehicle]').forEach(x => x.addEventListener('click', async () => { const reason = prompt('سبب الرفض:', 'مستندات المركبة غير مكتملة'); if (reason === null)
                 return; try {
-                await api('/admin/vehicles/' + x.dataset.rejectVehicle, { method: 'PATCH', body: JSON.stringify({ status: 'REJECTED', reason }) });
+                await api('/admin/vehicles/' + encodeURIComponent(x.dataset.rejectVehicle || '') + '/verification', { method: 'PATCH', body: JSON.stringify({ status: 'REJECTED', reason }) });
                 await draw();
             }
             catch (e) {
@@ -2669,40 +2819,47 @@ async function openAdminComplaint(id) {
         const closed = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status);
         const statusMap = { OPEN: 'جديدة', PROVIDER_REPLIED: 'بانتظار مراجعة الإدارة', UNDER_REVIEW: 'قيد المتابعة', RESOLVED: 'تم الحل', REJECTED: 'مرفوضة', CLOSED: 'مغلقة' };
         const roleMap = { CUSTOMER: 'العميل', PROVIDER: 'مقدم الخدمة', ADMIN: 'الإدارة' };
-        showModal(`<div class="complaint-modal" data-complaint-id="${esc(c.id)}"><h2>⚠️ الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> <span class="status">${esc(statusMap[c.status] || c.status)}</span> · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>وصف الشكوى</b><p>${esc(c.description)}</p></div><h3>المحادثة</h3><div class="complaint-thread">${msgs.map((m) => `<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(roleMap[m.authorRole] || m.authorRole)}</b><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') || '<p class="muted">لا توجد رسائل بعد.</p>'}</div>${!closed ? `<form id="adminComplaintReplyForm" class="card" style="margin-top:12px"><h3>الرد على العميل</h3><div class="field"><label>رسالة الرد</label><textarea name="body" minlength="1" maxlength="1000" required placeholder="اكتب رد الإدارة للعميل بوضوح..."></textarea></div><button class="btn" type="submit">إرسال الرد</button></form><div class="card" style="margin-top:12px"><h3>إنهاء الشكوى</h3><p class="muted">بعد مراجعة المحادثة، اختر القرار النهائي. لن تُغلق الشكوى بمجرد الرد فقط.</p><div class="field"><label>القرار</label><select id="adminComplaintAction"><option value="RESTORE_COMPLETED">حل المشكلة وإبقاء الطلب مكتملًا</option><option value="CANCEL_ORDER">إلغاء الطلب</option><option value="WARN_PROVIDER">تنبيه مقدم الخدمة</option><option value="SUSPEND_PROVIDER">إيقاف مقدم الخدمة مؤقتًا</option><option value="DISMISS">رفض الشكوى لعدم ثبوتها</option></select></div><div class="field"><label>ملاحظة القرار</label><textarea id="adminComplaintNote" maxlength="500" placeholder="سبب القرار أو ما تم التحقق منه..."></textarea></div><button class="btn danger" id="closeComplaintBtn" type="button">إغلاق الشكوى وحفظ القرار</button></div>` : `<div class="notice success">تم إنهاء هذه الشكوى. يمكنك مراجعة كامل المراسلات والقرار أعلاه.</div>`}</div>`);
-        document.getElementById('adminComplaintReplyForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const btn = form.querySelector('button');
-            const body = String(new FormData(form).get('body') || '').trim();
-            if (!body)
-                return;
-            btn.disabled = true;
-            try {
-                await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', body: JSON.stringify({ body }) });
-                await openAdminComplaint(id);
-            }
-            catch (e) {
-                btn.disabled = false;
-                alert(e.message);
-            }
-        });
-        document.getElementById('closeComplaintBtn')?.addEventListener('click', async () => {
-            const action = String(document.getElementById('adminComplaintAction').value);
-            const note = document.getElementById('adminComplaintNote').value.trim();
-            const btn = document.getElementById('closeComplaintBtn');
-            btn.disabled = true;
-            try {
-                await api('/admin/complaints/' + encodeURIComponent(id) + '/action', { method: 'POST', body: JSON.stringify({ action, note }) });
-                alert('تم حفظ القرار وإغلاق الشكوى');
-                closeModal();
-                await admin();
-            }
-            catch (e) {
-                btn.disabled = false;
-                alert(e.message);
-            }
-        });
+        showModal(`<div class="complaint-modal" data-complaint-id="${esc(c.id)}"><div class="chat-header"><div><h2>⚠️ محادثة الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> <span class="status">${esc(statusMap[c.status] || c.status)}</span> · <b>التصنيف:</b> ${esc(c.category)}</p></div><span class="chat-live-badge">● مباشر</span></div><div class="card"><b>وصف الشكوى</b><p>${esc(c.description)}</p></div><h3>المحادثة</h3><div id="adminComplaintThread" class="chat-messages complaint-thread"></div>${!closed ? `<form id="adminComplaintReplyForm" class="chat-form card" style="margin-top:12px"><textarea name="body" minlength="1" maxlength="1000" required placeholder="اكتب رد الإدارة للعميل بوضوح..."></textarea><button class="btn" type="submit">إرسال الرد</button></form><div class="card" style="margin-top:12px"><h3>إنهاء الشكوى</h3><p class="muted">يمكنك الرد دون إغلاق المحادثة. القرار النهائي منفصل.</p><div class="field"><label>القرار</label><select id="adminComplaintAction"><option value="RESTORE_COMPLETED">حل المشكلة وإبقاء الطلب مكتملًا</option><option value="CANCEL_ORDER">إلغاء الطلب</option><option value="WARN_PROVIDER">تنبيه مقدم الخدمة</option><option value="SUSPEND_PROVIDER">إيقاف مقدم الخدمة مؤقتًا</option><option value="DISMISS">رفض الشكوى لعدم ثبوتها</option></select></div><div class="field"><label>ملاحظة القرار</label><textarea id="adminComplaintNote" maxlength="500" placeholder="سبب القرار أو ما تم التحقق منه..."></textarea></div><button class="btn danger" id="closeComplaintBtn" type="button">إغلاق الشكوى وحفظ القرار</button></div>` : `<div class="notice success">تم إنهاء هذه الشكوى. يمكنك مراجعة كامل المراسلات والقرار أعلاه.</div>`}</div>`);
+        const renderThread = (items) => { const box = document.getElementById('adminComplaintThread'); if (!box)
+            return; box.innerHTML = items.map((m) => `<div class="chat-bubble ${m.authorRole === 'ADMIN' && m.authorId === state.user?.id ? 'mine' : 'theirs'}"><div class="chat-meta"><b>${esc(roleMap[m.authorRole] || m.authorRole)}</b><small>${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') || '<p class="muted">لا توجد رسائل بعد.</p>'; box.scrollTop = box.scrollHeight; };
+        renderThread(msgs);
+        document.getElementById('adminComplaintReplyForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const btn = form.querySelector('button'); const body = String(new FormData(form).get('body') || '').trim(); if (!body)
+            return; btn.disabled = true; try {
+            await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify({ body }) });
+            const latest = await api('/complaints/' + encodeURIComponent(c.id));
+            renderThread(latest.messages || []);
+            form.querySelector('textarea').value = '';
+        }
+        catch (e) {
+            alert(e.message);
+        }
+        finally {
+            btn.disabled = false;
+        } });
+        document.getElementById('closeComplaintBtn')?.addEventListener('click', async () => { const action = String(document.getElementById('adminComplaintAction').value); const note = document.getElementById('adminComplaintNote').value.trim(); const btn = document.getElementById('closeComplaintBtn'); btn.disabled = true; try {
+            await api('/admin/complaints/' + encodeURIComponent(id) + '/action', { method: 'POST', body: JSON.stringify({ action, note }) });
+            alert('تم حفظ القرار وإغلاق الشكوى');
+            closeModal();
+            await admin();
+        }
+        catch (e) {
+            btn.disabled = false;
+            alert(e.message);
+        } });
+        const onComplaint = async (ev) => { const d = ev.detail; if (d?.complaintId === c.id) {
+            const latest = await api('/complaints/' + encodeURIComponent(c.id));
+            renderThread(latest.messages || []);
+        } };
+        window.addEventListener('khadamat:complaint-message', onComplaint);
+        const timer = window.setInterval(async () => { if (!document.querySelector('.complaint-modal')) {
+            clearInterval(timer);
+            window.removeEventListener('khadamat:complaint-message', onComplaint);
+            return;
+        } try {
+            const latest = await api('/complaints/' + encodeURIComponent(c.id));
+            renderThread(latest.messages || []);
+        }
+        catch { } }, 5000);
     }
     catch (e) {
         alert(e.message);
@@ -2714,6 +2871,7 @@ if (restored) {
     startRealtime().catch(() => { });
     startNotificationPolling();
     flushOrderQueue().catch(() => { });
+    flushMessageOutbox().catch(() => { });
     if ('Notification' in window && Notification.permission === 'granted')
         registerWebPushSubscription().catch(() => { });
 }

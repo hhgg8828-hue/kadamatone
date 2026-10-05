@@ -76,14 +76,26 @@ export function registerComplaintRoutes(app: App, r: Router): void {
       const c = db.get<ComplaintRow>('SELECT * FROM complaints WHERE id = ?', ctx.params['id']);
       if (!c || !canView(c, ctx)) throw E.notFound('الشكوى غير موجودة');
       if (['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status)) throw E.unprocessable('هذه الشكوى مغلقة', 'COMPLAINT_CLOSED');
-      const now = iso(app.clock.now());
-      db.run('INSERT INTO complaint_messages(id,complaint_id,author_id,author_role,body,created_at) VALUES (?,?,?,?,?,?)', uuid(), c.id, ctx.user!.id, ctx.user!.role, b.body, now);
+      const idem = String(ctx.req.headers['idempotency-key'] || '').trim();
+      if (idem) {
+        const old = db.get<any>('SELECT * FROM complaint_messages WHERE complaint_id=? AND author_id=? AND idempotency_key=?', c.id, ctx.user!.id, idem);
+        if (old) { ctx.status = 200; return { complaint: complaintOut(c), message: { id: old.id, authorId: old.author_id, authorRole: old.author_role, body: old.body, createdAt: old.created_at }, idempotent: true }; }
+      }
+      const last = db.get<{ created_at:string }>('SELECT created_at FROM complaint_messages WHERE complaint_id=? ORDER BY created_at DESC,id DESC LIMIT 1', c.id);
+      const nowMs=app.clock.now(); const lastMs=last?.created_at?Date.parse(last.created_at):NaN; const now = new Date(Math.max(nowMs, Number.isFinite(lastMs)?lastMs+1:nowMs)).toISOString(); const messageId=uuid();
+      db.run('INSERT INTO complaint_messages(id,complaint_id,author_id,author_role,body,idempotency_key,created_at) VALUES (?,?,?,?,?,?,?)', messageId, c.id, ctx.user!.id, ctx.user!.role, b.body, idem||null, now);
       if (c.status === 'OPEN' && ctx.user!.id === c.against_user_id) db.run(`UPDATE complaints SET status='PROVIDER_REPLIED', updated_at=? WHERE id=?`, now, c.id);
       const notifyId = ctx.user!.id === c.opened_by ? c.against_user_id : c.opened_by;
       if (notifyId) { app.notifications.notify(notifyId, 'COMPLAINT_REPLIED', { complaint: c.code }, { orderId: c.order_id, complaintId: c.id, open: 'complaint' }); app.sse.send(notifyId, 'complaint_message', { orderId: c.order_id, complaintId: c.id }); }
-      if (ctx.user!.role !== 'ADMIN') app.notifications.notifyAdmins('COMPLAINT_REPLIED', { complaint: c.code }, { orderId: c.order_id, complaintId: c.id, open: 'complaint' });
+      if (ctx.user!.role !== 'ADMIN') {
+        const event = { orderId: c.order_id, complaintId: c.id };
+        for (const a of db.all<{ id: string }>("SELECT u.id FROM users u JOIN admin_users au ON au.user_id=u.id WHERE u.status='ACTIVE'")) {
+          app.sse.send(a.id, 'complaint_message', event);
+        }
+        app.notifications.notifyAdmins('COMPLAINT_REPLIED', { complaint: c.code }, { orderId: c.order_id, complaintId: c.id, open: 'complaint' });
+      }
       executionEvent(app,c.order_id,'COMPLAINT_REPLY','رد جديد على الشكوى',`الشكوى ${c.code}`,'SYSTEM',ctx.user!.id,{complaintId:c.id});
-      return { complaint: complaintOut(db.get<ComplaintRow>('SELECT * FROM complaints WHERE id = ?', c.id)!) };
+      return { complaint: complaintOut(db.get<ComplaintRow>('SELECT * FROM complaints WHERE id = ?', c.id)!), message: { id: messageId, authorId: ctx.user!.id, authorRole: ctx.user!.role, body: b.body, createdAt: now } };
     });
   });
 

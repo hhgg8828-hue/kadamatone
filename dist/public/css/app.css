@@ -201,3 +201,29 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 
 /* V66.7 RTL hardening for admin navigation, tables and modal editors. */
 .admin-page,.admin-page .modal,.admin-page .modal>.card{direction:rtl;text-align:right;transform:none}.admin-page .table{direction:rtl}.admin-page .admin-tabs{direction:rtl;justify-content:flex-start}.admin-page .admin-table-wrap{direction:rtl}
+
+/* V66.14 — compact capabilities, service discovery, live chat/support, provider avatar */
+.capability-dropdown{border:1px solid #e2dced;border-radius:16px;background:#fff;overflow:hidden}
+.capability-dropdown summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:13px 15px;font-weight:800}
+.capability-dropdown summary::-webkit-details-marker{display:none}
+.capability-dropdown summary b{color:var(--primary);font-size:12px}
+.capability-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 12px 12px}
+.capability-options label{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid #edf0f5;border-radius:12px;background:#fafbfc;cursor:pointer}
+.capability-options input{width:18px;height:18px;accent-color:var(--primary)}
+.selected-capabilities{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.quick-services-strip{margin-bottom:18px;overflow:hidden}
+.quick-services-strip .quick-services{display:flex;gap:11px;overflow-x:auto;overflow-y:hidden;padding:3px 2px 12px;scroll-snap-type:x proximity;grid-template-columns:none}
+.quick-services-strip .quick-service{flex:0 0 190px;scroll-snap-align:start}
+.quick-services-strip>.btn{margin-top:2px}
+.chat-live-badge{font-size:11px;color:#16845b;background:#eaf8f1;border:1px solid #c7ead8;border-radius:999px;padding:5px 9px;white-space:nowrap}
+.chat-pending{opacity:.68;border-style:dashed}
+.complaint-thread{min-height:220px}
+.provider-hero-head{display:flex;align-items:center;gap:14px;position:relative;z-index:1;margin-bottom:14px}
+.provider-avatar,.provider-profile-avatar,.account-avatar-preview{object-fit:cover;background:#fff;border:2px solid rgba(255,255,255,.8);box-shadow:0 8px 24px rgba(20,20,50,.18)}
+.provider-avatar{width:68px;height:68px;border-radius:22px;flex:none}
+.provider-avatar-empty{display:grid;place-items:center;color:var(--primary);font-size:30px}
+.provider-profile-avatar{width:90px;height:90px;border-radius:26px;display:block;margin-bottom:12px;border-color:#e4deef}
+.account-avatar-editor{display:flex;align-items:center;gap:14px;padding:12px;border:1px solid #e6e1ef;border-radius:16px;background:#faf9fd;margin-bottom:14px}
+.account-avatar-preview{width:76px;height:76px;border-radius:22px;display:grid;place-items:center;font-size:28px;flex:none;border-color:#e4deef}
+.account-avatar-editor input{margin-top:7px;max-width:100%}
+@media(max-width:600px){.capability-options{grid-template-columns:1fr}.quick-services-strip .quick-service{flex-basis:165px}.account-avatar-editor{align-items:flex-start;flex-direction:column}}

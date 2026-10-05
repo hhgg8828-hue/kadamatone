@@ -1,7 +1,7 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
 import { uuid } from '../core/security.js';
-import { iso, pageParams, cursorSql, finishPage } from '../core/util.js';
+import { pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
 import { executionEvent } from './execution.js';
 const bodySchema = s.obj({ body: s.str({ min: 0, max: 2000 }), attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 5, optional: true }), location: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }), accuracy: s.num({ min: 0, max: 100000, optional: true }), addressText: s.str({ max: 300, optional: true }) }, { optional: true }) });
@@ -36,37 +36,42 @@ export function registerChatRoutes(app, r) {
             throw E.unprocessable('لا يمكن مراسلة الطلب بعد إلغائه', 'ORDER_CLOSED');
         const b = parse(bodySchema, ctx.body);
         const idem = String(ctx.req.headers['idempotency-key'] || '').trim();
-        if (idem) {
-            const old = app.db.get('SELECT * FROM order_messages WHERE order_id=? AND sender_id=? AND idempotency_key=?', o.id, ctx.user.id, idem);
-            if (old) {
-                ctx.status = 200;
-                return { message: out(app, old), idempotent: true };
+        return app.db.tx(() => {
+            if (idem) {
+                const old = app.db.get('SELECT * FROM order_messages WHERE order_id=? AND sender_id=? AND idempotency_key=?', o.id, ctx.user.id, idem);
+                if (old) {
+                    ctx.status = 200;
+                    return { message: out(app, old), idempotent: true };
+                }
             }
-        }
-        const attachmentFileIds = (b.attachmentFileIds || []).filter((id) => !!app.db.get(`SELECT id FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'`, id, ctx.user.id));
-        if ((b.attachmentFileIds || []).length !== attachmentFileIds.length)
-            throw E.unprocessable('يوجد ملف مرفق غير صالح', 'INVALID_ATTACHMENT');
-        if (!b.body?.trim() && !b.location && !attachmentFileIds.length)
-            throw E.unprocessable('اكتب رسالة أو أرسل ملفًا أو أرسل موقعًا', 'MESSAGE_EMPTY');
-        const now = iso(app.clock.now());
-        const id = uuid();
-        app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,idempotency_key,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', id, o.id, ctx.user.id, ctx.user.role, (b.body || '').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'), JSON.stringify(attachmentFileIds), idem || null, b.location?.lat ?? null, b.location?.lng ?? null, b.location?.accuracy ?? null, b.location?.addressText ?? null, now);
-        executionEvent(app, o.id, 'CHAT_MESSAGE', 'رسالة جديدة في محادثة الطلب', undefined, ctx.user.role, ctx.user.id, { messageId: id });
-        const targets = new Set();
-        if (o.customer_id !== ctx.user.id)
-            targets.add(o.customer_id);
-        if (o.provider_id) {
-            const p = app.db.get('SELECT user_id FROM service_providers WHERE id=?', o.provider_id);
-            if (p && p.user_id !== ctx.user.id)
-                targets.add(p.user_id);
-        }
-        for (const uid of targets) {
-            const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
-            app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id, open: 'chat' });
-            app.sse.send(uid, 'chat_message', { orderId: o.id, message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) });
-        }
-        ctx.status = 201;
-        return { message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) };
+            const attachmentFileIds = (b.attachmentFileIds || []).filter((id) => !!app.db.get(`SELECT id FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'`, id, ctx.user.id));
+            if ((b.attachmentFileIds || []).length !== attachmentFileIds.length)
+                throw E.unprocessable('يوجد ملف مرفق غير صالح', 'INVALID_ATTACHMENT');
+            if (!b.body?.trim() && !b.location && !attachmentFileIds.length)
+                throw E.unprocessable('اكتب رسالة أو أرسل ملفًا أو أرسل موقعًا', 'MESSAGE_EMPTY');
+            const last = app.db.get('SELECT created_at FROM order_messages WHERE order_id=? ORDER BY created_at DESC,id DESC LIMIT 1', o.id);
+            const nowMs = app.clock.now();
+            const lastMs = last?.created_at ? Date.parse(last.created_at) : NaN;
+            const createdAt = new Date(Math.max(nowMs, Number.isFinite(lastMs) ? lastMs + 1 : nowMs)).toISOString();
+            const id = uuid();
+            app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,idempotency_key,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', id, o.id, ctx.user.id, ctx.user.role, (b.body || '').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'), JSON.stringify(attachmentFileIds), idem || null, b.location?.lat ?? null, b.location?.lng ?? null, b.location?.accuracy ?? null, b.location?.addressText ?? null, createdAt);
+            executionEvent(app, o.id, 'CHAT_MESSAGE', 'رسالة جديدة في محادثة الطلب', undefined, ctx.user.role, ctx.user.id, { messageId: id });
+            const targets = new Set();
+            if (o.customer_id !== ctx.user.id)
+                targets.add(o.customer_id);
+            if (o.provider_id) {
+                const p = app.db.get('SELECT user_id FROM service_providers WHERE id=?', o.provider_id);
+                if (p && p.user_id !== ctx.user.id)
+                    targets.add(p.user_id);
+            }
+            for (const uid of targets) {
+                const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
+                app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id, open: 'chat' });
+                app.sse.send(uid, 'chat_message', { orderId: o.id, message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) });
+            }
+            ctx.status = 201;
+            return { message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) };
+        });
     });
 }
 //# sourceMappingURL=chat.js.map

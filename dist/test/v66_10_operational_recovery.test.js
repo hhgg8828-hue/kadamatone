@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startApp, registerUser, loginAdmin } from './helpers.js';
-test('V66.13: مشوار الدباب لا يتوقف إذا تعطل التوجيه الخارجي ويستخدم احتياط المسافة', async () => {
+test('V66.14: مشوار الدباب لا يتوقف إذا تعطل التوجيه الخارجي ويستخدم احتياط المسافة', async () => {
     const t = await startApp({ ROUTING_URL: 'https://127.0.0.1:1', ROUTING_TIMEOUT_MS: '50' });
     try {
         const c = await registerUser(t.api);
@@ -17,7 +17,7 @@ test('V66.13: مشوار الدباب لا يتوقف إذا تعطل التوج
         await t.close();
     }
 });
-test('V66.13: اعتماد المركبة يعمل أيضًا عبر المسار القديم /verify', async () => {
+test('V66.14: اعتماد المركبة يعمل أيضًا عبر المسار القديم /verify', async () => {
     const t = await startApp();
     try {
         const admin = await loginAdmin(t.api);
@@ -35,14 +35,14 @@ test('V66.13: اعتماد المركبة يعمل أيضًا عبر المسا�
         await t.close();
     }
 });
-test('V66.13: واجهة مقدم الخدمة تعيد عرض العرض الجديد فور ظهوره وتستخدم cache bust', async () => {
+test('V66.14: واجهة مقدم الخدمة تعيد عرض العرض الجديد فور ظهوره وتستخدم cache bust', async () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const provider = fs.readFileSync('public/provider.html', 'utf8');
     const admin = fs.readFileSync('public/admin.html', 'utf8');
     assert.match(app, /providerPollTimer=window\.setInterval[\s\S]*?2000/);
     assert.match(app, /if\(addedOffers\.length\)/);
-    assert.match(provider, /app\.js\?v=66\.13/);
-    assert.match(admin, /app\.js\?v=66\.13/);
+    assert.match(provider, /app\.js\?v=66\.14/);
+    assert.match(admin, /app\.js\?v=66\.14/);
 });
 //# sourceMappingURL=v66_10_operational_recovery.test.js.map

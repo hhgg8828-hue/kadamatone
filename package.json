@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.22",
-  "description": "خدمات (Khadamat) — V66.13 live provider chat, concurrent dispatch and provider notification workspace",
+  "version": "0.6.23",
+  "description": "خدمات (Khadamat) — V66.14 capabilities, live messaging reliability, support chat, service discovery and provider profile",
   "private": true,
   "type": "module",
   "engines": {
