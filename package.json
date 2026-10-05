@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.20",
-  "description": "خدمات (Khadamat) — V66.11 live operations, provider presence integrity, accepting-orders control and optional trip destination",
+  "version": "0.6.21",
+  "description": "خدمات (Khadamat) — V66.12 audit hardening, performance diagnostics, complaint realtime and idempotent beneficiaries",
   "private": true,
   "type": "module",
   "engines": {

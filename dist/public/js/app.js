@@ -151,6 +151,12 @@ async function startRealtime() {
                 window.dispatchEvent(new CustomEvent('khadamat:chat-message', { detail: d }));
         }
         catch { } });
+        es.addEventListener('complaint_message', (ev) => { try {
+            const d = JSON.parse(ev.data || '{}');
+            if (d?.complaintId)
+                window.dispatchEvent(new CustomEvent('khadamat:complaint-message', { detail: d }));
+        }
+        catch { } });
         es.addEventListener('trip_location', (ev) => { try {
             const d = JSON.parse(ev.data || '{}');
             if (d?.orderId)
@@ -177,6 +183,14 @@ async function startRealtime() {
         realtimeRetry = window.setTimeout(() => { startRealtime().catch(() => { }); }, 5000);
     }
 }
+const perfApiStats = [];
+function recordApiTiming(path, ms, status) { if (perfApiStats.length >= 200)
+    perfApiStats.shift(); perfApiStats.push({ path, ms, status, at: new Date().toISOString() }); }
+window.addEventListener('khadamat:complaint-message', (ev) => { const d = ev.detail || {}; const active = document.querySelector('.complaint-modal'); if (!active)
+    return; const id = active.querySelector('[data-complaint-id]')?.dataset.complaintId; if (page === 'admin' && id)
+    openAdminComplaint(id).catch(() => { });
+else if (page === 'customer' && d.orderId)
+    openOrderComplaint(String(d.orderId), true).catch(() => { }); });
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function applyFieldPlaceholders(scope = document) { const map = { fullName: 'مثال: محمد أحمد', phone: 'مثال: 777123456', email: 'مثال: name@example.com', password: 'أدخل كلمة المرور', identifier: 'رقم الهاتف أو البريد الإلكتروني', displayName: 'مثال: مؤسسة الصيانة الحديثة', specialty: 'مثال: كهرباء وتكييف', bio: 'اكتب نبذة مختصرة عن خبرتك وخدماتك', contactPhone: 'مثال: 777123456', description: 'اكتب ما تحتاجه بالتفصيل', notes: 'أي ملاحظات أو تفاصيل إضافية', recipientName: 'اسم المستفيد', recipientPhone: 'هاتف المستفيد', label: 'مثال: المنزل', address: 'مثال: شارع 30 بجوار...', ar: 'الاسم بالعربية', en: 'الاسم بالإنجليزية' }; scope.querySelectorAll('input,textarea').forEach(el => { if (el.placeholder)
     return; const key = el.name || el.id; if (map[key])
@@ -210,8 +224,14 @@ async function flushOrderQueue() { if (!navigator.onLine || !state.token)
 } localStorage.setItem(OFFLINE_QUEUE, JSON.stringify(left)); if (q.length !== left.length)
     toast('تمت المزامنة', 'تم إرسال الطلبات المحفوظة بعد عودة الإنترنت.'); }
 window.addEventListener('online', () => { flushOrderQueue().catch(() => { }); });
-async function api(path, opts = {}, retry = true) { const h = new Headers(opts.headers || {}); h.set('Content-Type', 'application/json'); if (state.token)
-    h.set('Authorization', `Bearer ${state.token}`); const r = await fetch('/api/v1' + path, { ...opts, headers: h }); const j = await r.json().catch(() => ({})); if (r.status === 401 && retry && path !== '/auth/refresh' && sessionStorage.getItem(SESSION_KEY)) {
+async function api(path, opts = {}, retry = true) { const started = performance.now(); const h = new Headers(opts.headers || {}); h.set('Content-Type', 'application/json'); if (state.token)
+    h.set('Authorization', `Bearer ${state.token}`); let r; try {
+    r = await fetch('/api/v1' + path, { ...opts, headers: h });
+}
+catch (e) {
+    recordApiTiming(path, performance.now() - started, 0);
+    throw e;
+} const j = await r.json().catch(() => ({})); recordApiTiming(path, performance.now() - started, r.status); if (r.status === 401 && retry && path !== '/auth/refresh' && sessionStorage.getItem(SESSION_KEY)) {
     try {
         const refreshed = await fetch('/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'khadamat' }, body: '{}' });
         const rj = await refreshed.json().catch(() => ({}));
@@ -742,7 +762,7 @@ async function openBeneficiaries() { try {
     const j = await api('/me/beneficiaries');
     showModal(`<h2>👨‍👩‍👧 المستفيدون</h2><p class="muted">احفظ أفراد الأسرة أو أي شخص تطلب له الخدمة باستمرار.</p><button class="btn" id="addBeneficiary">+ إضافة مستفيد</button><div style="margin-top:12px">${(j.beneficiaries || []).map((b) => `<div class="card"><b>${esc(b.label)}</b><p>${esc(b.fullName)} · ${esc(b.phone)}</p><button class="btn danger small" data-del-beneficiary="${esc(b.id)}" type="button">حذف</button></div>`).join('') || '<div class="empty">لا يوجد مستفيدون محفوظون.</div>'}</div>`);
     document.getElementById('addBeneficiary')?.addEventListener('click', () => { showModal(`<h2>إضافة مستفيد</h2><form id="beneficiaryForm"><input name="label" placeholder="أبي / أمي / شخص آخر" required maxlength="40"><input name="fullName" placeholder="الاسم" required maxlength="80"><input name="phone" placeholder="الهاتف" required maxlength="24"><button class="btn">حفظ</button></form>`); document.getElementById('beneficiaryForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); try {
-        await api('/me/beneficiaries', { method: 'POST', body: JSON.stringify({ label: String(f.get('label')), fullName: String(f.get('fullName')), phone: String(f.get('phone')) }) });
+        await api('/me/beneficiaries', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify({ label: String(f.get('label')), fullName: String(f.get('fullName')), phone: String(f.get('phone')) }) });
         openBeneficiaries();
     }
     catch (x) {
@@ -1060,7 +1080,12 @@ async function openMotorcycleTripForm(service, savedAddresses) {
 }
 async function openOrderFormBySlug(slug) { try {
     const j = await api('/services/' + encodeURIComponent(slug));
-    await openOrderForm(j.service.id);
+    if (j.service?.slug === 'motorcycle-trips') {
+        const a = await api('/me/addresses');
+        await openMotorcycleTripForm(j.service, a.addresses || []);
+        return;
+    }
+    await openOrderForm(j.service.id, j.service);
 }
 catch (e) {
     alert(e.message);
@@ -1097,14 +1122,13 @@ async function openNearbyProviders(serviceId, lat, lng) {
 }
 async function openOrderForm(serviceId, initial = null) {
     const idempotencyKey = newIdempotencyKey();
-    const [j, addrPayload] = await Promise.all([api('/services/' + encodeURIComponent(serviceId)), api('/me/addresses')]);
+    const [j, addrPayload, beneficiaryPayload] = await Promise.all([api('/services/' + encodeURIComponent(serviceId)), api('/me/addresses'), api('/me/beneficiaries').catch(() => ({ beneficiaries: [] }))]);
     const savedAddresses = addrPayload.addresses || [];
     const s = j.service;
     if (s.slug === 'motorcycle-trips') {
         await openMotorcycleTripForm(s, savedAddresses);
         return;
     }
-    const beneficiaryPayload = await api('/me/beneficiaries').catch(() => ({ beneficiaries: [] }));
     const beneficiaries = beneficiaryPayload.beneficiaries || [];
     const fields = (s.formSchema || []).map((f) => `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب التفاصيل التي تساعد مقدم الخدمة')}"></textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`).join('');
     const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
@@ -1787,7 +1811,7 @@ async function openOrderComplaint(orderId, followExisting = false) {
         const c = j.complaint;
         const msgs = j.messages || [];
         if (c) {
-            showModal(`<h2>الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> ${esc(c.status)} · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>${esc(c.description)}</b></div><h3>المراسلات</h3>${msgs.map((m) => `<div class="card"><b>${esc(m.authorRole)}</b><p>${esc(m.body)}</p><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div>`).join('') || '<p class="muted">لا توجد ردود بعد.</p>'}${!['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status) ? `<form id="complaintReplyForm"><div class="field"><label>ردك</label><textarea name="body" minlength="1" maxlength="1000" required></textarea></div><button class="btn">إرسال الرد</button></form>` : ''}`);
+            showModal(`<div class="complaint-modal" data-complaint-id="${esc(c.id)}"><h2>الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> ${esc(c.status)} · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>${esc(c.description)}</b></div><h3>المراسلات</h3>${msgs.map((m) => `<div class="card"><b>${esc(m.authorRole)}</b><p>${esc(m.body)}</p><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div>`).join('') || '<p class="muted">لا توجد ردود بعد.</p>'}${!['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status) ? `<form id="complaintReplyForm"><div class="field"><label>ردك</label><textarea name="body" minlength="1" maxlength="1000" required></textarea></div><button class="btn">إرسال الرد</button></form>` : ''}`);
             document.getElementById('complaintReplyForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); try {
                 await api('/complaints/' + encodeURIComponent(c.id) + '/reply', { method: 'POST', body: JSON.stringify({ body: String(f.get('body')) }) });
                 await openOrderComplaint(orderId, true);
@@ -1858,7 +1882,7 @@ async function provider() {
         return;
     }
     try {
-        const [p, o, e, catalogPayload, capabilities, vehicleData] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/earnings'), api('/catalog/bootstrap'), api('/provider/capabilities').catch(() => ({ capabilities: [] })), api('/provider/vehicles').catch(() => ({ vehicles: [] }))]);
+        const [p, o, e, catalogPayload, capabilities, vehicleData, offers] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/earnings'), api('/catalog/bootstrap'), api('/provider/capabilities').catch(() => ({ capabilities: [] })), api('/provider/vehicles').catch(() => ({ vehicles: [] })), api('/provider/offers')]);
         const allServices = (catalogPayload.services || []).map((svc) => ({ ...svc, categoryName: catalogPayload.categories?.find((c) => c.id === svc.categoryId)?.name || '', categoryIcon: catalogPayload.categories?.find((c) => c.id === svc.categoryId)?.icon || '' }));
         const selected = new Set((p.provider.services || []).map((s) => s.serviceId));
         shell(`<div class="hero"><h1>لوحة مقدم الخدمة</h1><p>${esc(p.provider.displayName)} — ${esc(verifyAr(p.provider.verificationStatus))}</p><div class="row"><span class="status" id="providerConnectionStatus">${p.provider.isOnline ? '🟢 متصل' : '⚪ غير متصل'}</span><span class="status" id="providerAcceptingStatus">${p.provider.acceptingOrders ? 'يستقبل الطلبات' : 'لا يستقبل الطلبات'}</span><button class="btn" id="online" type="button">${p.provider.isOnline ? 'قطع الاتصال' : 'بدء الاتصال'}</button><button class="btn secondary" id="acceptingOrders" type="button" ${p.provider.isOnline ? '' : 'disabled'}>${p.provider.acceptingOrders ? 'إيقاف استقبال الطلبات' : 'بدء استقبال الطلبات'}</button>${p.provider.verificationStatus !== 'VERIFIED' ? '<button class="btn secondary" id="goVerification" type="button">🔐 توثيق الحساب</button>' : ''}</div>${p.provider.verificationStatus !== 'VERIFIED' ? '<div class="notice" style="margin-top:12px">لا يمكنك استقبال الطلبات قبل اعتماد الهوية والترخيص من الإدارة. ارفع الوثيقتين من قسم «توثيق الحساب» ثم انتظر المراجعة.</div>' : ''}</div>
@@ -1889,7 +1913,6 @@ async function provider() {
         finally {
             btn.disabled = false;
         } });
-        const offers = await api('/provider/offers');
         const priority = document.getElementById('providerPriority');
         const pendingOffers = offers.offers || [];
         if (priority) {
@@ -2275,14 +2298,14 @@ async function admin() {
     let activeTab = (new URLSearchParams(location.search).get('tab') || 'overview'), orderStatus = '', providerStatus = 'PENDING';
     const load = async () => {
         const qs = (base, status) => status ? base + encodeURIComponent(status) : base;
-        const [d, u, o, c, ps, cat, areas, settings, audit, intentAudit, liveProviders, trips, ops, liveOps, alerts, temporaryServices, campaigns, health, reports, vehicles, safety, admins] = await Promise.all([
-            api('/admin/dashboard'), api('/admin/users?limit=50'), api(qs('/admin/orders?limit=50&status=', orderStatus)), api('/admin/complaints?limit=50'), api(qs('/admin/providers?status=', providerStatus)), api('/admin/catalog'), api('/admin/areas'), api('/admin/settings'), api('/admin/audit-logs?limit=100'), api('/admin/intent-audit?limit=100').catch(() => ({ items: [] })), api('/admin/live-providers'), api('/admin/trips'), api('/admin/operations/overview'), api('/admin/operations/live'), api('/admin/operations/alerts?status=OPEN'), api('/admin/temporary-services'), api('/admin/campaigns'), api('/admin/system-health'), api('/admin/operations/reports').catch(() => ({ summary: {}, daily: [], byService: [], topProviders: [] })), api('/admin/vehicles'), api('/safety-centers'), state.user.adminLevel === 'SUPER_ADMIN' ? api('/admin/admins') : Promise.resolve({ admins: [] })
+        const [d, u, o, c, ps, cat, areas, settings, audit, intentAudit, liveProviders, trips, ops, liveOps, alerts, temporaryServices, campaigns, health, perf, reports, vehicles, safety, admins] = await Promise.all([
+            api('/admin/dashboard'), api('/admin/users?limit=50'), api(qs('/admin/orders?limit=50&status=', orderStatus)), api('/admin/complaints?limit=50'), api(qs('/admin/providers?status=', providerStatus)), api('/admin/catalog'), api('/admin/areas'), api('/admin/settings'), api('/admin/audit-logs?limit=100'), api('/admin/intent-audit?limit=100').catch(() => ({ items: [] })), api('/admin/live-providers'), api('/admin/trips'), api('/admin/operations/overview'), api('/admin/operations/live'), api('/admin/operations/alerts?status=OPEN'), api('/admin/temporary-services'), api('/admin/campaigns'), api('/admin/system-health'), api('/admin/performance-diagnostics').catch(() => ({ server: { database: { queries: 0, totalMs: 0, slowQueries: [] }, sse: { users: 0, connections: 0 } }, api: [] })), api('/admin/operations/reports').catch(() => ({ summary: {}, daily: [], byService: [], topProviders: [] })), api('/admin/vehicles'), api('/safety-centers'), state.user.adminLevel === 'SUPER_ADMIN' ? api('/admin/admins') : Promise.resolve({ admins: [] })
         ]);
-        return { d, u, o, c, ps, cat, areas, settings, audit, intentAudit, liveProviders, trips, vehicles, safety, admins, ops, liveOps, alerts, temporaryServices, campaigns, health, reports };
+        return { d, u, o, c, ps, cat, areas, settings, audit, intentAudit, liveProviders, trips, vehicles, safety, admins, ops, liveOps, alerts, temporaryServices, campaigns, health, reports, perf };
     };
     const draw = async () => {
         try {
-            const { d, u, o, c, ps, cat, areas, settings, audit, intentAudit, liveProviders, trips, vehicles, safety, admins, ops, liveOps, alerts, temporaryServices, campaigns, health, reports } = await load();
+            const { d, u, o, c, ps, cat, areas, settings, audit, intentAudit, liveProviders, trips, vehicles, safety, admins, ops, liveOps, alerts, temporaryServices, campaigns, health, reports, perf } = await load();
             const stats = d.stats || {};
             const statusOptions = ['', 'PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'DISPUTED'];
             const providerStatuses = ['PENDING', 'VERIFIED', 'REJECTED', 'SUSPENDED'];
@@ -2296,7 +2319,7 @@ async function admin() {
       ${activeTab === 'temporary' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>⏳ الخدمات المؤقتة والمناسبات</h2><p class="muted">الخدمة تختفي تلقائيًا بعد انتهاء الفترة دون حذف سجلها.</p></div><button class="btn" id="newTemporaryService">+ خدمة مؤقتة</button></div></div><div>${(temporaryServices.items || []).map((x) => `<div class="card"><b>${esc(trJson(x.title_i18n))}</b><p>${esc(trJson(x.description_i18n || '{}'))}</p><small class="muted">${esc(x.start_at)} → ${esc(x.end_at)} · ${esc(x.state || (x.is_active ? 'مفعلة' : 'معطلة'))} · أولوية ${esc(x.priority || 0)} · مرتبطة بخدمة ${esc(x.linked_service_id)}</small><div class="row" style="margin-top:8px"><button class="btn secondary small" data-temp-edit="${esc(x.id)}">تعديل الفترة والأولوية</button><button class="btn secondary small" data-temp-toggle="${esc(x.id)}" data-next-temp="${x.is_active ? 'false' : 'true'}">${x.is_active ? 'إيقاف' : 'تفعيل'}</button></div></div>`).join('') || '<div class="card muted">لا توجد خدمات مؤقتة.</div>'}</div>` : ''}
       ${activeTab === 'campaigns' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>📣 الإعلانات والحملات</h2><p class="muted">تحدد الإدارة المحتوى والجمهور والفترة دون تعديل الكود.</p></div><button class="btn" id="newCampaign">+ حملة جديدة</button></div></div><div>${(campaigns.items || []).map((x) => `<div class="card"><b>${esc(trJson(x.title_i18n))}</b><p>${esc(trJson(x.description_i18n || '{}'))}</p><small class="muted">${esc(x.start_at)} → ${esc(x.end_at)} · ${esc(x.state || (x.is_active ? 'مفعلة' : 'معطلة'))} · أولوية ${esc(x.priority || 0)}</small><div class="row" style="margin-top:8px"><button class="btn secondary small" data-camp-edit="${esc(x.id)}">تعديل الحملة</button><button class="btn secondary small" data-camp-toggle="${esc(x.id)}" data-next-camp="${x.is_active ? 'false' : 'true'}">${x.is_active ? 'إيقاف' : 'تفعيل'}</button></div></div>`).join('') || '<div class="card muted">لا توجد حملات.</div>'}</div>` : ''}
       ${activeTab === 'reports' ? `<div class="grid"><div class="card"><div class="stat">${esc(reports.summary?.orders ?? 0)}</div><div>الطلبات</div></div><div class="card"><div class="stat">${esc(reports.summary?.completed ?? 0)}</div><div>مكتملة</div></div><div class="card"><div class="stat">${esc(Math.round(reports.summary?.acceptSec || 0))} ث</div><div>متوسط القبول</div></div><div class="card"><div class="stat">${esc(Math.round(reports.summary?.executionSec || 0))} ث</div><div>متوسط التنفيذ</div></div></div><div class="card"><h3>أكثر الخدمات طلبًا</h3><div class="admin-table-wrap"><table class="table"><thead><tr><th>الخدمة</th><th>الطلبات</th><th>مكتملة</th><th>ملغاة</th><th>متوسط القبول</th></tr></thead><tbody>${(reports.byService || []).map((x) => `<tr><td>${esc(x.service)}</td><td>${esc(x.orders)}</td><td>${esc(x.completed)}</td><td>${esc(x.cancelled)}</td><td>${esc(Math.round(x.acceptSec || 0))} ث</td></tr>`).join('')}</tbody></table></div></div>` : ''}
-      ${activeTab === 'system' ? `<div class="grid"><div class="card"><div class="stat">${esc(health.db?.ok ? 'OK' : 'FAIL')}</div><div>قاعدة البيانات</div></div><div class="card"><div class="stat">${esc(health.api?.errors?.length || 0)}</div><div>أخطاء API مسجلة</div></div><div class="card"><div class="stat">${esc(health.api?.slow?.length || 0)}</div><div>مسارات بطيئة</div></div></div><div class="card"><h3>أحدث الأخطاء</h3>${(health.api?.errors || []).map((x) => `<div class="notice error"><b>${esc(x.event_type)}</b> · ${esc(x.path || '')} · ${esc(x.status_code || '')}<br>${esc(x.message)}<br><small>${esc(formatDateTime(x.created_at))}</small></div>`).join('') || '<p class="muted">لا توجد أخطاء مسجلة خلال الفترة.</p>'}</div>` : ''}
+      ${activeTab === 'system' ? `<div class="grid"><div class="card"><div class="stat">${esc(health.db?.ok ? 'OK' : 'FAIL')}</div><div>قاعدة البيانات</div></div><div class="card"><div class="stat">${esc(health.api?.errors?.length || 0)}</div><div>أخطاء API مسجلة</div></div><div class="card"><div class="stat">${esc(health.api?.slow?.length || 0)}</div><div>مسارات بطيئة</div></div><div class="card"><div class="stat">${esc(perf.server?.database?.queries || 0)}</div><div>استعلامات DB</div><small>${esc(perf.server?.database?.totalMs || 0)}ms إجمالي</small></div><div class="card"><div class="stat">${esc(perf.server?.sse?.connections || 0)}</div><div>اتصالات Realtime</div></div></div><div class="card"><h3>أحدث الأخطاء</h3>${(health.api?.errors || []).map((x) => `<div class="notice error"><b>${esc(x.event_type)}</b> · ${esc(x.path || '')} · ${esc(x.status_code || '')}<br>${esc(x.message)}<br><small>${esc(formatDateTime(x.created_at))}</small></div>`).join('') || '<p class="muted">لا توجد أخطاء مسجلة خلال الفترة.</p>'}</div>` : ''}
       ${activeTab === 'overview' ? `<div class="card" style="border:2px solid #2563eb"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">🔐 طلبات التوثيق</h2><p class="muted">طلبات مقدمي الخدمات التي تنتظر مراجعة الإدارة</p></div><div class="stat">${esc(stats.pendingProviders)}</div></div><button class="btn" id="openVerificationQueue" type="button">فتح طلبات التوثيق والموافقة عليها</button></div><div class="grid"><div class="card"><div class="stat">${esc(stats.users)}</div><div>مستخدمون</div></div><div class="card"><div class="stat">${esc(stats.providers)}</div><div>مقدمو خدمات</div></div><div class="card"><div class="stat">${esc(stats.pendingProviders)}</div><div>بانتظار التوثيق</div></div><div class="card"><div class="stat">${esc(stats.activeOrders)}</div><div>طلبات نشطة</div></div><div class="card"><div class="stat">${esc(stats.completedOrders)}</div><div>طلبات مكتملة</div></div><div class="card"><div class="stat">${esc(stats.cancelledOrders)}</div><div>طلبات ملغاة</div></div><div class="card"><div class="stat">${esc(stats.complaints)}</div><div>شكاوى مفتوحة</div></div><div class="card"><div class="stat">${esc(cats.length)}</div><div>أقسام الكتالوج</div></div><div class="card"><div class="stat">${esc(allServices.length)}</div><div>خدمات الكتالوج</div></div></div><h2>طلبات التوثيق</h2><div>${(ps.providers || []).slice(0, 5).map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
       ${activeTab === 'providers' ? `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">مقدمو الخدمات</h2><select id="providerStatusFilter">${providerStatuses.map(x => `<option value="${x}" ${providerStatus === x ? 'selected' : ''}>${esc(x === 'PENDING' ? 'بانتظار التوثيق' : x === 'VERIFIED' ? 'موثق' : x === 'REJECTED' ? 'مرفوض' : 'موقوف')}</option>`).join('')}</select></div></div><div>${(ps.providers || []).map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد نتائج.</div>'}</div>` : ''}
       ${activeTab === 'verification' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">طلبات توثيق الحسابات</h2><p class="muted">راجع الهوية والترخيص ثم اعتمد الحساب أو ارفضه مع ذكر السبب.</p></div><span class="status">${esc(stats.pendingProviders)} بانتظار المراجعة</span></div></div><div>${(ps.providers || []).filter((p) => p.verificationStatus === 'PENDING').map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
@@ -2612,7 +2635,7 @@ async function openAdminComplaint(id) {
         const closed = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status);
         const statusMap = { OPEN: 'جديدة', PROVIDER_REPLIED: 'بانتظار مراجعة الإدارة', UNDER_REVIEW: 'قيد المتابعة', RESOLVED: 'تم الحل', REJECTED: 'مرفوضة', CLOSED: 'مغلقة' };
         const roleMap = { CUSTOMER: 'العميل', PROVIDER: 'مقدم الخدمة', ADMIN: 'الإدارة' };
-        showModal(`<div class="complaint-modal"><h2>⚠️ الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> <span class="status">${esc(statusMap[c.status] || c.status)}</span> · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>وصف الشكوى</b><p>${esc(c.description)}</p></div><h3>المحادثة</h3><div class="complaint-thread">${msgs.map((m) => `<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(roleMap[m.authorRole] || m.authorRole)}</b><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') || '<p class="muted">لا توجد رسائل بعد.</p>'}</div>${!closed ? `<form id="adminComplaintReplyForm" class="card" style="margin-top:12px"><h3>الرد على العميل</h3><div class="field"><label>رسالة الرد</label><textarea name="body" minlength="1" maxlength="1000" required placeholder="اكتب رد الإدارة للعميل بوضوح..."></textarea></div><button class="btn" type="submit">إرسال الرد</button></form><div class="card" style="margin-top:12px"><h3>إنهاء الشكوى</h3><p class="muted">بعد مراجعة المحادثة، اختر القرار النهائي. لن تُغلق الشكوى بمجرد الرد فقط.</p><div class="field"><label>القرار</label><select id="adminComplaintAction"><option value="RESTORE_COMPLETED">حل المشكلة وإبقاء الطلب مكتملًا</option><option value="CANCEL_ORDER">إلغاء الطلب</option><option value="WARN_PROVIDER">تنبيه مقدم الخدمة</option><option value="SUSPEND_PROVIDER">إيقاف مقدم الخدمة مؤقتًا</option><option value="DISMISS">رفض الشكوى لعدم ثبوتها</option></select></div><div class="field"><label>ملاحظة القرار</label><textarea id="adminComplaintNote" maxlength="500" placeholder="سبب القرار أو ما تم التحقق منه..."></textarea></div><button class="btn danger" id="closeComplaintBtn" type="button">إغلاق الشكوى وحفظ القرار</button></div>` : `<div class="notice success">تم إنهاء هذه الشكوى. يمكنك مراجعة كامل المراسلات والقرار أعلاه.</div>`}</div>`);
+        showModal(`<div class="complaint-modal" data-complaint-id="${esc(c.id)}"><h2>⚠️ الشكوى ${esc(c.code)}</h2><p><b>الحالة:</b> <span class="status">${esc(statusMap[c.status] || c.status)}</span> · <b>التصنيف:</b> ${esc(c.category)}</p><div class="card"><b>وصف الشكوى</b><p>${esc(c.description)}</p></div><h3>المحادثة</h3><div class="complaint-thread">${msgs.map((m) => `<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(roleMap[m.authorRole] || m.authorRole)}</b><small class="muted">${esc(formatDateTime(m.createdAt))}</small></div><p>${esc(m.body)}</p></div>`).join('') || '<p class="muted">لا توجد رسائل بعد.</p>'}</div>${!closed ? `<form id="adminComplaintReplyForm" class="card" style="margin-top:12px"><h3>الرد على العميل</h3><div class="field"><label>رسالة الرد</label><textarea name="body" minlength="1" maxlength="1000" required placeholder="اكتب رد الإدارة للعميل بوضوح..."></textarea></div><button class="btn" type="submit">إرسال الرد</button></form><div class="card" style="margin-top:12px"><h3>إنهاء الشكوى</h3><p class="muted">بعد مراجعة المحادثة، اختر القرار النهائي. لن تُغلق الشكوى بمجرد الرد فقط.</p><div class="field"><label>القرار</label><select id="adminComplaintAction"><option value="RESTORE_COMPLETED">حل المشكلة وإبقاء الطلب مكتملًا</option><option value="CANCEL_ORDER">إلغاء الطلب</option><option value="WARN_PROVIDER">تنبيه مقدم الخدمة</option><option value="SUSPEND_PROVIDER">إيقاف مقدم الخدمة مؤقتًا</option><option value="DISMISS">رفض الشكوى لعدم ثبوتها</option></select></div><div class="field"><label>ملاحظة القرار</label><textarea id="adminComplaintNote" maxlength="500" placeholder="سبب القرار أو ما تم التحقق منه..."></textarea></div><button class="btn danger" id="closeComplaintBtn" type="button">إغلاق الشكوى وحفظ القرار</button></div>` : `<div class="notice success">تم إنهاء هذه الشكوى. يمكنك مراجعة كامل المراسلات والقرار أعلاه.</div>`}</div>`);
         document.getElementById('adminComplaintReplyForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const form = e.currentTarget;

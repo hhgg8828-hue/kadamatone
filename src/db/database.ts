@@ -18,6 +18,7 @@ export interface Db {
   run(sql: string, ...p: any[]): RunResult;
   tx<T>(fn: () => T): T;
   afterCommit(fn: () => void): void;
+  performanceSnapshot(): {queries:number; totalMs:number; slowQueries:Array<{sql:string;count:number;avgMs:number;maxMs:number}>};
   close(): void;
 }
 
@@ -33,17 +34,20 @@ export function openDb(file: string): Db {
   };
   let depth = 0;
   let after: (() => void)[] = [];
+  let queryCount = 0; let queryTotalMs = 0; const queryStats = new Map<string,{count:number;totalMs:number;maxMs:number}>();
+  const timed = <T>(sql:string, fn:()=>T):T => { const t=Date.now(); try{return fn();} finally { const ms=Date.now()-t; queryCount++; queryTotalMs+=ms; const x=queryStats.get(sql)||{count:0,totalMs:0,maxMs:0}; x.count++; x.totalMs+=ms; x.maxMs=Math.max(x.maxMs,ms); queryStats.set(sql,x); } };
+
   const db: Db = {
     raw,
-    exec: (sql: string) => raw.exec(sql),
-    get: <T = Row>(sql: string, ...p: any[]) => stmt(sql).get(...p) as T | undefined,
+    exec: (sql: string) => timed(sql,()=>raw.exec(sql)),
+    get: <T = Row>(sql: string, ...p: any[]) => timed(sql,()=>stmt(sql).get(...p) as T | undefined),
     one: <T = Row>(sql: string, ...p: any[]) => {
-      const row = stmt(sql).get(...p) as T | undefined;
+      const row = timed(sql,()=>stmt(sql).get(...p) as T | undefined);
       if (!row) throw new Error(`db.one(): no row for query: ${sql}`);
       return row;
     },
-    all: <T = Row>(sql: string, ...p: any[]) => stmt(sql).all(...p) as T[],
-    run: (sql: string, ...p: any[]) => stmt(sql).run(...p) as RunResult,
+    all: <T = Row>(sql: string, ...p: any[]) => timed(sql,()=>stmt(sql).all(...p) as T[]),
+    run: (sql: string, ...p: any[]) => timed(sql,()=>stmt(sql).run(...p) as RunResult),
     /** معاملة ذرّية. المتداخلة تُدمج في الخارجية. */
     tx<T>(fn: () => T): T {
       if (depth > 0) return fn();
@@ -64,6 +68,7 @@ export function openDb(file: string): Db {
     },
     /** ينفَّذ بعد نجاح الـCOMMIT فقط (إشعارات لحظية…) أو فورًا خارج معاملة. */
     afterCommit(fn: () => void): void { if (depth > 0) after.push(fn); else fn(); },
+    performanceSnapshot: () => ({queries:queryCount,totalMs:queryTotalMs,slowQueries:Array.from(queryStats.entries()).sort((a,b)=>b[1].totalMs-a[1].totalMs).slice(0,30).map(([sql,x])=>({sql,count:x.count,avgMs:Number((x.totalMs/x.count).toFixed(2)),maxMs:x.maxMs}))}),
     close(): void { raw.close(); },
   };
   return db;

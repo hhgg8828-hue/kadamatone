@@ -22,11 +22,32 @@ export function registerCustomerExperienceRoutes(app, r) {
     r.get('/me/beneficiaries', auth, roles('CUSTOMER'), (ctx) => ({ beneficiaries: db.all('SELECT * FROM customer_beneficiaries WHERE customer_id=? ORDER BY updated_at DESC', ctx.user.id).map(b => serializeBeneficiary(app, b, ctx.locale)) }));
     r.post('/me/beneficiaries', auth, roles('CUSTOMER'), (ctx) => {
         const b = parse(beneficiarySchema, ctx.body);
+        const idem = String(ctx.req.headers['idempotency-key'] || '').trim().slice(0, 128);
+        if (idem) {
+            const old = db.get('SELECT * FROM customer_beneficiaries WHERE customer_id=? AND idempotency_key=?', ctx.user.id, idem);
+            if (old) {
+                ctx.status = 200;
+                return { beneficiary: serializeBeneficiary(app, old, ctx.locale), idempotent: true };
+            }
+        }
         const id = uuid(), now = iso(app.clock.now());
         let locId = null;
         if (b.location)
             locId = app.locations.create(b.location).id;
-        db.run('INSERT INTO customer_beneficiaries(id,customer_id,label,full_name,phone,location_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)', id, ctx.user.id, b.label, b.fullName, b.phone, locId, now, now);
+        try {
+            db.run('INSERT INTO customer_beneficiaries(id,customer_id,label,full_name,phone,location_id,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)', id, ctx.user.id, b.label, b.fullName, b.phone, locId, idem || null, now, now);
+        }
+        catch (e) {
+            if (idem) {
+                const old = db.get('SELECT * FROM customer_beneficiaries WHERE customer_id=? AND idempotency_key=?', ctx.user.id, idem);
+                if (old) {
+                    ctx.status = 200;
+                    return { beneficiary: serializeBeneficiary(app, old, ctx.locale), idempotent: true };
+                }
+            }
+            throw e;
+        }
+        ctx.status = 201;
         return { beneficiary: serializeBeneficiary(app, db.get('SELECT * FROM customer_beneficiaries WHERE id=?', id), ctx.locale) };
     });
     r.patch('/me/beneficiaries/:id', auth, roles('CUSTOMER'), (ctx) => {

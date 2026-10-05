@@ -80,7 +80,8 @@ export function registerComplaintRoutes(app: App, r: Router): void {
       db.run('INSERT INTO complaint_messages(id,complaint_id,author_id,author_role,body,created_at) VALUES (?,?,?,?,?,?)', uuid(), c.id, ctx.user!.id, ctx.user!.role, b.body, now);
       if (c.status === 'OPEN' && ctx.user!.id === c.against_user_id) db.run(`UPDATE complaints SET status='PROVIDER_REPLIED', updated_at=? WHERE id=?`, now, c.id);
       const notifyId = ctx.user!.id === c.opened_by ? c.against_user_id : c.opened_by;
-      if (notifyId) app.notifications.notify(notifyId, 'COMPLAINT_REPLIED', { complaint: c.code });
+      if (notifyId) { app.notifications.notify(notifyId, 'COMPLAINT_REPLIED', { complaint: c.code }, { orderId: c.order_id, complaintId: c.id, open: 'complaint' }); app.sse.send(notifyId, 'complaint_message', { orderId: c.order_id, complaintId: c.id }); }
+      if (ctx.user!.role !== 'ADMIN') app.notifications.notifyAdmins('COMPLAINT_REPLIED', { complaint: c.code }, { orderId: c.order_id, complaintId: c.id, open: 'complaint' });
       executionEvent(app,c.order_id,'COMPLAINT_REPLY','رد جديد على الشكوى',`الشكوى ${c.code}`,'SYSTEM',ctx.user!.id,{complaintId:c.id});
       return { complaint: complaintOut(db.get<ComplaintRow>('SELECT * FROM complaints WHERE id = ?', c.id)!) };
     });

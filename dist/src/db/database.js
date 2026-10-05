@@ -17,18 +17,34 @@ export function openDb(file) {
     };
     let depth = 0;
     let after = [];
+    let queryCount = 0;
+    let queryTotalMs = 0;
+    const queryStats = new Map();
+    const timed = (sql, fn) => { const t = Date.now(); try {
+        return fn();
+    }
+    finally {
+        const ms = Date.now() - t;
+        queryCount++;
+        queryTotalMs += ms;
+        const x = queryStats.get(sql) || { count: 0, totalMs: 0, maxMs: 0 };
+        x.count++;
+        x.totalMs += ms;
+        x.maxMs = Math.max(x.maxMs, ms);
+        queryStats.set(sql, x);
+    } };
     const db = {
         raw,
-        exec: (sql) => raw.exec(sql),
-        get: (sql, ...p) => stmt(sql).get(...p),
+        exec: (sql) => timed(sql, () => raw.exec(sql)),
+        get: (sql, ...p) => timed(sql, () => stmt(sql).get(...p)),
         one: (sql, ...p) => {
-            const row = stmt(sql).get(...p);
+            const row = timed(sql, () => stmt(sql).get(...p));
             if (!row)
                 throw new Error(`db.one(): no row for query: ${sql}`);
             return row;
         },
-        all: (sql, ...p) => stmt(sql).all(...p),
-        run: (sql, ...p) => stmt(sql).run(...p),
+        all: (sql, ...p) => timed(sql, () => stmt(sql).all(...p)),
+        run: (sql, ...p) => timed(sql, () => stmt(sql).run(...p)),
         /** معاملة ذرّية. المتداخلة تُدمج في الخارجية. */
         tx(fn) {
             if (depth > 0)
@@ -66,6 +82,7 @@ export function openDb(file) {
             after.push(fn);
         else
             fn(); },
+        performanceSnapshot: () => ({ queries: queryCount, totalMs: queryTotalMs, slowQueries: Array.from(queryStats.entries()).sort((a, b) => b[1].totalMs - a[1].totalMs).slice(0, 30).map(([sql, x]) => ({ sql, count: x.count, avgMs: Number((x.totalMs / x.count).toFixed(2)), maxMs: x.maxMs })) }),
         close() { raw.close(); },
     };
     return db;

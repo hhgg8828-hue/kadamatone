@@ -42,6 +42,8 @@ export class SseHub {
                 res.write(': ping\n\n');
             }
             catch { /* ignore */ } }
+    stats() { let connections = 0; for (const set of this.clients.values())
+        connections += set.size; return { users: this.clients.size, connections }; }
     closeAll() { clearInterval(this.timer); for (const set of this.clients.values())
         for (const r of set)
             r.end(); this.clients.clear(); }

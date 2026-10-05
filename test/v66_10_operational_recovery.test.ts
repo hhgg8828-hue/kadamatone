@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startApp, registerUser, loginAdmin } from './helpers.js';
 
-test('V66.11: مشوار الدباب لا يتوقف إذا تعطل التوجيه الخارجي ويستخدم احتياط المسافة', async()=>{
+test('V66.12: مشوار الدباب لا يتوقف إذا تعطل التوجيه الخارجي ويستخدم احتياط المسافة', async()=>{
   const t=await startApp({ROUTING_URL:'https://127.0.0.1:1',ROUTING_TIMEOUT_MS:'50'} as any);
   try{
     const c=await registerUser(t.api);
@@ -13,7 +13,7 @@ test('V66.11: مشوار الدباب لا يتوقف إذا تعطل التوج
   } finally { await t.close(); }
 });
 
-test('V66.11: اعتماد المركبة يعمل أيضًا عبر المسار القديم /verify', async()=>{
+test('V66.12: اعتماد المركبة يعمل أيضًا عبر المسار القديم /verify', async()=>{
   const t=await startApp();
   try{
     const admin=await loginAdmin(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'سائق تجريبي',bio:'',specialty:'دباب'}}); assert.equal(p.status,201,p.text);
@@ -25,8 +25,8 @@ test('V66.11: اعتماد المركبة يعمل أيضًا عبر المسا�
   } finally { await t.close(); }
 });
 
-test('V66.11: واجهة مقدم الخدمة تعيد عرض العرض الجديد فور ظهوره وتستخدم cache bust', async()=>{
+test('V66.12: واجهة مقدم الخدمة تعيد عرض العرض الجديد فور ظهوره وتستخدم cache bust', async()=>{
   const fs=await import('node:fs');
   const app=fs.readFileSync('public/app.ts','utf8'); const provider=fs.readFileSync('public/provider.html','utf8'); const admin=fs.readFileSync('public/admin.html','utf8');
-  assert.match(app,/providerPollTimer=window\.setInterval[\s\S]*?2000/); assert.match(app,/if\(addedOffers\.length\)/); assert.match(provider,/app\.js\?v=66\.11/); assert.match(admin,/app\.js\?v=66\.11/);
+  assert.match(app,/providerPollTimer=window\.setInterval[\s\S]*?2000/); assert.match(app,/if\(addedOffers\.length\)/); assert.match(provider,/app\.js\?v=66\.12/); assert.match(admin,/app\.js\?v=66\.12/);
 });

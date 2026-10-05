@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startApp, registerUser } from './helpers.js';
 
-test('V66.11: حالات مقدم الخدمة مستقلة وHeartbeat يحدّث المصدر الحقيقي', async()=>{
+test('V66.12: حالات مقدم الخدمة مستقلة وHeartbeat يحدّث المصدر الحقيقي', async()=>{
   const t=await startApp();
   try{
     const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مقدم حي'}});
@@ -15,7 +15,7 @@ test('V66.11: حالات مقدم الخدمة مستقلة وHeartbeat يحدّ
   } finally { await t.close(); }
 });
 
-test('V66.11: المطابقة لا ترسل طلبًا لمن أوقف استقبال الطلبات', async()=>{
+test('V66.12: المطابقة لا ترسل طلبًا لمن أوقف استقبال الطلبات', async()=>{
   const t=await startApp();
   try{
     const c=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'لا يستقبل'}});
@@ -28,7 +28,7 @@ test('V66.11: المطابقة لا ترسل طلبًا لمن أوقف استق
   } finally { await t.close(); }
 });
 
-test('V66.11: المشوار يسمح بالإرسال بدون وجهة ثم إضافة الوجهة لاحقًا', async()=>{
+test('V66.12: المشوار يسمح بالإرسال بدون وجهة ثم إضافة الوجهة لاحقًا', async()=>{
   const t=await startApp();
   try{
     const c=await registerUser(t.api); const o=await t.api('POST','/api/v1/trips',{token:c.body.accessToken,headers:{'Idempotency-Key':'v6611-trip-no-dest'},body:{origin:{lat:15.36,lng:44.19},purpose:'PASSENGER',description:'أريد مشوارًا شخصيًا',contactPhone:c.creds.phone}});
@@ -38,7 +38,7 @@ test('V66.11: المشوار يسمح بالإرسال بدون وجهة ثم إ
   } finally { await t.close(); }
 });
 
-test('V66.11: لوحة المراقبة الحية تعيد جميع مقدمي الخدمة مع heartbeat/location/order', async()=>{
+test('V66.12: لوحة المراقبة الحية تعيد جميع مقدمي الخدمة مع heartbeat/location/order', async()=>{
   const t=await startApp();
   try{
     const admin=await t.api('POST','/api/v1/auth/login',{body:{identifier:'admin@test.local',password:'AdminPass123'}}); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مراقبة'}}); const pid=t.app.db.get<any>('SELECT id FROM service_providers WHERE user_id=?',p.body.user.id).id;
@@ -47,7 +47,7 @@ test('V66.11: لوحة المراقبة الحية تعيد جميع مقدمي 
   } finally { await t.close(); }
 });
 
-test('V66.11: إكمال مشوار يحسب المسافة الفعلية من سجل المواقع ويحدّث الأجرة النهائية', async()=>{
+test('V66.12: إكمال مشوار يحسب المسافة الفعلية من سجل المواقع ويحدّث الأجرة النهائية', async()=>{
   const t=await startApp();
   try{
     const c=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'سائق مشوار'}});
@@ -65,5 +65,38 @@ test('V66.11: إكمال مشوار يحسب المسافة الفعلية من 
     const proof=await t.api('POST',`/api/v1/orders/${id}/delivery-proof/issue`,{token:c.body.accessToken,body:{}}); assert.equal(proof.status,200,proof.text); const verified=await t.api('POST',`/api/v1/provider/orders/${id}/delivery-proof/verify`,{token:p.body.accessToken,body:{pin:proof.body.pin}}); assert.equal(verified.status,200,verified.text);
     const done=await t.api('POST',`/api/v1/provider/orders/${id}/status`,{token:p.body.accessToken,body:{to:'COMPLETED'}}); assert.equal(done.status,200,done.text);
     const trip=t.app.db.get<any>('SELECT distance_km distanceKm,fare FROM trip_orders WHERE order_id=?',id); assert.ok(trip.distanceKm>0); assert.equal(done.body.order.agreedPrice,trip.fare);
+  } finally { await t.close(); }
+});
+
+test('V66.12+: المستفيد يستخدم Idempotency-Key ولا ينشئ سجلًا مكررًا عند إعادة الإرسال', async()=>{
+  const t=await startApp();
+  try{
+    const c=await registerUser(t.api); const h={'Idempotency-Key':'beneficiary-retry-1'}; const body={label:'أمي',fullName:'محمد أحمد',phone:'+967771234567'};
+    const a=await t.api('POST','/api/v1/me/beneficiaries',{token:c.body.accessToken,headers:h,body}); const b=await t.api('POST','/api/v1/me/beneficiaries',{token:c.body.accessToken,headers:h,body});
+    assert.equal(a.status,201,a.text); assert.equal(b.status,200,b.text); assert.equal(b.body.idempotent,true);
+    const row=t.app.db.get<any>('SELECT COUNT(*) n FROM customer_beneficiaries WHERE customer_id=?',c.body.user.id); assert.equal(row.n,1);
+  } finally { await t.close(); }
+});
+
+test('V66.12+: رد الشكوى يرسل حدث Realtime مرتبطًا بالشكوى والطلب', async()=>{
+  const t=await startApp();
+  try{
+    const c=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مزود شكوى'}});
+    const pid=t.app.db.get<any>('SELECT id FROM service_providers WHERE user_id=?',p.body.user.id).id;
+    const svc=t.app.catalog.all().services.find((x:any)=>x.slug==='cleaning'); assert.ok(svc); const serviceId=String((svc as any).id); t.app.db.run("UPDATE service_providers SET verification_status='VERIFIED',is_online=1,accepting_orders=1,base_lat=15.36,base_lng=44.19 WHERE id=?",pid); t.app.db.run('INSERT INTO provider_services(provider_id,service_id,experience_years,is_active) VALUES(?,?,?,1)',pid,serviceId,2);
+    const o=await t.api('POST','/api/v1/orders',{token:c.body.accessToken,headers:{'Idempotency-Key':'complaint-sse-order'},body:{serviceId,description:'خدمة تنظيف لاختبار الشكوى',location:{lat:15.36,lng:44.19},contactPhone:c.creds.phone}}); assert.equal(o.status,201,o.text);
+    const offer=(await t.api('GET','/api/v1/provider/offers',{token:p.body.accessToken})).body.offers[0]; await t.api('POST',`/api/v1/provider/offers/${offer.id}/accept`,{token:p.body.accessToken,body:{}});
+    const complaint=await t.api('POST',`/api/v1/orders/${o.body.order.id}/complaints`,{token:c.body.accessToken,body:{category:'QUALITY',description:'الخدمة تحتاج مراجعة'}}); assert.equal(complaint.status,201,complaint.text);
+    const events:any[]=[]; const original=t.app.sse.send.bind(t.app.sse); (t.app.sse as any).send=(uid:string,event:string,data:any)=>{events.push({uid,event,data}); return original(uid,event,data)};
+    const reply=await t.api('POST',`/api/v1/complaints/${complaint.body.complaint.id}/reply`,{token:p.body.accessToken,body:{body:'تم استلام الشكوى وسأتابعها'}}); assert.equal(reply.status,200,reply.text);
+    assert.ok(events.some(x=>x.event==='complaint_message'&&x.data.complaintId===complaint.body.complaint.id&&x.data.orderId===o.body.order.id));
+  } finally { await t.close(); }
+});
+
+test('V66.12+: تشخيص الأداء يعرض DB وRealtime وطلبات API', async()=>{
+  const t=await startApp();
+  try{
+    const admin=await t.api('POST','/api/v1/auth/login',{body:{identifier:'admin@test.local',password:'AdminPass123'}}); assert.equal(admin.status,200,admin.text);
+    const r=await t.api('GET','/api/v1/admin/performance-diagnostics',{token:admin.body.accessToken}); assert.equal(r.status,200,r.text); assert.ok(typeof r.body.server.database.queries==='number'); assert.ok(typeof r.body.server.sse.connections==='number'); assert.ok(Array.isArray(r.body.api));
   } finally { await t.close(); }
 });
