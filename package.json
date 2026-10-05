@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.25",
-  "description": "خدمات (Khadamat) — V66.16 smart service matching and private order chat quality",
+  "version": "0.6.26",
+  "description": "خدمات (Khadamat) — V67 rural-first simple customer experience and smart service matching",
   "private": true,
   "type": "module",
   "engines": {

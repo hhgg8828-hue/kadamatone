@@ -137,6 +137,6 @@ test('V66.14: العميل يرى الطلبات الملغاة أيضًا، و�
     assert.ok(html.includes('app.js?v=66.15'));
     assert.ok(index.includes('app.js?v=66.15'));
     assert.ok(admin.includes('app.js?v=66.15'));
-    assert.ok(sw.includes('khadamat-shell-v66_15'));
+    assert.ok(sw.includes('khadamat-shell-v67'));
 });
 //# sourceMappingURL=v66_14_reliability.test.js.map
