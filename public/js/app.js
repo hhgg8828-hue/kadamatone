@@ -128,6 +128,9 @@ async function startRealtime() {
                 maybeSystemNotification(n.title || 'إشعار جديد', n.body || '');
                 if (document.getElementById('notificationList'))
                     await refreshOpenNotifications();
+                if (n.type === 'NEW_OFFER' && page === 'provider') {
+                    await provider();
+                }
                 if (n.type === 'CHAT_MESSAGE' && n.orderId && document.getElementById('chatMessages')) {
                     window.dispatchEvent(new CustomEvent('khadamat:chat', { detail: { orderId: n.orderId } }));
                 }
@@ -1000,6 +1003,8 @@ async function openMotorcycleTripForm(service, savedAddresses) {
         maps[kind].map.setView([pos.coords.latitude, pos.coords.longitude], 17); setPoint(kind, pos.coords.latitude, pos.coords.longitude, 'gps', `تم تحديد الموقع عبر GPS — الدقة ${Math.round(pos.coords.accuracy)} متر`); }, err => alert(err.code === 1 ? 'اسمح للتطبيق باستخدام الموقع من إعدادات الهاتف.' : 'تعذر تحديد الموقع، استخدم موقعًا محفوظًا أو اكتب وصف المكان.'), { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 }); };
     document.getElementById('tripOriginGps').addEventListener('click', () => gps('origin'));
     document.getElementById('tripDestinationGps').addEventListener('click', () => gps('destination'));
+    // تحديد نقطة الانطلاق تلقائيًا عند فتح المشوار، مع استمرار إمكانية استخدام موقع محفوظ أو الخريطة.
+    setTimeout(() => gps('origin').catch(() => { }), 150);
     let estimate = null;
     let estimateTimer;
     let lastEstimateKey = '';
@@ -1957,7 +1962,7 @@ async function provider() {
             const [pp, oo, offers] = await Promise.all([api('/provider/profile'), api('/provider/orders'), api('/provider/offers')]);
             const currentOfferIds = new Set((offers.offers || []).map((x) => String(x.id || '')));
             const addedOffers = [...currentOfferIds].filter(id => id && !lastProviderOfferIds.has(id));
-            if (lastProviderOfferIds.size > 0 && addedOffers.length) {
+            if (addedOffers.length) {
                 toast('طلب جديد', addedOffers.length === 1 ? 'لديك طلب جديد يحتاج ردك' : `لديك ${addedOffers.length} طلبات جديدة تحتاج ردك`);
                 refreshNotificationBadge().catch(() => { });
             }
