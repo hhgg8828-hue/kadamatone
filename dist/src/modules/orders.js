@@ -54,7 +54,7 @@ export function createOrders(app) {
                 contactPhone: (ctx.user?.role === 'PROVIDER' || approx) ? null : o.contact_phone, recipient: (!approx && (isOwnerCustomer || ctx.user?.role === 'ADMIN')) && o.recipient_name ? { fullName: o.recipient_name, phone: o.recipient_phone || '' } : null, scheduledAt: o.scheduled_at, pricingType: o.pricing_type, priceSnapshot: o.price_snapshot, agreedPrice: o.agreed_price,
                 currency: o.currency, paymentMethod: o.payment_method, notes: isOwnerCustomer || ctx.user?.role === 'ADMIN' ? o.customer_notes : null,
                 attachments: (parseJson(o.attachments, []) ?? []).map((id) => `/api/v1/files/${id}`), wave: o.wave,
-                createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason,
+                createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason, commissionRate: o.commission_rate_snapshot, commissionAmount: o.commission_amount, providerPayoutAmount: o.provider_payout_amount, settlementStatus: o.settlement_status,
             };
             if (ctx.user?.role === 'PROVIDER' || ctx.user?.role === 'ADMIN') {
                 const cu = db.get('SELECT id, full_name, phone FROM users WHERE id = ?', o.customer_id);
@@ -99,6 +99,15 @@ export function createOrders(app) {
             executionEvent(app, o.id, 'STATUS', `تغيرت حالة الطلب إلى ${to}`, reason, actorRole, ctx.user?.id, metadata || {});
             if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED')
                 db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?', to, now, o.id);
+            if (to === 'COMPLETED' && o.provider_id) {
+                const gross = Number(o.agreed_price ?? o.price_snapshot ?? 0);
+                const commissionRate = Number(app.settings.get('platform.commission_percent') || 0);
+                const commissionAmount = Math.round(gross * commissionRate) / 100;
+                const payoutAmount = Math.max(0, gross - commissionAmount);
+                db.run(`UPDATE orders SET commission_rate_snapshot=?,commission_amount=?,provider_payout_amount=?,settlement_status=?,completed_by=?,updated_at=? WHERE id=?`, commissionRate, commissionAmount, payoutAmount, commissionAmount > 0 ? 'DUE' : 'WAIVED', ctx.user?.id ?? null, now, o.id);
+                if (commissionAmount > 0)
+                    db.run(`INSERT OR IGNORE INTO provider_settlements(id,order_id,provider_id,gross_amount,commission_rate,commission_amount,payout_amount,currency,status,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), o.id, o.provider_id, gross, commissionRate, commissionAmount, payoutAmount, o.currency, 'DUE', now, now, now);
+            }
             return db.get('SELECT * FROM orders WHERE id = ?', o.id);
         },
     };

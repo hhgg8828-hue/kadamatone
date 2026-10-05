@@ -231,3 +231,14 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 /* V66.15 — compact provider notification workspace */
 .provider-notification-summary{display:grid;gap:10px;padding:12px;border:1px solid #e3deed;border-radius:16px;background:linear-gradient(145deg,#fff,#faf8ff)}
 .provider-notification-count{display:flex;align-items:center;gap:10px}.provider-notification-count>div{display:grid;gap:3px}.provider-notification-count small{font-size:11px}.provider-notification-stats{display:flex;gap:7px;flex-wrap:wrap}.notification-stat{font-size:11px;padding:7px 9px}.provider-notification-latest{display:grid;gap:3px;padding:9px 11px;border-radius:12px;background:#f7f5fb}.provider-notification-latest>span{font-size:10px;color:#777}.provider-notification-latest small{font-size:10px}
+
+/* V68 product strategy: rural-first, priority-first UI */
+.customer-tools{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0 4px}
+.location-human-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.location-human-fields .field:last-child{grid-column:1/-1}
+.provider-command-strip{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:10px;margin:14px 0}
+.provider-command-strip>div{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.provider-command-strip b{font-size:18px}
+.provider-command-strip small{color:var(--muted,#667085)}
+.admin-alias-list{max-height:360px;overflow:auto;margin-top:10px}
+@media(max-width:700px){.location-human-fields{grid-template-columns:1fr}.location-human-fields .field:last-child{grid-column:auto}.provider-command-strip{grid-template-columns:1fr 1fr}.provider-command-strip>div:first-child{grid-column:1/-1}}

@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.26",
-  "description": "خدمات (Khadamat) — V67 rural-first simple customer experience and smart service matching",
+  "version": "0.6.28",
+  "description": "خدمات (Khadamat) — V68 Yemen rural-first service marketplace with smart intent, order chat, local landmarks and operational settlement",
   "private": true,
   "type": "module",
   "engines": {

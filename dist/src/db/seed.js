@@ -23,6 +23,11 @@ export async function seedBase(db, config) {
                 db.run('INSERT INTO categories(id,slug,name_i18n,icon,keywords,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)', cat.id, c.slug, j(c.name), c.icon, j(c.keywords), ci + 1, now, now);
                 out.categories++;
             }
+            if (c.slug === 'agriculture') {
+                const parent = db.get('SELECT id FROM categories WHERE slug=?', 'on-demand-labor');
+                if (parent)
+                    db.run('UPDATE categories SET parent_id=? WHERE id=?', parent.id, cat.id);
+            }
             c.services.forEach((sv, si) => {
                 if (db.get('SELECT 1 FROM services WHERE slug = ?', sv.slug))
                     return;
@@ -31,8 +36,52 @@ export async function seedBase(db, config) {
                 out.services++;
             });
         });
+        // الزراعة عائلة مستقلة في تجربة العميل، لكنها تُحفظ كقسم فرعي لتوافق الكتالوج التاريخي.
+        const agri = db.get('SELECT id FROM categories WHERE slug=?', 'agriculture');
+        const labor = db.get('SELECT id FROM categories WHERE slug=?', 'on-demand-labor');
+        if (agri && labor)
+            db.run('UPDATE categories SET parent_id=? WHERE id=?', labor.id, agri.id);
         // إعدادات تشغيلية للخدمات التي تتطلب إثبات تسليم: تُطبق بعد إنشاء seed للخدمات لأن migrations تسبق seedBase.
         db.run("UPDATE services SET delivery_proof_type='PIN' WHERE slug IN ('parcel-delivery','shopping-delivery','shopping-for-me','document-delivery','motorcycle-trips','pharmacy-purchase','purchase-and-delivery')");
+        // قاموس المرادفات اليمنية: بيانات قابلة للإدارة، ويستخدمها محرك المطابقة فعليًا.
+        const aliasMap = {
+            'motorcycle-trips': ['دباب', 'موتور', 'موتوسيكل', 'مشوار بالدباب', 'مشوار موتور'],
+            'purchase-and-delivery': ['اشتر لي', 'اشتري لي', 'جيب لي', 'هات لي', 'دبر لي', 'شراء وإحضار', 'اشتره لي ووصلّه'],
+            'shopping-for-me': ['مقاضي', 'مقاضي البيت', 'بقالة', 'بقاله', 'مواد البيت', 'احتياجات البيت', 'تسوق لي', 'تسوق عني'],
+            'pharmacy-purchase': ['دواء ويوصله', 'جيب الدواء', 'هات الدواء', 'دواء للبيت', 'من الصيدلية للبيت'],
+            'parcel-delivery': ['وصل لي الطرد', 'مندوب يجيب الطرد', 'جيب الطرد', 'أرسل لي الطرد'],
+            'electricity': ['كهربائي', 'فني كهرباء', 'الكهرباء طافية', 'عطل كهرباء'],
+            'plumbing': ['سباك', 'مشكلة ماء', 'تسريب ماء', 'مواسير'],
+            'air-conditioning': ['مكيف', 'مكيف خربان', 'فريون', 'سبلت', 'سبليت'],
+            'daily-worker': ['شغيل', 'عامل يومي', 'عامل باليوم', 'حمال'],
+            'seasonal-plowing': ['حراث', 'حراثة', 'حرث الأرض', 'جهز الأرض'],
+            'seasonal-harvest': ['حصيدة', 'حصد المحصول', 'وقت الحصاد', 'عمال حصاد'],
+            'seasonal-crop-transport': ['نقل المحصول', 'نقل الحصيدة', 'من المزرعة للسوق', 'شاحنة للمحصول'],
+            'farm-worker': ['عامل مزرعة', 'شغيل مزرعة', 'عامل زراعة'],
+        };
+        for (const [slug, phrases] of Object.entries(aliasMap)) {
+            const svc = db.get('SELECT id FROM services WHERE slug=?', slug);
+            if (!svc)
+                continue;
+            for (const phrase of phrases) {
+                const normalized = phrase.toLowerCase().trim().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْـ]/g, '').replace(/\s+/g, ' ');
+                db.run('INSERT OR IGNORE INTO service_aliases(id,service_id,phrase,normalized_phrase,source,created_at) VALUES(?,?,?,?,?,?)', uuid(), svc.id, phrase, normalized, 'SEED', now);
+            }
+        }
+        // ترحيل آمن للاستحقاقات المالية للطلبات المكتملة القديمة بعد إضافة دفتر التسويات.
+        const commissionRate = Number(SETTINGS['platform.commission_percent']?.def || 10);
+        const completed = db.all(`SELECT id,provider_id,currency,COALESCE(agreed_price,price_snapshot,0) gross,completed_at FROM orders WHERE status='COMPLETED' AND provider_id IS NOT NULL`);
+        for (const o of completed) {
+            if (db.get('SELECT 1 FROM provider_settlements WHERE order_id=?', o.id))
+                continue;
+            const gross = Number(o.gross || 0);
+            const commission = Math.round(gross * commissionRate) / 100;
+            const payout = Math.max(0, gross - commission);
+            const status = commission > 0 ? 'DUE' : 'WAIVED';
+            db.run(`UPDATE orders SET commission_rate_snapshot=COALESCE(commission_rate_snapshot,?),commission_amount=COALESCE(commission_amount,?),provider_payout_amount=COALESCE(provider_payout_amount,?),settlement_status=CASE WHEN settlement_status='NOT_APPLICABLE' THEN ? ELSE settlement_status END WHERE id=?`, commissionRate, commission, payout, status, o.id);
+            if (commission > 0)
+                db.run(`INSERT OR IGNORE INTO provider_settlements(id,order_id,provider_id,gross_amount,commission_rate,commission_amount,payout_amount,currency,status,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, uuid(), o.id, o.provider_id, gross, commissionRate, commission, payout, o.currency, 'DUE', o.completed_at || now, o.completed_at || now, now);
+        }
         // طلب خدمة غير موجودة يجب أن يُزرع بعد الأقسام لأن migrations تُطبق قبل seedBase.
         if (!db.get('SELECT 1 FROM services WHERE slug=?', 'custom-request')) {
             const cat = db.get('SELECT id FROM categories WHERE slug=?', 'delivery');

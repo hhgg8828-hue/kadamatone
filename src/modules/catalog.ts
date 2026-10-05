@@ -59,6 +59,7 @@ export interface Catalog {
   serializeArea(a: ServiceAreaRow, locale: Locale, admin?: boolean): AreaOut;
   resolveArea(lat: number, lng: number): ServiceAreaRow | null;
   areaChain(areaId: string): string[];
+  aliasesForService(serviceId: string): string[];
 }
 
 export function createCatalog(app: App): Catalog {
@@ -138,6 +139,9 @@ export function createCatalog(app: App): Catalog {
       return country && haversineKm(lat, lng, country.center_lat, country.center_lng) <= country.radius_km ? country : null;
     },
     /** المنطقة + أسلافها (مزود يغطي مدينة يخدم أحياءها) */
+    aliasesForService(serviceId) {
+      return db.all<{phrase:string}>('SELECT phrase FROM service_aliases WHERE service_id=? AND is_active=1 ORDER BY phrase', serviceId).map(x=>x.phrase);
+    },
     areaChain(areaId) {
       const by = new Map(load().areas.map((a) => [a.id, a]));
       const out: string[] = []; let cur = by.get(areaId);
@@ -221,14 +225,14 @@ export function registerCatalogRoutes(app: App, r: App['router']): void {
       id:x.id, linkedServiceId:x.linked_service_id, name:tr(parseJson(x.name_i18n),locale), title:tr(parseJson(x.title_i18n),locale), description:tr(parseJson(x.description_i18n||'{}'),locale), icon:x.icon, categoryId:x.category_id, startAt:x.start_at,endAt:x.end_at,sortOrder:x.sort_order,priority:Number(x.priority||0),requestFlow:x.request_flow||'SERVICE',actionValue:x.action_value||x.linked_service_id,actionLabel:tr(parseJson(x.action_label_i18n||'{}'),locale),areaIds:parseJson(x.area_ids_json||'[]'),maxOrders:x.max_orders,pricing:parseJson(x.pricing_json||'{}'),targetCapabilities:parseJson(x.target_capabilities_json||'[]')||[]
     }));
     const campaigns = app.db.all<any>(`SELECT * FROM admin_campaigns WHERE is_active=1 AND start_at<=? AND end_at>? ORDER BY priority DESC, sort_order ASC, start_at ASC`,now,now).map((x:any)=>({id:x.id,title:tr(parseJson(x.title_i18n),locale),description:tr(parseJson(x.description_i18n||'{}'),locale),buttonLabel:tr(parseJson(x.button_label_i18n||'{}'),locale),actionType:x.action_type,actionValue:x.action_value,startAt:x.start_at,endAt:x.end_at,priority:Number(x.priority||0),sortOrder:x.sort_order,areaIds:parseJson(x.area_ids_json||'[]')}));
-    return { categories: catalog.tree(locale), services: data.services.filter(x=>!!catalog.getActiveService(x.id)).map(x=>catalog.serializeService(x, locale)), temporaryServices, campaigns };
+    const popularRows=app.db.all<any>(`SELECT service_id serviceId, COUNT(*) count FROM orders WHERE created_at>=? GROUP BY service_id ORDER BY count DESC LIMIT 30`, new Date(app.clock.now()-30*86400000).toISOString()); const popularity=popularRows.map(x=>({serviceId:x.serviceId,count:Number(x.count||0)})); return { categories: catalog.tree(locale), services: data.services.filter(x=>!!catalog.getActiveService(x.id)).map(x=>catalog.serializeService(x, locale)), temporaryServices, campaigns, popularity };
   });
   r.get('/categories/:slug/services', (ctx: Ctx) => {
     const data = catalog.all();
     const c = data.categories.find((x) => x.slug === ctx.params['slug'] && x.is_active);
     if (!c) throw E.notFound('القسم غير موجود');
-    return { category: catalog.serializeCategory(c, ctx.locale, { withServices: false }),
-      services: data.services.filter((x) => x.category_id === c.id && x.is_active).map((x) => catalog.serializeService(x, ctx.locale)) };
+    const extraCategoryIds = c.slug==='maintenance' ? data.categories.filter(x=>x.slug==='car-services' && x.is_active).map(x=>x.id) : []; const allowed=new Set([c.id,...extraCategoryIds]); return { category: catalog.serializeCategory(c, ctx.locale, { withServices: false }),
+      services: data.services.filter((x) => allowed.has(x.category_id) && x.is_active).map((x) => catalog.serializeService(x, ctx.locale)) };
   });
   r.get('/services/:id', (ctx: Ctx) => {
     const idOrSlug = ctx.params['id']!;

@@ -64,7 +64,7 @@ function deterministic(text: string, { catalog, locale='ar' }: { catalog: Catalo
 
   for(const svc of data.services){
     const cat=activeCats.get(svc.category_id); if(!svc.is_active||!cat||!catalog.getActiveService(svc.id)) continue;
-    const terms=new Set<string>(); for(const k of parseJson<string[]>(svc.keywords,[])||[])terms.add(normalizeAr(k)); for(const lang of ['ar','en'] as const)terms.add(normalizeAr(tr(svc.name_i18n,lang)));
+    const terms=new Set<string>(); for(const k of parseJson<string[]>(svc.keywords,[])||[])terms.add(normalizeAr(k)); for(const lang of ['ar','en'] as const)terms.add(normalizeAr(tr(svc.name_i18n,lang))); for(const alias of catalog.aliasesForService(svc.id)) terms.add(normalizeAr(alias));
     let score=0; if(forcedSlug===svc.slug) score+=12;
     for(const term of terms){if(!term)continue;if(term.includes(' ')){if(norm.includes(term))score+=4+term.split(' ').length;continue;}if(tokenSet.has(term))score+=3;else if(term.length>=3&&tokens.some(t=>t.length>=3&&(t.startsWith(term)||term.startsWith(t))))score+=1.5;}
     for(const k of parseJson<string[]>(cat.keywords,[])||[]){const kk=normalizeAr(k);if(kk&&(tokenSet.has(kk)||norm.includes(kk)))score+=.75;}

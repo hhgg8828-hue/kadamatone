@@ -70,6 +70,8 @@ function deterministic(text, { catalog, locale = 'ar' }) {
             terms.add(normalizeAr(k));
         for (const lang of ['ar', 'en'])
             terms.add(normalizeAr(tr(svc.name_i18n, lang)));
+        for (const alias of catalog.aliasesForService(svc.id))
+            terms.add(normalizeAr(alias));
         let score = 0;
         if (forcedSlug === svc.slug)
             score += 12;

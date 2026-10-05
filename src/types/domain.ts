@@ -51,7 +51,7 @@ export interface ServiceAreaRow {
   center_lat: number; center_lng: number; radius_km: number; is_active: 0 | 1; created_at: string; updated_at: string;
 }
 export interface LocationRow {
-  id: string; lat: number; lng: number; accuracy_m: number | null; address_text: string | null; area_id: string | null; source: string; created_at: string;
+  id: string; lat: number; lng: number; accuracy_m: number | null; address_text: string | null; landmark_text: string | null; locality_text: string | null; access_notes: string | null; area_id: string | null; source: string; created_at: string;
 }
 export interface OrderRow {
   id: string; code: string; customer_id: string; service_id: string; provider_id: string | null; status: OrderStatus; priority: Priority;
@@ -59,7 +59,7 @@ export interface OrderRow {
   pricing_type: PricingType; price_snapshot: number | null; agreed_price: number | null; currency: string; payment_method: string;
   customer_notes: string | null; attachments: string; cancelled_by_role: string | null; cancel_reason: string | null; cancellation_fee: number | null;
   wave: number; accepted_at: string | null; started_at: string | null; completed_at: string | null; cancelled_at: string | null;
-  version: number; recipient_name: string | null; recipient_phone: string | null; recipient_user_id: string | null; delivery_pin_hash: string | null; idempotency_key: string | null; created_at: string; updated_at: string;
+  version: number; commission_rate_snapshot: number | null; commission_amount: number | null; provider_payout_amount: number | null; settlement_status: 'NOT_APPLICABLE'|'DUE'|'PAID'|'WAIVED'; completed_by: string | null; recipient_name: string | null; recipient_phone: string | null; recipient_user_id: string | null; delivery_pin_hash: string | null; idempotency_key: string | null; created_at: string; updated_at: string;
 }
 export interface OrderAssignmentRow {
   id: string; order_id: string; provider_id: string; status: AssignmentStatus; wave: number; score: number | null; distance_km: number | null;
