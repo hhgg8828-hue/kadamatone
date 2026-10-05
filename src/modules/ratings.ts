@@ -34,7 +34,8 @@ export function registerRatingRoutes(app: App, r: Router): void {
       const newSum = sp.rating_sum + b.score, newCount = sp.rating_count + 1;
       db.run('UPDATE service_providers SET rating_sum = ?, rating_count = ?, rating_avg = ?, updated_at = ? WHERE id = ?', newSum, newCount, round(newSum / newCount, 3), now, o.provider_id);
       const p = db.get<{ user_id: string }>('SELECT user_id FROM service_providers WHERE id = ?', o.provider_id)!;
-      app.notifications.notify(p.user_id, 'NEW_RATING', { score: String(b.score), code: o.code });
+      app.notifications.notify(p.user_id, 'NEW_RATING', { score: String(b.score), code: o.code }, {orderId:o.id,ratingId:ratingId});
+      app.sse.broadcast('sync',{scope:'admin',entity:'rating',orderId:o.id,providerId:o.provider_id});
       const rating = db.get<RatingRow>('SELECT * FROM ratings WHERE id = ?', ratingId)!;
       ctx.status = 201;
       return { rating: { id: rating.id, orderId: rating.order_id, score: rating.score, comment: b.comment || null, createdAt: rating.created_at } };

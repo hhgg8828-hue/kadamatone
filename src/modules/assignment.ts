@@ -7,6 +7,7 @@ import { canTransition, PROVIDER_STEPS } from '../../shared/orderStateMachine.js
 import type { App } from '../app.js';
 import type { Ctx, Router } from '../core/http.js';
 import type { OrderRow, OrderAssignmentRow, OrderStatus } from '../types/domain.js';
+import { executionEvent } from './execution.js';
 
 export interface AssignmentService {
   assignWave(orderId: string): { offered: number };
@@ -47,7 +48,8 @@ export function createAssignmentService(app: App): AssignmentService {
         const areaRow = catalog.all().areas.find((a) => a.id === o.area_id);
         for (const c of candidates) {
           const p = db.get<{ user_id: string }>('SELECT user_id FROM service_providers WHERE id = ?', c.providerId)!;
-          app.notifications.notify(p.user_id, 'NEW_OFFER', { service: tr(svcRow.name_i18n, 'ar'), area: areaRow ? tr(areaRow.name_i18n, 'ar') : '' }, { orderId: o.id });
+          app.notifications.notify(p.user_id, 'NEW_OFFER', { service: tr(svcRow.name_i18n, 'ar'), area: areaRow ? tr(areaRow.name_i18n, 'ar') : '' }, { orderId: o.id, assignmentId: db.get<any>('SELECT id FROM order_assignments WHERE order_id=? AND provider_id=?',o.id,c.providerId)?.id || null });
+          app.sse.broadcast('sync', {scope:'admin',entity:'assignment',orderId:o.id,providerId:c.providerId});
         }
         notifiedExhausted.delete(o.id);
         return { offered: candidates.length };
@@ -104,6 +106,8 @@ export function createAssignmentService(app: App): AssignmentService {
         app.payment.onAccepted(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!);
         const p = app.providers.summary(providerId);
         app.notifications.notify(o.customer_id, 'ORDER_ACCEPTED', { code: o.code, provider: p.displayName }, { orderId: o.id });
+        executionEvent(app,o.id,'ASSIGNED_PROVIDER','تم قبول الطلب من مقدم الخدمة',p.displayName,'PROVIDER',ctx.user!.id,{providerId});
+        app.sse.broadcast('sync',{scope:'admin',entity:'order',orderId:o.id,event:'accepted',providerId});
         return db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!;
       });
     },

@@ -58,6 +58,7 @@ export function registerChatRoutes(app, r) {
             if (p && p.user_id !== ctx.user.id)
                 targets.add(p.user_id);
         }
+        app.sse.broadcast('sync', { scope: 'admin', entity: 'chat', orderId: o.id, event: 'message' });
         for (const uid of targets) {
             const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
             app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id, open: 'chat' });

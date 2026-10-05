@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.19",
-  "description": "خدمات (Khadamat) — V66.10 operational recovery, historical feature consolidation, catalog integrity, hybrid intent, operations and reliability",
+  "version": "0.6.20",
+  "description": "خدمات (Khadamat) — V66.11 live operations, provider presence and order intake separation",
   "private": true,
   "type": "module",
   "engines": {

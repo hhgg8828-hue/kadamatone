@@ -71,7 +71,7 @@ export class NearestRatedMatcher {
       LEFT JOIN provider_capabilities pc ON pc.provider_id=sp.id AND pc.is_active=1
       LEFT JOIN provider_live_locations ll ON ll.provider_id=sp.id AND ll.updated_at >= ?
       LEFT JOIN favorite_providers f ON f.customer_id=? AND f.provider_id=sp.id
-      WHERE sp.verification_status='VERIFIED' AND sp.is_online=1
+      WHERE sp.verification_status='VERIFIED' AND sp.is_online=1 AND sp.accepting_orders=1
         AND NOT EXISTS (SELECT 1 FROM orders ao WHERE ao.provider_id=sp.id AND ao.status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS'))
       GROUP BY sp.id`, order.service_id, new Date(this.app.clock.now() - 5 * 60_000).toISOString(), order.customer_id);
         const scored = [];

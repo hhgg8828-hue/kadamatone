@@ -37,6 +37,7 @@ export function registerChatRoutes(app:App,r:Router){
     const targets=new Set<string>();
     if(o.customer_id!==ctx.user!.id) targets.add(o.customer_id);
     if(o.provider_id){const p=app.db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',o.provider_id);if(p&&p.user_id!==ctx.user!.id)targets.add(p.user_id)}
+    app.sse.broadcast('sync',{scope:'admin',entity:'chat',orderId:o.id,event:'message'});
     for(const uid of targets){const code=app.db.get<{code:string}>('SELECT code FROM orders WHERE id=?',o.id)?.code||'';app.notifications.notify(uid,'CHAT_MESSAGE',{code},{orderId:o.id,open:'chat'});app.sse.send(uid,'chat_message',{orderId:o.id,message:out(app,app.db.get<MsgRow>('SELECT * FROM order_messages WHERE id=?',id)!)});}
     ctx.status=201; return {message:out(app,app.db.get<MsgRow>('SELECT * FROM order_messages WHERE id=?',id)!)};
   });

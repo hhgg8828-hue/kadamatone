@@ -6,6 +6,7 @@ import { auth, roles } from './auth.middleware.js';
 import type { App } from '../app.js';
 import type { Ctx, Router } from '../core/http.js';
 import type { OrderRow, QuoteRow } from '../types/domain.js';
+import { executionEvent } from './execution.js';
 
 /**
  * عروض الأسعار (Quotes): لخدمات نوع QUOTE — عدة مزودين يقدّمون عرضًا، والعميل يقبل واحدًا فيُسند الطلب لصاحبه.
@@ -46,6 +47,8 @@ export function registerQuoteRoutes(app: App, r: Router): void {
       ctx.status = existing ? 200 : 201;
       const q = db.get<QuoteRow>('SELECT * FROM quotes WHERE order_id = ? AND provider_id = ?', o.id, providerId)!;
       app.notifications.notify(o.customer_id, 'NEW_QUOTE', { provider: p.displayName, amount: String(b.amount), code: o.code }, { orderId: o.id, quoteId: q.id });
+      executionEvent(app,o.id,'QUOTE_SUBMITTED','تم إرسال عرض سعر',`${p.displayName} · ${b.amount}`,'PROVIDER',ctx.user!.id,{quoteId:q.id});
+      app.sse.broadcast('sync',{scope:'admin',entity:'quote',orderId:o.id,quoteId:q.id,event:'submitted'});
       return { quote: quoteOut(q, p.displayName) };
     });
   });
@@ -100,7 +103,10 @@ export function registerQuoteRoutes(app: App, r: Router): void {
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', o.id, o.status, 'ACCEPTED', ctx.user!.id, 'CUSTOMER', now);
       app.payment.onAccepted(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!);
       const p = app.providers.summary(q.provider_id);
-      app.notifications.notify(p.userId, 'QUOTE_ACCEPTED', { code: o.code });
+      app.notifications.notify(p.userId, 'QUOTE_ACCEPTED', { code: o.code }, {orderId:o.id,quoteId:q.id});
+      app.notifications.notify(o.customer_id, 'ORDER_ACCEPTED', { code: o.code, provider: p.displayName }, {orderId:o.id});
+      executionEvent(app,o.id,'QUOTE_ACCEPTED','تم قبول عرض السعر',p.displayName,'CUSTOMER',ctx.user!.id,{quoteId:q.id,providerId:q.provider_id});
+      app.sse.broadcast('sync',{scope:'admin',entity:'order',orderId:o.id,event:'quote_accepted',providerId:q.provider_id});
       return { order: orders.serialize(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!, ctx) };
     });
   });

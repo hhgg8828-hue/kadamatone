@@ -12,13 +12,13 @@ const TIME: Schema = s.str({ pattern: /^([01]\d|2[0-3]):[0-5]\d$/, patternMessag
 export interface ProviderSummary {
   id: string; userId: string; fullName: string; displayName: string; providerType: ProviderType; bio: string | null; companyName: string | null; specialty: string | null;
   avatarUrl: string | null; verificationStatus: VerificationStatus; verified: boolean; rejectionReason: string | null; suspensionReason: string | null;
-  isOnline: boolean; acceptanceRate: number; responseTimeAvgSec: number | null; responseTimeText: string; availabilityStatus: 'AVAILABLE'|'BUSY'|'OFFLINE'; availabilityStatusText: string; featured: boolean; baseLocation: { lat: number; lng: number } | null; rating: { avg: number; count: number }; completedOrders: number;
+  isOnline: boolean; acceptingOrders: boolean; lastHeartbeatAt: string | null; lastLocationAt: string | null; acceptanceRate: number; responseTimeAvgSec: number | null; responseTimeText: string; availabilityStatus: 'AVAILABLE'|'BUSY'|'OFFLINE'|'UNAVAILABLE'; availabilityStatusText: string; featured: boolean; baseLocation: { lat: number; lng: number } | null; rating: { avg: number; count: number }; completedOrders: number;
   services: Array<{ serviceId: string; name: string; categoryName: string; customPrice: number | null; experienceYears: number }>;
   areas: Array<{ id: string; name: string }>; availability: Array<{ weekday: number; start: string; end: string }>; createdAt: string;
 }
 export interface ProviderPublicProfile {
   id: string; displayName: string; providerType: ProviderType; bio: string | null; companyName: string | null; specialty: string | null; avatarUrl: string | null;
-  verified: boolean; rating: { avg: number; count: number }; completedOrders: number; isOnline: boolean; acceptanceRate: number; responseTimeAvgSec: number | null; responseTimeText: string; availabilityStatus: 'AVAILABLE'|'BUSY'|'OFFLINE'; availabilityStatusText: string; featured: boolean;
+  verified: boolean; rating: { avg: number; count: number }; completedOrders: number; isOnline: boolean; acceptingOrders: boolean; lastHeartbeatAt: string | null; lastLocationAt: string | null; acceptanceRate: number; responseTimeAvgSec: number | null; responseTimeText: string; availabilityStatus: 'AVAILABLE'|'BUSY'|'OFFLINE'|'UNAVAILABLE'; availabilityStatusText: string; featured: boolean;
   services: ProviderSummary['services']; areas: ProviderSummary['areas']; availability: ProviderSummary['availability'];
   workPhotos: (string | null)[]; recentReviews: Array<{ score: number; comment: string; createdAt: string; customerName: string }>;
 }
@@ -50,14 +50,14 @@ export function createProviders(app: App): Providers {
       const assignmentStats=db.get<{accepted:number;responded:number;offered:number;avg_response:number|null}>(`SELECT COALESCE(SUM(CASE WHEN status='ACCEPTED' THEN 1 ELSE 0 END),0) accepted, COALESCE(SUM(CASE WHEN responded_at IS NOT NULL THEN 1 ELSE 0 END),0) responded, COUNT(*) offered, AVG(CASE WHEN responded_at IS NOT NULL THEN (julianday(responded_at)-julianday(offered_at))*86400 END) avg_response FROM order_assignments WHERE provider_id=?`,providerId)!;
       const acceptanceRate=assignmentStats.offered?round((assignmentStats.accepted/assignmentStats.offered)*100,1):0;
       const activeCount=Number(db.get<{n:number}>(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`,providerId)?.n||0);
-      const availabilityStatus: 'AVAILABLE'|'BUSY'|'OFFLINE'=!p.is_online?'OFFLINE':activeCount>0?'BUSY':'AVAILABLE';
+      const availabilityStatus: 'AVAILABLE'|'BUSY'|'OFFLINE'|'UNAVAILABLE'=!p.is_online?'OFFLINE':activeCount>0?'BUSY':'AVAILABLE';
       const featured=!!db.get('SELECT 1 FROM featured_providers WHERE provider_id=?',providerId);
       const responseTimeAvgSec=assignmentStats.avg_response==null?null:Math.max(0,Math.round(assignmentStats.avg_response));
       const responseTimeText=responseTimeAvgSec==null?'غير متاح':responseTimeAvgSec<60?`${responseTimeAvgSec} ثانية`:responseTimeAvgSec<3600?`${Math.round(responseTimeAvgSec/60)} دقيقة`:`${Math.round(responseTimeAvgSec/3600)} ساعة`;
       return {
         id: p.id, userId: p.user_id, fullName: p.full_name, displayName: p.display_name, providerType: p.provider_type, bio: p.bio, companyName: p.company_name, specialty: p.specialty,
         avatarUrl: fileUrl(p.avatar_file_id), verificationStatus: p.verification_status, verified: p.verification_status === 'VERIFIED',
-        rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online,
+        rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online, acceptingOrders: !!p.accepting_orders, lastHeartbeatAt: p.last_heartbeat_at || null, lastLocationAt: p.last_location_at || null,
         baseLocation: p.base_lat === null ? null : { lat: p.base_lat, lng: p.base_lng! },
         rating: { avg: round(p.rating_avg, 2), count: p.rating_count }, completedOrders: p.completed_orders_count, acceptanceRate, responseTimeAvgSec, responseTimeText, availabilityStatus, availabilityStatusText:availabilityStatus==='AVAILABLE'?'متاح':availabilityStatus==='BUSY'?'مشغول':'غير متاح', featured, services, areas, availability, createdAt: p.created_at,
       };
@@ -75,7 +75,7 @@ export function createProviders(app: App): Providers {
           WHERE ra.provider_id = ? ORDER BY rv.created_at DESC LIMIT 10`, providerId)
         .map((x) => ({ score: x.score, comment: x.comment, createdAt: x.created_at, customerName: String(x.full_name).split(' ')[0] ?? '' }));
       return { id: base.id, displayName: base.displayName, providerType: base.providerType, bio: base.bio, companyName: base.companyName, specialty: base.specialty, avatarUrl: base.avatarUrl,
-        verified: base.verified, rating: base.rating, completedOrders: base.completedOrders, isOnline: base.isOnline, acceptanceRate:base.acceptanceRate, responseTimeAvgSec:base.responseTimeAvgSec, responseTimeText:base.responseTimeText, availabilityStatus:base.availabilityStatus, availabilityStatusText:base.availabilityStatusText, featured:base.featured, services: base.services, areas: base.areas, availability: base.availability, workPhotos: works, recentReviews: reviews };
+        verified: base.verified, acceptingOrders: base.acceptingOrders, lastHeartbeatAt: base.lastHeartbeatAt, lastLocationAt: base.lastLocationAt, rating: base.rating, completedOrders: base.completedOrders, isOnline: base.isOnline, acceptanceRate:base.acceptanceRate, responseTimeAvgSec:base.responseTimeAvgSec, responseTimeText:base.responseTimeText, availabilityStatus:base.availabilityStatus, availabilityStatusText:base.availabilityStatusText, featured:base.featured, services: base.services, areas: base.areas, availability: base.availability, workPhotos: works, recentReviews: reviews };
     },
     earnings(providerId) {
       const commission = app.settings.get<number>('platform.commission_percent');
@@ -187,10 +187,10 @@ export function registerProviderRoutes(app: App, r: Router): void {
 
   r.post('/provider/presence-heartbeat', ...isProvider, (ctx: Ctx) => {
     const now=iso(app.clock.now());
-    const p=db.get<any>('SELECT id,user_id,is_online FROM service_providers WHERE id=?',pid(ctx));
+    const p=db.get<any>('SELECT id,user_id,is_online,accepting_orders FROM service_providers WHERE id=?',pid(ctx));
     if(!p) throw E.notFound('ملف مقدم الخدمة غير موجود');
     if(!p.is_online) return {isOnline:false,lastSeenAt:null};
-    db.run('UPDATE service_providers SET last_seen_at=?,updated_at=? WHERE id=?',now,now,p.id);
+    db.run('UPDATE service_providers SET last_seen_at=?,last_heartbeat_at=?,updated_at=? WHERE id=?',now,now,now,p.id);
     db.run('UPDATE provider_presence_sessions SET last_seen_at=? WHERE provider_id=? AND ended_at IS NULL',now,p.id);
     return {isOnline:true,lastSeenAt:now};
   });
@@ -204,19 +204,33 @@ export function registerProviderRoutes(app: App, r: Router): void {
     if (online && serviceCount < 1) throw E.unprocessable('اختر خدمة واحدة على الأقل قبل بدء استقبال الطلبات', 'PROVIDER_SERVICES_REQUIRED');
     const now=iso(app.clock.now());
     db.tx(()=>{
-      db.run('UPDATE service_providers SET is_online = ?, last_seen_at=?, updated_at = ? WHERE id = ?', online ? 1 : 0, now, now, pid(ctx));
+      db.run('UPDATE service_providers SET is_online = ?, accepting_orders = ?, last_seen_at=?, last_heartbeat_at=?, updated_at = ? WHERE id = ?', online ? 1 : 0, online ? 1 : 0, now, now, now, pid(ctx));
       if(online) db.run(`INSERT INTO provider_presence_sessions(id,provider_id,started_at,last_seen_at,created_at) VALUES(?,?,?,?,?)`,uuid(),pid(ctx),now,now,now);
       else db.run(`UPDATE provider_presence_sessions SET ended_at=?,last_seen_at=? WHERE provider_id=? AND ended_at IS NULL`,now,now,pid(ctx));
     });
-    app.sse.send(ctx.user!.id, 'sync', { scope: 'provider' }); return { isOnline: online, lastSeenAt: now };
+    app.sse.send(ctx.user!.id, 'sync', { scope: 'provider' }); app.sse.broadcast('sync', { scope: 'admin', entity: 'provider_presence', providerId: pid(ctx) }); return { isOnline: online, acceptingOrders: online, lastSeenAt: now };
   });
+
+  r.post('/provider/accepting-orders', ...isProvider, (ctx: Ctx) => {
+    const { accepting } = parse<{ accepting: boolean }>(s.obj({ accepting: s.bool() }), ctx.body);
+    const p = db.get<any>('SELECT id,is_online,verification_status FROM service_providers WHERE id=?', pid(ctx));
+    if (!p) throw E.notFound('ملف مقدم الخدمة غير موجود');
+    if (accepting && p.verification_status !== 'VERIFIED') throw E.forbidden('لا يمكنك استقبال الطلبات قبل توثيق حسابك', 'PROVIDER_NOT_VERIFIED');
+    if (accepting && !p.is_online) throw E.unprocessable('فعّل الاتصال أولًا قبل استقبال الطلبات', 'PROVIDER_OFFLINE');
+    const now=iso(app.clock.now());
+    db.run('UPDATE service_providers SET accepting_orders=?,last_seen_at=?,last_heartbeat_at=?,updated_at=? WHERE id=?',accepting?1:0,now,now,now,p.id);
+    app.sse.send(ctx.user!.id,'sync',{scope:'provider'});
+    app.sse.broadcast('sync',{scope:'admin',entity:'provider_presence',providerId:p.id});
+    return {acceptingOrders:accepting,lastSeenAt:now};
+  });
+
 
 
   // إدارة توثيق مقدمي الخدمات من لوحة الإدارة
   r.get('/admin/providers', auth, adminLevel('SUPPORT'), (ctx: Ctx) => {
     const status = ctx.query['status'];
     const rows = db.all<any>(`SELECT sp.*, u.full_name, u.phone, u.email FROM service_providers sp JOIN users u ON u.id = sp.user_id ${status ? 'WHERE sp.verification_status = ?' : ''} ORDER BY sp.created_at DESC LIMIT 200`, ...(status ? [status] : []));
-    return { providers: rows.map((p) => { const sm=app.providers.summary(p.id, ctx.locale); const active=Number(db.get<any>(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`,p.id)?.n||0); const received=Number(db.get<any>('SELECT COUNT(*) n FROM order_assignments WHERE provider_id=?',p.id)?.n||0); const rejected=Number(db.get<any>(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='REJECTED'`,p.id)?.n||0); const expired=Number(db.get<any>(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='EXPIRED'`,p.id)?.n||0); const cancelled=Number(db.get<any>(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status='CANCELLED'`,p.id)?.n||0); return { id: p.id, userId: p.user_id, fullName: p.full_name, phone: p.phone, email: p.email, displayName: p.display_name, providerType: p.provider_type, verificationStatus: p.verification_status, rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online, lastSeenAt:p.last_seen_at||null, availabilityStatus:sm.availabilityStatus, availabilityStatusText:sm.availabilityStatusText, activeOrders:active, receivedOrders:received, rejectedOrders:rejected, noResponseOrders:expired, cancelledOrders:cancelled, rating: p.rating_avg, completedOrders: p.completed_orders_count, acceptanceRate: sm.acceptanceRate, responseTimeText: sm.responseTimeText, featured: sm.featured, createdAt: p.created_at, documents: app.providers.documents(p.id) }; }) };
+    return { providers: rows.map((p) => { const sm=app.providers.summary(p.id, ctx.locale); const active=Number(db.get<any>(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`,p.id)?.n||0); const received=Number(db.get<any>('SELECT COUNT(*) n FROM order_assignments WHERE provider_id=?',p.id)?.n||0); const rejected=Number(db.get<any>(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='REJECTED'`,p.id)?.n||0); const expired=Number(db.get<any>(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='EXPIRED'`,p.id)?.n||0); const cancelled=Number(db.get<any>(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status='CANCELLED'`,p.id)?.n||0); return { id: p.id, userId: p.user_id, fullName: p.full_name, phone: p.phone, email: p.email, displayName: p.display_name, providerType: p.provider_type, verificationStatus: p.verification_status, rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online, acceptingOrders: !!p.accepting_orders, lastSeenAt:p.last_seen_at||null, lastHeartbeatAt:p.last_heartbeat_at||null, lastLocationAt:p.last_location_at||null, availabilityStatus:sm.availabilityStatus, availabilityStatusText:sm.availabilityStatusText, activeOrders:active, receivedOrders:received, rejectedOrders:rejected, noResponseOrders:expired, cancelledOrders:cancelled, rating: p.rating_avg, completedOrders: p.completed_orders_count, acceptanceRate: sm.acceptanceRate, responseTimeText: sm.responseTimeText, featured: sm.featured, createdAt: p.created_at, documents: app.providers.documents(p.id) }; }) };
   });
 
   r.patch('/admin/providers/:id/verification', auth, adminLevel('ADMIN'), (ctx: Ctx) => {
