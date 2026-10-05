@@ -134,9 +134,9 @@ test('V66.14: العميل يرى الطلبات الملغاة أيضًا، و�
     assert.match(app, /providerAvatarFile/);
     assert.match(app, /quick-services-strip/);
     assert.match(app, /complaint_message/);
-    assert.ok(html.includes('app.js?v=66.14'));
-    assert.ok(index.includes('app.js?v=66.14'));
-    assert.ok(admin.includes('app.js?v=66.14'));
-    assert.ok(sw.includes('khadamat-shell-v66_14'));
+    assert.ok(html.includes('app.js?v=66.15'));
+    assert.ok(index.includes('app.js?v=66.15'));
+    assert.ok(admin.includes('app.js?v=66.15'));
+    assert.ok(sw.includes('khadamat-shell-v66_15'));
 });
 //# sourceMappingURL=v66_14_reliability.test.js.map

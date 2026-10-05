@@ -21,8 +21,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 
 test('provider page and frontend assets use the current version', () => {
   assert.ok(provider.includes('data-page="provider"'));
-  assert.ok(provider.includes('app.js?v=66.14')); 
-  assert.ok(index.includes('app.js?v=66.14')); 
+  assert.ok(provider.includes('app.js?v=66.15')); 
+  assert.ok(index.includes('app.js?v=66.15')); 
 });
 
 
@@ -113,7 +113,7 @@ test('real-time SSE notifications are wired into customer/provider frontend', ()
 
 
 test('V34 live operations: notification center, provider profile, and offer countdown', () => {
-  assert.ok(app.includes('/notifications?limit=30'));
+  assert.ok(app.includes('/notifications?limit=100'));
   assert.ok(app.includes('read-all'));
   assert.ok(app.includes("'/providers/'+encodeURIComponent(o.provider.id)"));
   assert.ok(app.includes('offer-countdown'));

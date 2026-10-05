@@ -28,5 +28,5 @@ test('V66.14: اعتماد المركبة يعمل أيضًا عبر المسا�
 test('V66.14: واجهة مقدم الخدمة تعيد عرض العرض الجديد فور ظهوره وتستخدم cache bust', async()=>{
   const fs=await import('node:fs');
   const app=fs.readFileSync('public/app.ts','utf8'); const provider=fs.readFileSync('public/provider.html','utf8'); const admin=fs.readFileSync('public/admin.html','utf8');
-  assert.match(app,/providerPollTimer=window\.setInterval[\s\S]*?2000/); assert.match(app,/if\(addedOffers\.length\)/); assert.match(provider,/app\.js\?v=66\.14/); assert.match(admin,/app\.js\?v=66\.14/);
+  assert.match(app,/providerPollTimer=window\.setInterval[\s\S]*?8000/); assert.match(app,/if\(addedOffers\.length\)/); assert.match(provider,/app\.js\?v=66\.15/); assert.match(admin,/app\.js\?v=66\.15/);
 });

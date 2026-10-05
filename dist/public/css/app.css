@@ -227,3 +227,7 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 .account-avatar-preview{width:76px;height:76px;border-radius:22px;display:grid;place-items:center;font-size:28px;flex:none;border-color:#e4deef}
 .account-avatar-editor input{margin-top:7px;max-width:100%}
 @media(max-width:600px){.capability-options{grid-template-columns:1fr}.quick-services-strip .quick-service{flex-basis:165px}.account-avatar-editor{align-items:flex-start;flex-direction:column}}
+
+/* V66.15 — compact provider notification workspace */
+.provider-notification-summary{display:grid;gap:10px;padding:12px;border:1px solid #e3deed;border-radius:16px;background:linear-gradient(145deg,#fff,#faf8ff)}
+.provider-notification-count{display:flex;align-items:center;gap:10px}.provider-notification-count>div{display:grid;gap:3px}.provider-notification-count small{font-size:11px}.provider-notification-stats{display:flex;gap:7px;flex-wrap:wrap}.notification-stat{font-size:11px;padding:7px 9px}.provider-notification-latest{display:grid;gap:3px;padding:9px 11px;border-radius:12px;background:#f7f5fb}.provider-notification-latest>span{font-size:10px;color:#777}.provider-notification-latest small{font-size:10px}
