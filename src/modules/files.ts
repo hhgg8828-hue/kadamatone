@@ -19,6 +19,10 @@ function sniff(buf: Buffer): string | null {
   if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (buf.length > 12 && buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP') return 'image/webp';
   if (buf.length > 5 && buf.subarray(0, 5).toString() === '%PDF-') return 'application/pdf';
+  // WebM/Opus recordings produced by MediaRecorder.
+  if (buf.length >= 4 && buf.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) return 'audio/webm';
+  // Ogg/Opus recordings on browsers that prefer OGG containers.
+  if (buf.length > 4 && buf.subarray(0, 4).toString('ascii') === 'OggS') return 'audio/ogg';
   return null;
 }
 
@@ -31,7 +35,7 @@ export function registerFileRoutes(app: App, r: Router): void {
     if (!buf.length) throw E.unprocessable('الملف فارغ', 'EMPTY_FILE');
     if (buf.length > MAX_BYTES) throw E.unprocessable('حجم الملف يتجاوز 5MB', 'FILE_TOO_LARGE');
     const mime = sniff(buf);
-    const allowed = (b.purpose === 'provider_document' || b.purpose === 'order_attachment') ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : ['image/jpeg', 'image/png', 'image/webp'];
+    const allowed = (b.purpose === 'provider_document') ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : b.purpose === 'order_attachment' ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'audio/webm', 'audio/ogg'] : ['image/jpeg', 'image/png', 'image/webp'];
     if (!mime || !allowed.includes(mime)) throw E.unprocessable('نوع الملف غير مدعوم', 'UNSUPPORTED_FILE_TYPE');
     if (b.purpose === 'service_icon' && ctx.user!.role !== 'ADMIN') throw E.forbidden();
     const id = uuid();

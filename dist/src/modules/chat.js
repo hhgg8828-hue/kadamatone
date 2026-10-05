@@ -13,13 +13,18 @@ function canAccess(app, orderId, ctx) {
         return o;
     if (ctx.user?.role === 'CUSTOMER' && o.customer_id === ctx.user.id)
         return o;
-    if (ctx.user?.role === 'PROVIDER' && o.provider_id === ctx.user.providerId)
-        return o;
+    if (ctx.user?.role === 'PROVIDER') {
+        if (o.provider_id === ctx.user.providerId)
+            return o;
+        const assigned = app.db.get("SELECT status FROM order_assignments WHERE order_id=? AND provider_id=? AND status IN ('OFFERED','ACCEPTED') LIMIT 1", orderId, ctx.user.providerId);
+        if (assigned)
+            return o;
+    }
     throw E.forbidden('لا تملك صلاحية الوصول إلى محادثة هذا الطلب');
 }
 function out(app, m) {
     const u = app.db.get('SELECT full_name FROM users WHERE id=?', m.sender_id);
-    return { id: m.id, orderId: m.order_id, senderId: m.sender_id, senderRole: m.sender_role, senderName: u?.full_name || '', body: m.body, attachments: JSON.parse(m.attachments || '[]').map(id => ({ id, url: `/api/v1/files/${id}` })), location: m.location_lat === null ? null : { lat: m.location_lat, lng: m.location_lng, accuracy: m.location_accuracy_m, addressText: m.location_address_text }, createdAt: m.created_at };
+    return { id: m.id, orderId: m.order_id, senderId: m.sender_id, senderRole: m.sender_role, senderName: u?.full_name || '', body: m.body, attachments: JSON.parse(m.attachments || '[]').map(id => { const f = app.db.get('SELECT mime FROM files WHERE id=?', id); return { id, mime: f?.mime || '', url: `/api/v1/files/${id}` }; }), location: m.location_lat === null ? null : { lat: m.location_lat, lng: m.location_lng, accuracy: m.location_accuracy_m, addressText: m.location_address_text }, createdAt: m.created_at };
 }
 export function registerChatRoutes(app, r) {
     r.get('/orders/:id/messages', auth, (ctx) => {

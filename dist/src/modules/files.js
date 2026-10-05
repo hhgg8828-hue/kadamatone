@@ -17,6 +17,12 @@ function sniff(buf) {
         return 'image/webp';
     if (buf.length > 5 && buf.subarray(0, 5).toString() === '%PDF-')
         return 'application/pdf';
+    // WebM/Opus recordings produced by MediaRecorder.
+    if (buf.length >= 4 && buf.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])))
+        return 'audio/webm';
+    // Ogg/Opus recordings on browsers that prefer OGG containers.
+    if (buf.length > 4 && buf.subarray(0, 4).toString('ascii') === 'OggS')
+        return 'audio/ogg';
     return null;
 }
 export function registerFileRoutes(app, r) {
@@ -29,7 +35,7 @@ export function registerFileRoutes(app, r) {
         if (buf.length > MAX_BYTES)
             throw E.unprocessable('حجم الملف يتجاوز 5MB', 'FILE_TOO_LARGE');
         const mime = sniff(buf);
-        const allowed = (b.purpose === 'provider_document' || b.purpose === 'order_attachment') ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : ['image/jpeg', 'image/png', 'image/webp'];
+        const allowed = (b.purpose === 'provider_document') ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : b.purpose === 'order_attachment' ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'audio/webm', 'audio/ogg'] : ['image/jpeg', 'image/png', 'image/webp'];
         if (!mime || !allowed.includes(mime))
             throw E.unprocessable('نوع الملف غير مدعوم', 'UNSUPPORTED_FILE_TYPE');
         if (b.purpose === 'service_icon' && ctx.user.role !== 'ADMIN')
