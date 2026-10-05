@@ -16,12 +16,19 @@ function bool(v: any): boolean { return !!v; }
 function json(v: any, fallback: any): any { try { return parseJson(v); } catch { return fallback; } }
 function providerState(app: App, p: any) {
   const timeout = app.settings.get<number>('presence.timeout_sec');
-  const seenValue = p.last_seen_at ?? p.lastSeenAt ?? null;
-  const seen = seenValue ? Date.parse(seenValue) : 0;
-  const online = !!(p.is_online ?? p.isOnline) && seen > app.clock.now() - timeout * 1000;
+  const now = app.clock.now();
+  const lastSeen = p.last_seen_at ?? p.lastSeenAt ?? null; const seen = lastSeen ? Date.parse(lastSeen) : 0;
+  const online = !!(p.is_online ?? p.isOnline) && seen > now - timeout * 1000;
   const active = Number(app.db.get<{ n:number}>(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`,p.id)?.n||0);
-  const accepting = !!(p.accepting_orders ?? p.acceptingOrders);
-  return { online, availability: online ? (active ? 'BUSY' : (accepting ? 'AVAILABLE' : 'UNAVAILABLE')) : 'OFFLINE', acceptingOrders: online && accepting, lastSeenAt:seenValue, lastHeartbeatAt:p.last_heartbeat_at ?? p.lastHeartbeatAt ?? null, lastLocationAt:p.last_location_at ?? p.lastLocationAt ?? null, currentOrderId: app.db.get<any>(`SELECT id FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS') ORDER BY updated_at DESC LIMIT 1`,p.id)?.id || null };
+  const acceptingOrders = !!(p.accepting_orders ?? p.acceptingOrders) && online;
+  const currentOrder = app.db.get<any>(`SELECT id,code,status,updated_at FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS') ORDER BY updated_at DESC LIMIT 1`,p.id);
+  return {
+    online, isOnline: online, acceptingOrders,
+    availability: online ? (active ? 'BUSY' : 'AVAILABLE') : 'OFFLINE',
+    availabilityText: online ? (active ? 'مشغول' : 'متاح') : 'غير متاح',
+    lastSeenAt: lastSeen, lastHeartbeatAt: p.last_heartbeat_at ?? p.lastHeartbeatAt ?? null, lastLocationAt: p.last_location_at ?? p.lastLocationAt ?? null,
+    currentOrder: currentOrder ? { id:currentOrder.id, code:currentOrder.code, status:currentOrder.status, updatedAt:currentOrder.updated_at } : null,
+  };
 }
 
 export function registerAdminOperationsRoutes(app: App, r: Router): void {
@@ -64,7 +71,7 @@ export function registerAdminOperationsRoutes(app: App, r: Router): void {
 
   r.get('/admin/operations/live', auth, adminLevel('SUPPORT'), () => {
     refreshAlerts(); const now=iso(app.clock.now());
-    const orders=db.all<any>(`SELECT o.id,o.code,o.status,o.created_at createdAt,o.updated_at updatedAt,o.accepted_at acceptedAt,o.started_at startedAt,o.completed_at completedAt,o.cancelled_at cancelledAt, o.wave, cu.full_name customerName, s.name_i18n serviceName, sp.display_name providerName, sp.id providerId, l.lat,l.lng,sp.is_online providerIsOnline,sp.accepting_orders providerAcceptingOrders,sp.last_seen_at providerLastSeenAt,sp.last_heartbeat_at providerLastHeartbeatAt,sp.last_location_at providerLastLocationAt FROM orders o JOIN users cu ON cu.id=o.customer_id JOIN services s ON s.id=o.service_id LEFT JOIN service_providers sp ON sp.id=o.provider_id LEFT JOIN locations l ON l.id=o.location_id WHERE o.status IN ${activeStatuses} ORDER BY o.created_at ASC LIMIT 200`);
+    const orders=db.all<any>(`SELECT o.id,o.code,o.status,o.created_at createdAt,o.updated_at updatedAt,o.accepted_at acceptedAt,o.started_at startedAt,o.completed_at completedAt,o.cancelled_at cancelledAt, o.wave, cu.full_name customerName, s.name_i18n serviceName, sp.display_name providerName, sp.id providerId, l.lat,l.lng FROM orders o JOIN users cu ON cu.id=o.customer_id JOIN services s ON s.id=o.service_id LEFT JOIN service_providers sp ON sp.id=o.provider_id LEFT JOIN locations l ON l.id=o.location_id WHERE o.status IN ${activeStatuses} ORDER BY o.created_at ASC LIMIT 200`);
     const providers=db.all<any>(`SELECT sp.id,sp.display_name displayName,sp.is_online isOnline,sp.accepting_orders acceptingOrders,sp.last_seen_at lastSeenAt,sp.last_heartbeat_at lastHeartbeatAt,sp.last_location_at lastLocationAt,sp.base_lat baseLat,sp.base_lng baseLng,u.full_name fullName FROM service_providers sp JOIN users u ON u.id=sp.user_id WHERE sp.verification_status='VERIFIED' ORDER BY sp.display_name LIMIT 300`).map((p:any)=>({...p,...providerState(app,p)}));
     return {orders,providers};
   });

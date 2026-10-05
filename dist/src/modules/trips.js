@@ -13,7 +13,7 @@ const tripLocation = s.obj({
 const purposeSchema = s.oneOf(['PASSENGER', 'ITEM_PURCHASE', 'MEDICINE', 'PARCEL', 'RESTAURANT_PICKUP', 'DOCUMENT_DELIVERY', 'TECHNICIAN_PICKUP', 'STORE_SHOPPING', 'SMALL_CARGO', 'HOME_PICKUP', 'OTHER']);
 const tripInputSchema = s.obj({
     origin: tripLocation,
-    destination: tripLocation,
+    destination: { ...tripLocation, optional: true },
     originAddressId: s.str({ max: 64, optional: true }),
     destinationAddressId: s.str({ max: 64, optional: true }),
     purpose: purposeSchema,
@@ -135,17 +135,16 @@ export function registerTripRoutes(app, r) {
             throw E.notFound('خدمة المشاوير غير متاحة', 'SERVICE_NOT_FOUND');
         const b = parse(tripInputSchema, ctx.body);
         const origin = makeLocation(app, ctx.user.id, b.origin, b.originAddressId);
-        const destination = makeLocation(app, ctx.user.id, b.destination, b.destinationAddressId);
+        const destination = b.destination ? makeLocation(app, ctx.user.id, b.destination, b.destinationAddressId) : origin;
         const stops = [];
         for (const stop of (b.stops || []))
             stops.push(app.locations.create(stop, { requireArea: false }));
-        const points = [origin, ...stops, destination];
-        if (points.every((p) => p.lat === origin.lat && p.lng === origin.lng))
+        const points = [origin, ...stops, ...(b.destination ? [destination] : [])];
+        const destinationPending = !b.destination;
+        if (!destinationPending && points.every((p) => p.lat === origin.lat && p.lng === origin.lng))
             throw E.unprocessable('حدد وجهة مختلفة عن موقع الانطلاق', 'SAME_LOCATION');
-        const route = await drivingRoute(app, points);
+        const route = destinationPending ? { distanceKm: 0, durationMin: null, method: 'STRAIGHT_LINE_TEST' } : await drivingRoute(app, points);
         const distanceKm = route.distanceKm;
-        if (distanceKm <= 0)
-            throw E.unprocessable('تعذر حساب مسافة القيادة بين الموقعين', 'INVALID_DISTANCE');
         const pricing = price(app, distanceKm);
         const now = iso(app.clock.now());
         return app.db.tx(() => {
@@ -155,8 +154,8 @@ export function registerTripRoutes(app, r) {
             const id = uuid();
             const code = (() => { const year = new Date(app.clock.now()).getUTCFullYear(); const key = `order_seq_${year}`; app.db.run('INSERT INTO counters(name,value) VALUES(?,1) ON CONFLICT(name) DO UPDATE SET value=value+1', key); const n = app.db.get('SELECT value FROM counters WHERE name=?', key).value; return `KH-${year}-${String(n).padStart(6, '0')}`; })();
             app.db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,pricing_type,price_snapshot,agreed_price,currency,customer_notes,attachments,created_at,updated_at)
-                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, tripService.id, 'PENDING', 'NORMAL', b.description, JSON.stringify({ purpose: b.purpose, purposeNote: b.purposeNote || null, originAddressText: b.origin.addressText || null, destinationAddressText: b.destination.addressText || null, stops: points.slice(1, -1).map((p) => ({ lat: p.lat, lng: p.lng, addressText: p.address_text || p.addressText || null })) }), origin.id, origin.area_id, b.contactPhone, null, 'FIXED', pricing.fare, null, pricing.currency, b.notes || null, '[]', now, now);
-            app.db.run(`INSERT INTO trip_orders(order_id,destination_location_id,purpose,purpose_note,distance_km,base_fare,per_km_fare,minimum_fare,fare,currency,waiting_per_minute_fare,waiting_total_minutes,purchase_max_price,purchase_quantity,purchase_alternatives,purchase_requires_approval,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, destination.id, b.purpose, b.purposeNote || null, distanceKm, pricing.baseFare, pricing.perKmFare, pricing.minimumFare, pricing.fare, pricing.currency, Number(b.waitingPerMinute ?? app.settings.get('trips.waiting_per_minute_fare')), 0, b.purchaseMaxPrice ?? null, b.purchaseQuantity ?? null, b.purchaseAlternatives ?? null, b.purchaseRequiresApproval ? 1 : 0, now, now);
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, tripService.id, 'PENDING', 'NORMAL', b.description, JSON.stringify({ purpose: b.purpose, purposeNote: b.purposeNote || null, originAddressText: b.origin.addressText || null, destinationAddressText: b.destination?.addressText || null, destinationPending, stops: points.slice(1, -1).map((p) => ({ lat: p.lat, lng: p.lng, addressText: p.address_text || p.addressText || null })) }), origin.id, origin.area_id, b.contactPhone, null, 'FIXED', pricing.fare, null, pricing.currency, b.notes || null, '[]', now, now);
+            app.db.run(`INSERT INTO trip_orders(order_id,destination_location_id,destination_pending,purpose,purpose_note,distance_km,base_fare,per_km_fare,minimum_fare,fare,currency,waiting_per_minute_fare,waiting_total_minutes,purchase_max_price,purchase_quantity,purchase_alternatives,purchase_requires_approval,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, destination.id, destinationPending ? 1 : 0, b.purpose, b.purposeNote || null, distanceKm, pricing.baseFare, pricing.perKmFare, pricing.minimumFare, pricing.fare, pricing.currency, Number(b.waitingPerMinute ?? app.settings.get('trips.waiting_per_minute_fare')), 0, b.purchaseMaxPrice ?? null, b.purchaseQuantity ?? null, b.purchaseAlternatives ?? null, b.purchaseRequiresApproval ? 1 : 0, now, now);
             stops.forEach((p, i) => app.db.run('INSERT INTO trip_stops(id,order_id,sequence_no,location_id,note) VALUES(?,?,?,?,?)', uuid(), id, i + 1, p.id, null));
             app.db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user.id, 'CUSTOMER', now);
             let o = app.db.get('SELECT * FROM orders WHERE id=?', id);
@@ -167,6 +166,30 @@ export function registerTripRoutes(app, r) {
             ctx.status = 201;
             return { order: app.orders.serialize(o, ctx), trip: serializeTrip(app, o.id, ctx.locale) };
         });
+    });
+    r.post('/trips/:id/destination', auth, roles('CUSTOMER', 'PROVIDER'), async (ctx) => {
+        const b = parse(s.obj({ destination: tripLocation }), ctx.body);
+        const o = app.db.get('SELECT * FROM orders WHERE id=?', ctx.params.id);
+        if (!o)
+            throw E.notFound('المشوار غير موجود');
+        if (ctx.user.role === 'CUSTOMER' && o.customer_id !== ctx.user.id)
+            throw E.forbidden();
+        if (ctx.user.role === 'PROVIDER' && o.provider_id !== ctx.user.providerId)
+            throw E.forbidden();
+        if (['COMPLETED', 'CANCELLED'].includes(o.status))
+            throw E.unprocessable('لا يمكن تغيير وجهة مشوار منتهٍ', 'TRIP_CLOSED');
+        const t = app.db.get('SELECT * FROM trip_orders WHERE order_id=?', o.id);
+        if (!t)
+            throw E.notFound('بيانات المشوار غير موجودة');
+        const d = makeLocation(app, ctx.user.id, b.destination);
+        const origin = app.db.get('SELECT * FROM locations WHERE id=?', o.location_id);
+        const route = await drivingRoute(app, [origin, { lat: d.lat, lng: d.lng }]);
+        const pricing = price(app, route.distanceKm);
+        const now = iso(app.clock.now());
+        app.db.run('UPDATE trip_orders SET destination_location_id=?,destination_pending=0,distance_km=?,fare=?,updated_at=? WHERE order_id=?', d.id, route.distanceKm, pricing.fare, now, o.id);
+        app.db.run('UPDATE orders SET price_snapshot=?,updated_at=?,version=version+1 WHERE id=?', pricing.fare, now, o.id);
+        app.sse.send(o.customer_id, 'sync', { scope: 'orders', orderId: o.id });
+        return { ok: true, distanceKm: route.distanceKm, fare: pricing.fare, currency: pricing.currency, trip: serializeTrip(app, o.id, ctx.locale) };
     });
     r.post('/trips/:id/wait', auth, roles('PROVIDER'), (ctx) => {
         const b = parse(s.obj({ action: s.oneOf(['START', 'STOP']) }), ctx.body);
@@ -202,10 +225,8 @@ export function serializeTrip(app, orderId, locale = 'ar') {
     const t = app.db.get('SELECT * FROM trip_orders WHERE order_id=?', orderId);
     if (!t)
         return null;
-    const d = app.db.get('SELECT * FROM locations WHERE id=?', t.destination_location_id);
-    if (!d)
-        return null;
+    const d = t.destination_pending ? null : app.db.get('SELECT * FROM locations WHERE id=?', t.destination_location_id);
     const labels = { PASSENGER: 'نقل شخص', ITEM_PURCHASE: 'شراء وإحضار غرض', MEDICINE: 'شراء دواء من صيدلية', PARCEL: 'توصيل طلب أو غرض', RESTAURANT_PICKUP: 'استلام طلب من مطعم', DOCUMENT_DELIVERY: 'استلام وتسليم مستندات', TECHNICIAN_PICKUP: 'إحضار فني أو عامل', STORE_SHOPPING: 'شراء أغراض من متجر', SMALL_CARGO: 'نقل أغراض صغيرة', HOME_PICKUP: 'استلام أو توصيل شيء من/إلى المنزل', OTHER: 'أخرى' };
-    return { purpose: t.purpose, purposeName: labels[t.purpose] || t.purpose, purposeNote: t.purpose_note, distanceKm: t.distance_km, fare: t.fare, currency: t.currency, pricing: { baseFare: t.base_fare, perKmFare: t.per_km_fare, minimumFare: t.minimum_fare, waitingPerMinuteFare: t.waiting_per_minute_fare }, waitingTotalMinutes: t.waiting_total_minutes, purchase: { maxPrice: t.purchase_max_price, quantity: t.purchase_quantity, alternatives: t.purchase_alternatives, requiresApproval: !!t.purchase_requires_approval }, stops: app.db.all('SELECT ts.sequence_no sequenceNo,l.lat,l.lng,l.address_text addressText FROM trip_stops ts JOIN locations l ON l.id=ts.location_id WHERE ts.order_id=? ORDER BY ts.sequence_no', orderId), destination: app.locations.serialize(d, locale) };
+    return { purpose: t.purpose, purposeName: labels[t.purpose] || t.purpose, purposeNote: t.purpose_note, distanceKm: t.distance_km, fare: t.fare, currency: t.currency, pricing: { baseFare: t.base_fare, perKmFare: t.per_km_fare, minimumFare: t.minimum_fare, waitingPerMinuteFare: t.waiting_per_minute_fare }, waitingTotalMinutes: t.waiting_total_minutes, purchase: { maxPrice: t.purchase_max_price, quantity: t.purchase_quantity, alternatives: t.purchase_alternatives, requiresApproval: !!t.purchase_requires_approval }, stops: app.db.all('SELECT ts.sequence_no sequenceNo,l.lat,l.lng,l.address_text addressText FROM trip_stops ts JOIN locations l ON l.id=ts.location_id WHERE ts.order_id=? ORDER BY ts.sequence_no', orderId), destination: d ? app.locations.serialize(d, locale) : null, destinationPending: !!t.destination_pending };
 }
 //# sourceMappingURL=trips.js.map

@@ -47,7 +47,7 @@ export function createProviders(app) {
           WHERE ra.provider_id = ? ORDER BY rv.created_at DESC LIMIT 10`, providerId)
                 .map((x) => ({ score: x.score, comment: x.comment, createdAt: x.created_at, customerName: String(x.full_name).split(' ')[0] ?? '' }));
             return { id: base.id, displayName: base.displayName, providerType: base.providerType, bio: base.bio, companyName: base.companyName, specialty: base.specialty, avatarUrl: base.avatarUrl,
-                verified: base.verified, acceptingOrders: base.acceptingOrders, lastHeartbeatAt: base.lastHeartbeatAt, lastLocationAt: base.lastLocationAt, rating: base.rating, completedOrders: base.completedOrders, isOnline: base.isOnline, acceptanceRate: base.acceptanceRate, responseTimeAvgSec: base.responseTimeAvgSec, responseTimeText: base.responseTimeText, availabilityStatus: base.availabilityStatus, availabilityStatusText: base.availabilityStatusText, featured: base.featured, services: base.services, areas: base.areas, availability: base.availability, workPhotos: works, recentReviews: reviews };
+                verified: base.verified, rating: base.rating, completedOrders: base.completedOrders, isOnline: base.isOnline, acceptingOrders: base.acceptingOrders, lastHeartbeatAt: base.lastHeartbeatAt, lastLocationAt: base.lastLocationAt, acceptanceRate: base.acceptanceRate, responseTimeAvgSec: base.responseTimeAvgSec, responseTimeText: base.responseTimeText, availabilityStatus: base.availabilityStatus, availabilityStatusText: base.availabilityStatusText, featured: base.featured, services: base.services, areas: base.areas, availability: base.availability, workPhotos: works, recentReviews: reviews };
         },
         earnings(providerId) {
             const commission = app.settings.get('platform.commission_percent');
@@ -165,14 +165,29 @@ export function registerProviderRoutes(app, r) {
     });
     r.post('/provider/presence-heartbeat', ...isProvider, (ctx) => {
         const now = iso(app.clock.now());
-        const p = db.get('SELECT id,user_id,is_online,accepting_orders FROM service_providers WHERE id=?', pid(ctx));
+        const p = db.get('SELECT id,user_id,is_online,accepting_orders,last_seen_at,last_heartbeat_at FROM service_providers WHERE id=?', pid(ctx));
         if (!p)
             throw E.notFound('ملف مقدم الخدمة غير موجود');
         if (!p.is_online)
-            return { isOnline: false, lastSeenAt: null };
+            return { isOnline: false, acceptingOrders: !!p.accepting_orders, lastSeenAt: p.last_seen_at || null, lastHeartbeatAt: p.last_heartbeat_at || null };
         db.run('UPDATE service_providers SET last_seen_at=?,last_heartbeat_at=?,updated_at=? WHERE id=?', now, now, now, p.id);
         db.run('UPDATE provider_presence_sessions SET last_seen_at=? WHERE provider_id=? AND ended_at IS NULL', now, p.id);
-        return { isOnline: true, lastSeenAt: now };
+        return { isOnline: true, acceptingOrders: !!p.accepting_orders, lastSeenAt: now, lastHeartbeatAt: now };
+    });
+    r.post('/provider/accepting-orders', ...isProvider, (ctx) => {
+        const { accepting } = parse(s.obj({ accepting: s.bool() }), ctx.body);
+        const p = db.get('SELECT id,is_online,verification_status FROM service_providers WHERE id=?', pid(ctx));
+        if (!p)
+            throw E.notFound('ملف مقدم الخدمة غير موجود');
+        if (accepting && !p.is_online)
+            throw E.unprocessable('ابدأ الاتصال أولًا قبل استقبال الطلبات', 'PROVIDER_OFFLINE');
+        if (accepting && p.verification_status !== 'VERIFIED')
+            throw E.forbidden('لا يمكنك استقبال الطلبات قبل توثيق الحساب', 'PROVIDER_NOT_VERIFIED');
+        const now = iso(app.clock.now());
+        db.run('UPDATE service_providers SET accepting_orders=?,last_seen_at=?,last_heartbeat_at=?,updated_at=? WHERE id=?', accepting ? 1 : 0, now, now, now, p.id);
+        for (const a of db.all("SELECT u.id FROM users u JOIN admin_users au ON au.user_id=u.id WHERE u.status='ACTIVE'"))
+            app.sse.send(a.id, 'sync', { scope: 'provider', providerId: p.id });
+        return { ok: true, acceptingOrders: accepting, lastSeenAt: now, lastHeartbeatAt: now };
     });
     r.post('/provider/online', ...isProvider, (ctx) => {
         const { online } = parse(s.obj({ online: s.bool() }), ctx.body);
@@ -193,29 +208,15 @@ export function registerProviderRoutes(app, r) {
                 db.run(`UPDATE provider_presence_sessions SET ended_at=?,last_seen_at=? WHERE provider_id=? AND ended_at IS NULL`, now, now, pid(ctx));
         });
         app.sse.send(ctx.user.id, 'sync', { scope: 'provider' });
-        app.sse.broadcast('sync', { scope: 'admin', entity: 'provider_presence', providerId: pid(ctx) });
-        return { isOnline: online, acceptingOrders: online, lastSeenAt: now };
-    });
-    r.post('/provider/accepting-orders', ...isProvider, (ctx) => {
-        const { accepting } = parse(s.obj({ accepting: s.bool() }), ctx.body);
-        const p = db.get('SELECT id,is_online,verification_status FROM service_providers WHERE id=?', pid(ctx));
-        if (!p)
-            throw E.notFound('ملف مقدم الخدمة غير موجود');
-        if (accepting && p.verification_status !== 'VERIFIED')
-            throw E.forbidden('لا يمكنك استقبال الطلبات قبل توثيق حسابك', 'PROVIDER_NOT_VERIFIED');
-        if (accepting && !p.is_online)
-            throw E.unprocessable('فعّل الاتصال أولًا قبل استقبال الطلبات', 'PROVIDER_OFFLINE');
-        const now = iso(app.clock.now());
-        db.run('UPDATE service_providers SET accepting_orders=?,last_seen_at=?,last_heartbeat_at=?,updated_at=? WHERE id=?', accepting ? 1 : 0, now, now, now, p.id);
-        app.sse.send(ctx.user.id, 'sync', { scope: 'provider' });
-        app.sse.broadcast('sync', { scope: 'admin', entity: 'provider_presence', providerId: p.id });
-        return { acceptingOrders: accepting, lastSeenAt: now };
+        for (const a of db.all("SELECT u.id FROM users u JOIN admin_users au ON au.user_id=u.id WHERE u.status='ACTIVE'"))
+            app.sse.send(a.id, 'sync', { scope: 'provider', providerId: pid(ctx) });
+        return { isOnline: online, acceptingOrders: online, lastSeenAt: now, lastHeartbeatAt: now };
     });
     // إدارة توثيق مقدمي الخدمات من لوحة الإدارة
     r.get('/admin/providers', auth, adminLevel('SUPPORT'), (ctx) => {
         const status = ctx.query['status'];
         const rows = db.all(`SELECT sp.*, u.full_name, u.phone, u.email FROM service_providers sp JOIN users u ON u.id = sp.user_id ${status ? 'WHERE sp.verification_status = ?' : ''} ORDER BY sp.created_at DESC LIMIT 200`, ...(status ? [status] : []));
-        return { providers: rows.map((p) => { const sm = app.providers.summary(p.id, ctx.locale); const active = Number(db.get(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`, p.id)?.n || 0); const received = Number(db.get('SELECT COUNT(*) n FROM order_assignments WHERE provider_id=?', p.id)?.n || 0); const rejected = Number(db.get(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='REJECTED'`, p.id)?.n || 0); const expired = Number(db.get(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='EXPIRED'`, p.id)?.n || 0); const cancelled = Number(db.get(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status='CANCELLED'`, p.id)?.n || 0); return { id: p.id, userId: p.user_id, fullName: p.full_name, phone: p.phone, email: p.email, displayName: p.display_name, providerType: p.provider_type, verificationStatus: p.verification_status, rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online, acceptingOrders: !!p.accepting_orders, lastSeenAt: p.last_seen_at || null, lastHeartbeatAt: p.last_heartbeat_at || null, lastLocationAt: p.last_location_at || null, availabilityStatus: sm.availabilityStatus, availabilityStatusText: sm.availabilityStatusText, activeOrders: active, receivedOrders: received, rejectedOrders: rejected, noResponseOrders: expired, cancelledOrders: cancelled, rating: p.rating_avg, completedOrders: p.completed_orders_count, acceptanceRate: sm.acceptanceRate, responseTimeText: sm.responseTimeText, featured: sm.featured, createdAt: p.created_at, documents: app.providers.documents(p.id) }; }) };
+        return { providers: rows.map((p) => { const sm = app.providers.summary(p.id, ctx.locale); const active = Number(db.get(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`, p.id)?.n || 0); const received = Number(db.get('SELECT COUNT(*) n FROM order_assignments WHERE provider_id=?', p.id)?.n || 0); const rejected = Number(db.get(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='REJECTED'`, p.id)?.n || 0); const expired = Number(db.get(`SELECT COUNT(*) n FROM order_assignments WHERE provider_id=? AND status='EXPIRED'`, p.id)?.n || 0); const cancelled = Number(db.get(`SELECT COUNT(*) n FROM orders WHERE provider_id=? AND status='CANCELLED'`, p.id)?.n || 0); return { id: p.id, userId: p.user_id, fullName: p.full_name, phone: p.phone, email: p.email, displayName: p.display_name, providerType: p.provider_type, verificationStatus: p.verification_status, rejectionReason: p.rejection_reason, suspensionReason: p.suspension_reason, isOnline: !!p.is_online, lastSeenAt: p.last_seen_at || null, availabilityStatus: sm.availabilityStatus, availabilityStatusText: sm.availabilityStatusText, activeOrders: active, receivedOrders: received, rejectedOrders: rejected, noResponseOrders: expired, cancelledOrders: cancelled, rating: p.rating_avg, completedOrders: p.completed_orders_count, acceptanceRate: sm.acceptanceRate, responseTimeText: sm.responseTimeText, featured: sm.featured, createdAt: p.created_at, documents: app.providers.documents(p.id) }; }) };
     });
     r.patch('/admin/providers/:id/verification', auth, adminLevel('ADMIN'), (ctx) => {
         const b = parse(s.obj({ status: s.oneOf(['VERIFIED', 'REJECTED', 'SUSPENDED']), reason: s.str({ max: 500, optional: true }) }), ctx.body);

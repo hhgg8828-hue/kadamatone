@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
   "version": "0.6.20",
-  "description": "خدمات (Khadamat) — V66.11 live operations, provider presence and order intake separation",
+  "description": "خدمات (Khadamat) — V66.11 live operations, provider presence integrity, accepting-orders control and optional trip destination",
   "private": true,
   "type": "module",
   "engines": {

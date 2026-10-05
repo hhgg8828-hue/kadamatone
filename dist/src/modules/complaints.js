@@ -3,6 +3,7 @@ import { E } from '../core/errors.js';
 import { uuid } from '../core/security.js';
 import { iso, pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles, adminLevel } from './auth.middleware.js';
+import { executionEvent } from './execution.js';
 const CATEGORIES = ['QUALITY', 'BEHAVIOR', 'PRICE', 'NO_SHOW', 'DAMAGE', 'OTHER'];
 const RESOLUTIONS = ['RESTORE_COMPLETED', 'CANCEL_ORDER', 'WARN_PROVIDER', 'SUSPEND_PROVIDER', 'DISMISS'];
 function genComplaintCode(db, now) {
@@ -81,6 +82,7 @@ export function registerComplaintRoutes(app, r) {
             const notifyId = ctx.user.id === c.opened_by ? c.against_user_id : c.opened_by;
             if (notifyId)
                 app.notifications.notify(notifyId, 'COMPLAINT_REPLIED', { complaint: c.code });
+            executionEvent(app, c.order_id, 'COMPLAINT_REPLY', 'رد جديد على الشكوى', `الشكوى ${c.code}`, 'SYSTEM', ctx.user.id, { complaintId: c.id });
             return { complaint: complaintOut(db.get('SELECT * FROM complaints WHERE id = ?', c.id)) };
         });
     });

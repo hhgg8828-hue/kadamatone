@@ -7,7 +7,6 @@ import { canTransition, PROVIDER_STEPS } from '../../shared/orderStateMachine.js
 import type { App } from '../app.js';
 import type { Ctx, Router } from '../core/http.js';
 import type { OrderRow, OrderAssignmentRow, OrderStatus } from '../types/domain.js';
-import { executionEvent } from './execution.js';
 
 export interface AssignmentService {
   assignWave(orderId: string): { offered: number };
@@ -48,8 +47,7 @@ export function createAssignmentService(app: App): AssignmentService {
         const areaRow = catalog.all().areas.find((a) => a.id === o.area_id);
         for (const c of candidates) {
           const p = db.get<{ user_id: string }>('SELECT user_id FROM service_providers WHERE id = ?', c.providerId)!;
-          app.notifications.notify(p.user_id, 'NEW_OFFER', { service: tr(svcRow.name_i18n, 'ar'), area: areaRow ? tr(areaRow.name_i18n, 'ar') : '' }, { orderId: o.id, assignmentId: db.get<any>('SELECT id FROM order_assignments WHERE order_id=? AND provider_id=?',o.id,c.providerId)?.id || null });
-          app.sse.broadcast('sync', {scope:'admin',entity:'assignment',orderId:o.id,providerId:c.providerId});
+          app.notifications.notify(p.user_id, 'NEW_OFFER', { service: tr(svcRow.name_i18n, 'ar'), area: areaRow ? tr(areaRow.name_i18n, 'ar') : '' }, { orderId: o.id });
         }
         notifiedExhausted.delete(o.id);
         return { offered: candidates.length };
@@ -106,8 +104,6 @@ export function createAssignmentService(app: App): AssignmentService {
         app.payment.onAccepted(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!);
         const p = app.providers.summary(providerId);
         app.notifications.notify(o.customer_id, 'ORDER_ACCEPTED', { code: o.code, provider: p.displayName }, { orderId: o.id });
-        executionEvent(app,o.id,'ASSIGNED_PROVIDER','تم قبول الطلب من مقدم الخدمة',p.displayName,'PROVIDER',ctx.user!.id,{providerId});
-        app.sse.broadcast('sync',{scope:'admin',entity:'order',orderId:o.id,event:'accepted',providerId});
         return db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!;
       });
     },
@@ -201,6 +197,12 @@ export function registerAssignmentRoutes(app: App, r: Router): void {
       if (PROVIDER_STEPS[o.status] !== b.to || !canTransition(o.status, b.to, 'PROVIDER')) throw E.unprocessable(`لا يمكن الانتقال من ${o.status} إلى ${b.to}`, 'INVALID_TRANSITION');
       const updated = orders.applyTransition(o, b.to, 'PROVIDER', ctx);
       if (b.to === 'COMPLETED') {
+        const tripRow=db.get<any>(`SELECT t.* FROM trip_orders t JOIN orders oo ON oo.id=t.order_id JOIN services s ON s.id=oo.service_id WHERE t.order_id=? AND s.slug='motorcycle-trips'`,o.id);
+        if(tripRow){
+          const pts=db.all<any>('SELECT lat,lng FROM trip_location_history WHERE order_id=? ORDER BY id',o.id);
+          let actualKm=0; for(let i=1;i<pts.length;i++){ const R=6371; const dLat=(Number(pts[i].lat)-Number(pts[i-1].lat))*Math.PI/180; const dLng=(Number(pts[i].lng)-Number(pts[i-1].lng))*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(Number(pts[i-1].lat)*Math.PI/180)*Math.cos(Number(pts[i].lat)*Math.PI/180)*Math.sin(dLng/2)**2; actualKm += 2*R*Math.asin(Math.sqrt(a)); }
+          if(actualKm>0.05){ actualKm=Math.round(actualKm*10)/10; const base=Math.max(Number(tripRow.minimum_fare),Number(tripRow.base_fare)+actualKm*Number(tripRow.per_km_fare)); const finalFare=Math.round((base+Number(tripRow.waiting_total_minutes||0)*Number(tripRow.waiting_per_minute_fare||0))/50)*50; db.run('UPDATE trip_orders SET distance_km=?,fare=?,updated_at=? WHERE order_id=?',actualKm,finalFare,iso(app.clock.now()),o.id); db.run('UPDATE orders SET agreed_price=?,price_snapshot=?,updated_at=?,version=version+1 WHERE id=?',finalFare,finalFare,iso(app.clock.now()),o.id); }
+        }
         const proof = db.get<{delivery_proof_type:string}>('SELECT delivery_proof_type FROM services WHERE id=?', o.service_id);
         if (proof?.delivery_proof_type && proof.delivery_proof_type !== 'NONE' && !db.get('SELECT 1 FROM orders WHERE id=? AND delivery_proof_verified_at IS NOT NULL', o.id)) throw E.unprocessable('يجب إكمال إثبات التسليم قبل إنهاء الطلب', 'DELIVERY_PROOF_REQUIRED');
         db.run('UPDATE service_providers SET completed_orders_count = completed_orders_count + 1, updated_at = ? WHERE id = ?', iso(app.clock.now()), o.provider_id); app.payment.onCompleted(updated); }

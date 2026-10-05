@@ -3,6 +3,7 @@ import { E } from '../core/errors.js';
 import { uuid } from '../core/security.js';
 import { iso, round } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
+import { executionEvent } from './execution.js';
 /**
  * التقييمات: 1–5 نجوم + تعليق اختياري. لا يُسمح بها إلا للعميل صاحب الطلب المكتمل، مرة واحدة لكل طلب (UNIQUE في DB).
  * يُحدَّث متوسط تقييم المزود (rating_avg/rating_count) في نفس المعاملة (متوسط تراكمي).
@@ -33,8 +34,8 @@ export function registerRatingRoutes(app, r) {
             const newSum = sp.rating_sum + b.score, newCount = sp.rating_count + 1;
             db.run('UPDATE service_providers SET rating_sum = ?, rating_count = ?, rating_avg = ?, updated_at = ? WHERE id = ?', newSum, newCount, round(newSum / newCount, 3), now, o.provider_id);
             const p = db.get('SELECT user_id FROM service_providers WHERE id = ?', o.provider_id);
-            app.notifications.notify(p.user_id, 'NEW_RATING', { score: String(b.score), code: o.code }, { orderId: o.id, ratingId: ratingId });
-            app.sse.broadcast('sync', { scope: 'admin', entity: 'rating', orderId: o.id, providerId: o.provider_id });
+            app.notifications.notify(p.user_id, 'NEW_RATING', { score: String(b.score), code: o.code });
+            executionEvent(app, o.id, 'RATING', 'تم تسجيل تقييم مقدم الخدمة', `التقييم ${b.score}/5`, 'CUSTOMER', ctx.user.id, { ratingId });
             const rating = db.get('SELECT * FROM ratings WHERE id = ?', ratingId);
             ctx.status = 201;
             return { rating: { id: rating.id, orderId: rating.order_id, score: rating.score, comment: b.comment || null, createdAt: rating.created_at } };

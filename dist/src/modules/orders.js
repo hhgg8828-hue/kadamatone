@@ -97,7 +97,6 @@ export function createOrders(app) {
                 throw E.conflict('تم تعديل الطلب من عملية أخرى، أعد المحاولة', 'VERSION_CONFLICT');
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,metadata,created_at) VALUES (?,?,?,?,?,?,?,?)', o.id, o.status, to, ctx.user?.id ?? null, actorRole, reason ?? null, metadata ? JSON.stringify(metadata) : null, now);
             executionEvent(app, o.id, 'STATUS', `تغيرت حالة الطلب إلى ${to}`, reason, actorRole, ctx.user?.id, metadata || {});
-            app.sse.broadcast('sync', { scope: 'admin', entity: 'order', orderId: o.id, event: 'status', status: to });
             if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED')
                 db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?', to, now, o.id);
             return db.get('SELECT * FROM orders WHERE id = ?', o.id);
@@ -215,8 +214,7 @@ export function registerOrderRoutes(app, r) {
                 db.run('UPDATE intent_audit SET order_id=?,selected_service_id=?,updated_at=? WHERE assistant_session_id=? AND order_id IS NULL', id, svc.id, nowIso, b.assistantSessionId);
             let o = db.get('SELECT * FROM orders WHERE id = ?', id);
             o = orders.applyTransition(o, 'SEARCHING', 'SYSTEM', ctx, { reason: 'auto' });
-            app.notifications.notify(ctx.user.id, 'ORDER_RECEIVED', { code: o.code }, { orderId: o.id });
-            app.sse.broadcast('sync', { scope: 'admin', entity: 'order', orderId: o.id, event: 'created' });
+            app.notifications.notify(ctx.user.id, 'ORDER_RECEIVED', { code: o.code });
             app.assignment.assignWave(o.id);
             o = db.get('SELECT * FROM orders WHERE id = ?', id);
             ctx.status = 201;

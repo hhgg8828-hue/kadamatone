@@ -1,10 +1,13 @@
-# خدمات V66.11 — Live Operations & Provider Presence Integrity
+# V66.11
 
-- فصل الاتصال عن استقبال الطلبات بمعلومة `accepting_orders` مستقلة.
-- إضافة `last_heartbeat_at` و`last_location_at` مع الحفاظ على `last_seen_at` للتوافق.
-- المطابقة لا ترسل الطلب إلا لمقدم خدمة موثّق ومتصل ويستقبل الطلبات.
-- لوحة الإدارة تعرض الاتصال والتوفر واستقبال الطلبات ووقت النبضة والموقع والطلب الحالي.
-- Heartbeat والموقع يحدّثان مصدر الحالة نفسه وتصدر مزامنة إدارية عبر SSE.
-- تغييرات الطلب والإسناد والعرض السعري والمحادثة والتقييم ترسل مزامنة إدارية لحظية.
-- واجهة مقدم الخدمة تفصل زر الاتصال عن زر استقبال الطلبات.
-- cache bust إلى V66.11.
+- Provider Presence now stores heartbeat and location timestamps separately.
+- Online, availability and accepting-orders are independent operational states.
+- Matching requires accepting_orders=1 in addition to existing verification/online gates.
+- Admin live monitoring includes all verified providers, heartbeat/location timestamps and current order.
+- Order execution events push admin SSE synchronization.
+- Motorcycle trip destination is optional at creation; destination can be supplied later through `/trips/:id/destination`.
+- Existing data is preserved through additive migration 023.
+
+- Native share sheet is used for live trip location and trip sharing when supported, with clipboard fallback.
+- Admin SSE receives provider location changes for live monitoring.
+- Chat, complaint replies and ratings are recorded in the order execution timeline.

@@ -3,6 +3,7 @@ import { E } from '../core/errors.js';
 import { uuid } from '../core/security.js';
 import { iso, pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
+import { executionEvent } from './execution.js';
 const bodySchema = s.obj({ body: s.str({ min: 0, max: 2000 }), attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 5, optional: true }), location: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }), accuracy: s.num({ min: 0, max: 100000, optional: true }), addressText: s.str({ max: 300, optional: true }) }, { optional: true }) });
 function canAccess(app, orderId, ctx) {
     const o = app.db.get('SELECT id,customer_id,provider_id,status FROM orders WHERE id=?', orderId);
@@ -50,6 +51,7 @@ export function registerChatRoutes(app, r) {
         const now = iso(app.clock.now());
         const id = uuid();
         app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,idempotency_key,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', id, o.id, ctx.user.id, ctx.user.role, (b.body || '').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'), JSON.stringify(attachmentFileIds), idem || null, b.location?.lat ?? null, b.location?.lng ?? null, b.location?.accuracy ?? null, b.location?.addressText ?? null, now);
+        executionEvent(app, o.id, 'CHAT_MESSAGE', 'رسالة جديدة في محادثة الطلب', undefined, ctx.user.role, ctx.user.id, { messageId: id });
         const targets = new Set();
         if (o.customer_id !== ctx.user.id)
             targets.add(o.customer_id);
@@ -58,7 +60,6 @@ export function registerChatRoutes(app, r) {
             if (p && p.user_id !== ctx.user.id)
                 targets.add(p.user_id);
         }
-        app.sse.broadcast('sync', { scope: 'admin', entity: 'chat', orderId: o.id, event: 'message' });
         for (const uid of targets) {
             const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
             app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id, open: 'chat' });

@@ -24,7 +24,7 @@ export function createScheduler(app: App): Scheduler {
       const cutoff=new Date(app.clock.now()-timeout*1000).toISOString();
       const stale=app.db.all<any>(`SELECT id,user_id FROM service_providers WHERE is_online=1 AND (last_seen_at IS NULL OR last_seen_at < ?)`,cutoff);
       for(const p of stale){
-        app.db.run(`UPDATE service_providers SET is_online=0,accepting_orders=0,updated_at=? WHERE id=?`,now,p.id); app.sse.broadcast('sync',{scope:'admin',entity:'provider_presence',providerId:p.id});
+        app.db.run(`UPDATE service_providers SET is_online=0,updated_at=? WHERE id=?`,now,p.id);
         app.db.run(`UPDATE provider_presence_sessions SET ended_at=? WHERE provider_id=? AND ended_at IS NULL`,now,p.id);
         app.sse.send(p.user_id,'sync',{scope:'provider'});
       }

@@ -5,6 +5,7 @@ import { iso, pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles, adminLevel } from './auth.middleware.js';
 import type { App } from '../app.js';
 import type { Ctx, Router } from '../core/http.js';
+import { executionEvent } from './execution.js';
 import type { OrderRow, ComplaintRow, ComplaintCategory, ResolutionAction } from '../types/domain.js';
 
 const CATEGORIES: ComplaintCategory[] = ['QUALITY', 'BEHAVIOR', 'PRICE', 'NO_SHOW', 'DAMAGE', 'OTHER'];
@@ -80,6 +81,7 @@ export function registerComplaintRoutes(app: App, r: Router): void {
       if (c.status === 'OPEN' && ctx.user!.id === c.against_user_id) db.run(`UPDATE complaints SET status='PROVIDER_REPLIED', updated_at=? WHERE id=?`, now, c.id);
       const notifyId = ctx.user!.id === c.opened_by ? c.against_user_id : c.opened_by;
       if (notifyId) app.notifications.notify(notifyId, 'COMPLAINT_REPLIED', { complaint: c.code });
+      executionEvent(app,c.order_id,'COMPLAINT_REPLY','رد جديد على الشكوى',`الشكوى ${c.code}`,'SYSTEM',ctx.user!.id,{complaintId:c.id});
       return { complaint: complaintOut(db.get<ComplaintRow>('SELECT * FROM complaints WHERE id = ?', c.id)!) };
     });
   });

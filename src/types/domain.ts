@@ -33,7 +33,7 @@ export interface UserRow {
 export interface ServiceProviderRow {
   id: string; user_id: string; provider_type: ProviderType; display_name: string; bio: string | null; company_name: string | null;
   verification_status: VerificationStatus; verified_at: string | null; verified_by: string | null; rejection_reason: string | null;
-  suspension_reason: string | null; specialty: string | null; is_online: 0 | 1; accepting_orders: 0 | 1; last_heartbeat_at: string | null; last_location_at: string | null; base_lat: number | null; base_lng: number | null;
+  suspension_reason: string | null; specialty: string | null; is_online: 0 | 1; base_lat: number | null; base_lng: number | null;
   rating_sum: number; rating_count: number; rating_avg: number; completed_orders_count: number; created_at: string; updated_at: string;
 }
 export interface CategoryRow {
