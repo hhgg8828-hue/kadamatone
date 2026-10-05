@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startApp, registerUser } from './helpers.js';
 
-test('V66.12: حالات مقدم الخدمة مستقلة وHeartbeat يحدّث المصدر الحقيقي', async()=>{
+test('V66.13: حالات مقدم الخدمة مستقلة وHeartbeat يحدّث المصدر الحقيقي', async()=>{
   const t=await startApp();
   try{
     const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مقدم حي'}});
@@ -15,7 +15,7 @@ test('V66.12: حالات مقدم الخدمة مستقلة وHeartbeat يحدّ
   } finally { await t.close(); }
 });
 
-test('V66.12: المطابقة لا ترسل طلبًا لمن أوقف استقبال الطلبات', async()=>{
+test('V66.13: المطابقة لا ترسل طلبًا لمن أوقف استقبال الطلبات', async()=>{
   const t=await startApp();
   try{
     const c=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'لا يستقبل'}});
@@ -28,7 +28,7 @@ test('V66.12: المطابقة لا ترسل طلبًا لمن أوقف استق
   } finally { await t.close(); }
 });
 
-test('V66.12: المشوار يسمح بالإرسال بدون وجهة ثم إضافة الوجهة لاحقًا', async()=>{
+test('V66.13: المشوار يسمح بالإرسال بدون وجهة ثم إضافة الوجهة لاحقًا', async()=>{
   const t=await startApp();
   try{
     const c=await registerUser(t.api); const o=await t.api('POST','/api/v1/trips',{token:c.body.accessToken,headers:{'Idempotency-Key':'v6611-trip-no-dest'},body:{origin:{lat:15.36,lng:44.19},purpose:'PASSENGER',description:'أريد مشوارًا شخصيًا',contactPhone:c.creds.phone}});
@@ -38,7 +38,7 @@ test('V66.12: المشوار يسمح بالإرسال بدون وجهة ثم إ
   } finally { await t.close(); }
 });
 
-test('V66.12: لوحة المراقبة الحية تعيد جميع مقدمي الخدمة مع heartbeat/location/order', async()=>{
+test('V66.13: لوحة المراقبة الحية تعيد جميع مقدمي الخدمة مع heartbeat/location/order', async()=>{
   const t=await startApp();
   try{
     const admin=await t.api('POST','/api/v1/auth/login',{body:{identifier:'admin@test.local',password:'AdminPass123'}}); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مراقبة'}}); const pid=t.app.db.get<any>('SELECT id FROM service_providers WHERE user_id=?',p.body.user.id).id;
@@ -47,7 +47,7 @@ test('V66.12: لوحة المراقبة الحية تعيد جميع مقدمي 
   } finally { await t.close(); }
 });
 
-test('V66.12: إكمال مشوار يحسب المسافة الفعلية من سجل المواقع ويحدّث الأجرة النهائية', async()=>{
+test('V66.13: إكمال مشوار يحسب المسافة الفعلية من سجل المواقع ويحدّث الأجرة النهائية', async()=>{
   const t=await startApp();
   try{
     const c=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'سائق مشوار'}});
@@ -98,5 +98,38 @@ test('V66.12+: تشخيص الأداء يعرض DB وRealtime وطلبات API',
   try{
     const admin=await t.api('POST','/api/v1/auth/login',{body:{identifier:'admin@test.local',password:'AdminPass123'}}); assert.equal(admin.status,200,admin.text);
     const r=await t.api('GET','/api/v1/admin/performance-diagnostics',{token:admin.body.accessToken}); assert.equal(r.status,200,r.text); assert.ok(typeof r.body.server.database.queries==='number'); assert.ok(typeof r.body.server.sse.connections==='number'); assert.ok(Array.isArray(r.body.api));
+  } finally { await t.close(); }
+});
+
+test('V66.13: مقدم الخدمة يستقبل الطلب الجديد رغم وجود طلب قيد التنفيذ ما دام يستقبل الطلبات', async()=>{
+  const t=await startApp();
+  try{
+    const c1=await registerUser(t.api); const c2=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مزود متعدد الطلبات'}});
+    const pid=t.app.db.get<any>('SELECT id FROM service_providers WHERE user_id=?',p.body.user.id).id;
+    const svc=t.app.db.get<any>("SELECT id FROM services WHERE slug='cleaning'");
+    t.app.db.run("UPDATE service_providers SET verification_status='VERIFIED',is_online=1,accepting_orders=1,base_lat=15.36,base_lng=44.19 WHERE id=?",pid);
+    t.app.db.run('INSERT INTO provider_services(provider_id,service_id,experience_years,is_active) VALUES(?,?,?,1)',pid,svc.id,5);
+    const first=await t.api('POST','/api/v1/orders',{token:c1.body.accessToken,headers:{'Idempotency-Key':'v6613-first'},body:{serviceId:svc.id,description:'طلب أول قيد التنفيذ',location:{lat:15.36,lng:44.19},contactPhone:c1.creds.phone}}); assert.equal(first.status,201,first.text);
+    const offer1=(await t.api('GET','/api/v1/provider/offers',{token:p.body.accessToken})).body.offers.find((x:any)=>x.orderId===first.body.order.id); assert.ok(offer1); await t.api('POST',`/api/v1/provider/offers/${offer1.id}/accept`,{token:p.body.accessToken,body:{}});
+    const second=await t.api('POST','/api/v1/orders',{token:c2.body.accessToken,headers:{'Idempotency-Key':'v6613-second'},body:{serviceId:svc.id,description:'طلب ثان قريب من الطلب الأول',location:{lat:15.361,lng:44.191},contactPhone:c2.creds.phone}}); assert.equal(second.status,201,second.text);
+    const offers=(await t.api('GET','/api/v1/provider/offers',{token:p.body.accessToken})).body.offers; assert.ok(offers.some((x:any)=>x.orderId===second.body.order.id));
+  } finally { await t.close(); }
+});
+
+test('V66.13: رسالة العميل تنشئ إشعارًا قابلًا لفتح نفس الطلب، والمزود يستطيع فتح المحادثة', async()=>{
+  const t=await startApp();
+  try{
+    const c=await registerUser(t.api); const p=await registerUser(t.api,{role:'PROVIDER',provider:{providerType:'DRIVER',displayName:'مزود محادثة'}});
+    const pid=t.app.db.get<any>('SELECT id FROM service_providers WHERE user_id=?',p.body.user.id).id;
+    const svc=t.app.db.get<any>("SELECT id FROM services WHERE slug='cleaning'");
+    t.app.db.run("UPDATE service_providers SET verification_status='VERIFIED',is_online=1,accepting_orders=1,base_lat=15.36,base_lng=44.19 WHERE id=?",pid);
+    t.app.db.run('INSERT INTO provider_services(provider_id,service_id,experience_years,is_active) VALUES(?,?,?,1)',pid,svc.id,2);
+    const o=await t.api('POST','/api/v1/orders',{token:c.body.accessToken,headers:{'Idempotency-Key':'v6613-chat-order'},body:{serviceId:svc.id,description:'طلب لاختبار المحادثة الحية',location:{lat:15.36,lng:44.19},contactPhone:c.creds.phone}}); assert.equal(o.status,201,o.text);
+    const offer=(await t.api('GET','/api/v1/provider/offers',{token:p.body.accessToken})).body.offers[0]; await t.api('POST',`/api/v1/provider/offers/${offer.id}/accept`,{token:p.body.accessToken,body:{}});
+    const sent=await t.api('POST',`/api/v1/orders/${o.body.order.id}/messages`,{token:c.body.accessToken,headers:{'Idempotency-Key':'v6613-message-1'},body:{body:'أين وصلت؟'}}); assert.equal(sent.status,201,sent.text);
+    const ns=(await t.api('GET','/api/v1/notifications?limit=20',{token:p.body.accessToken})).body.notifications; const n=ns.find((x:any)=>x.type==='CHAT_MESSAGE'&&x.data?.orderId===o.body.order.id); assert.ok(n); assert.equal(n.data.open,'chat');
+    const msgs=await t.api('GET',`/api/v1/orders/${o.body.order.id}/messages?limit=20`,{token:p.body.accessToken}); assert.equal(msgs.status,200,msgs.text); assert.equal(msgs.body.messages.at(-1).body,'أين وصلت؟');
+    const reply=await t.api('POST',`/api/v1/orders/${o.body.order.id}/messages`,{token:p.body.accessToken,headers:{'Idempotency-Key':'v6613-message-2'},body:{body:'أنا قريب، بجوار السوق وسأصل خلال 5 دقائق.'}}); assert.equal(reply.status,201,reply.text);
+    const back=await t.api('GET',`/api/v1/orders/${o.body.order.id}/messages?limit=20`,{token:c.body.accessToken}); assert.equal(back.body.messages.at(-1).body,'أنا قريب، بجوار السوق وسأصل خلال 5 دقائق.');
   } finally { await t.close(); }
 });

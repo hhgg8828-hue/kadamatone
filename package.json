@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.21",
-  "description": "خدمات (Khadamat) — V66.12 audit hardening, performance diagnostics, complaint realtime and idempotent beneficiaries",
+  "version": "0.6.22",
+  "description": "خدمات (Khadamat) — V66.13 live provider chat, concurrent dispatch and provider notification workspace",
   "private": true,
   "type": "module",
   "engines": {

@@ -53,7 +53,8 @@ export class NearestRatedMatcher implements Matcher {
         GROUP_CONCAT(DISTINCT psa.area_id) provider_area_ids,
         GROUP_CONCAT(DISTINCT pc.capability_key) capability_keys,
         ll.lat live_lat,ll.lng live_lng,ll.updated_at live_updated_at,
-        CASE WHEN f.provider_id IS NULL THEN 0 ELSE 1 END favorite
+        CASE WHEN f.provider_id IS NULL THEN 0 ELSE 1 END favorite,
+        (SELECT COUNT(*) FROM orders ao WHERE ao.provider_id=sp.id AND ao.status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')) active_order_count
       FROM service_providers sp
       JOIN users u ON u.id=sp.user_id AND u.status='ACTIVE'
       JOIN provider_services ps ON ps.provider_id=sp.id AND ps.service_id=? AND ps.is_active=1
@@ -62,7 +63,6 @@ export class NearestRatedMatcher implements Matcher {
       LEFT JOIN provider_live_locations ll ON ll.provider_id=sp.id AND ll.updated_at >= ?
       LEFT JOIN favorite_providers f ON f.customer_id=? AND f.provider_id=sp.id
       WHERE sp.verification_status='VERIFIED' AND sp.is_online=1 AND sp.accepting_orders=1
-        AND NOT EXISTS (SELECT 1 FROM orders ao WHERE ao.provider_id=sp.id AND ao.status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS'))
       GROUP BY sp.id`, order.service_id, new Date(this.app.clock.now()-5*60_000).toISOString(), order.customer_id);
 
     const scored: Candidate[] = [];
@@ -83,9 +83,13 @@ export class NearestRatedMatcher implements Matcher {
       const distanceComponent = dist === null ? 0 : Math.max(0, 1 - Math.min(dist, 50)/50);
       const qualityComponent = rating/5;
       const experienceComponent = Math.min(1, completed/50);
+      const activeOrders = Math.max(0, Number(p.active_order_count || 0));
+      // مقدم الخدمة الذي لديه طلبات حالية لكنه اختار استقبال طلبات إضافية يبقى مرشحًا؛
+      // الحمل الحالي عامل ترتيب/ازدحام وليس شرط منع.
+      const workloadComponent = Math.max(0, 1 - Math.min(activeOrders, 3) / 3);
       // Distance-first: quality can break close ties but cannot normally outrank a materially closer capable provider.
       const urgencyBoost = order.priority === 'URGENT' ? (dist === null ? 0.08 : Math.max(0,1-Math.min(dist,10)/10)*0.12) : 0;
-      const composite = dist === null ? qualityComponent*0.58 + favorite*0.22 + experienceComponent*0.10 + urgencyBoost : distanceComponent*0.72 + qualityComponent*0.12 + favorite*0.06 + experienceComponent*0.04 + urgencyBoost;
+      const composite = dist === null ? qualityComponent*0.48 + favorite*0.18 + experienceComponent*0.10 + workloadComponent*0.16 + urgencyBoost : distanceComponent*0.68 + qualityComponent*0.11 + favorite*0.05 + experienceComponent*0.03 + workloadComponent*0.13 + urgencyBoost;
       scored.push({ providerId:p.id, distanceKm:dist===null?null:round(dist,2), score:round(composite,6) });
     }
     scored.sort((a,b)=>{
