@@ -43,10 +43,11 @@ export function registerChatRoutes(app:App,r:Router){
       const nowMs=app.clock.now(); const lastMs=last?.created_at?Date.parse(last.created_at):NaN; const createdAt=new Date(Math.max(nowMs,Number.isFinite(lastMs)?lastMs+1:nowMs)).toISOString(); const id=uuid();
       app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,idempotency_key,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',id,o.id,ctx.user!.id,ctx.user!.role,(b.body||'').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'),JSON.stringify(attachmentFileIds),idem||null,b.location?.lat??null,b.location?.lng??null,b.location?.accuracy??null,b.location?.addressText??null,createdAt);
       executionEvent(app,o.id,'CHAT_MESSAGE','رسالة جديدة في محادثة الطلب',undefined,ctx.user!.role as any,ctx.user!.id,{messageId:id});
+      const senderName=app.db.get<{full_name:string}>('SELECT full_name FROM users WHERE id=?',ctx.user!.id)?.full_name||'مشارك في الطلب';
       const targets=new Set<string>();
       if(o.customer_id!==ctx.user!.id) targets.add(o.customer_id);
       if(o.provider_id){const p=app.db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',o.provider_id);if(p&&p.user_id!==ctx.user!.id)targets.add(p.user_id)}
-      for(const uid of targets){const code=app.db.get<{code:string}>('SELECT code FROM orders WHERE id=?',o.id)?.code||'';app.notifications.notify(uid,'CHAT_MESSAGE',{code},{orderId:o.id,open:'chat'});app.sse.send(uid,'chat_message',{orderId:o.id,message:out(app,app.db.get<MsgRow>('SELECT * FROM order_messages WHERE id=?',id)!)});}
+      for(const uid of targets){const code=app.db.get<{code:string}>('SELECT code FROM orders WHERE id=?',o.id)?.code||'';app.notifications.notify(uid,'CHAT_MESSAGE',{code,sender:senderName},{orderId:o.id,open:'chat'});app.sse.send(uid,'chat_message',{orderId:o.id,message:out(app,app.db.get<MsgRow>('SELECT * FROM order_messages WHERE id=?',id)!)});}
       ctx.status=201; return {message:out(app,app.db.get<MsgRow>('SELECT * FROM order_messages WHERE id=?',id)!) };
     });
   });

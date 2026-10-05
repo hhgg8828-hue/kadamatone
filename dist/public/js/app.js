@@ -1579,6 +1579,8 @@ catch (e) {
 } }
 async function openOrderChat(orderId) {
     try {
+        const orderSummary = await api('/orders/' + encodeURIComponent(orderId));
+        const orderInfo = orderSummary.order || {};
         const load = async () => { const j = await api('/orders/' + encodeURIComponent(orderId) + '/messages?limit=100'); return j.messages || []; };
         const isProvider = state.user?.role === 'PROVIDER';
         const quick = isProvider ? ['أنا في الطريق', 'وصلت إلى الموقع', 'أحتاج موقعك بالضبط', 'سأتأخر قليلًا', 'أنا عندك الآن'] : ['أين وصلت؟', 'أنا بانتظارك', 'هل أنت قريب؟', 'هذا هو موقعي', 'سأتأخر قليلًا'];
@@ -1595,7 +1597,7 @@ async function openOrderChat(orderId) {
                 box.querySelectorAll('[data-chat-file]').forEach((x) => x.addEventListener('click', () => openPrivateFile(String(x.dataset.chatFile || ''))));
             }
         };
-        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب</h2><p class="muted">محادثة واحدة مرتبطة بهذا الطلب. الرسائل تتحدث مباشرة وتُحفظ عند ضعف الاتصال.</p></div><span class="chat-live-badge">● مباشر</span></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
+        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب ${esc(orderInfo.code || '')}</h2><p class="muted">${esc(orderInfo.service?.name || '')} · محادثة خاصة بهذا الطلب فقط${orderInfo.provider?.displayName ? ` · ${esc(orderInfo.provider.displayName)}` : ''}</p><p class="muted">الرسائل مباشرة وتُحفظ عند ضعف الاتصال، ولا تظهر خارج أطراف هذا الطلب.</p></div><span class="chat-live-badge">● مباشر</span></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
         await render();
         document.querySelectorAll('[data-chat-quick]').forEach(x => x.addEventListener('click', () => { const body = document.getElementById('chatBody'); if (body) {
             body.value = x.dataset.chatQuick || '';

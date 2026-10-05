@@ -2,11 +2,12 @@ import { normalizeAr, tr, parseJson } from '../core/util.js';
 const URGENT = ['اليوم', 'الان', 'حالا', 'فورا', 'بسرعه', 'مستعجل', 'عاجل', 'ضروري', 'طارئ', 'سريع', 'urgent', 'asap', 'now', 'today'].map(normalizeAr);
 const VILLAGE = ['قرية', 'ريف', 'مزرعة', 'عزلة', 'منطقة', 'القرية', 'المزرعة', 'الريف', 'قرية صغيرة', 'مكان غير مسمى'].map(normalizeAr);
 const CITY = ['مدينة', 'المدينة', 'المدينه', 'السوق', 'المركز', 'إب', 'صنعاء', 'تعز', 'عدن'].map(normalizeAr);
-const PURCHASE_WORDS = ['اشتر', 'اشتري', 'اشترِ', 'يشتري', 'شراء', 'تسوق', 'تسوق لي', 'تسوق عني', 'بدلي', 'بالنيابة', 'غرض', 'دواء', 'صيدلية', 'سوق'].map(normalizeAr);
+const PURCHASE_WORDS = ['اشتر', 'اشتري', 'اشترِ', 'يشتري', 'شراء', 'تسوق', 'تسوق لي', 'تسوق عني', 'بدلي', 'بالنيابة', 'دواء', 'صيدلية'].map(normalizeAr);
 const PASSENGER_WORDS = ['يوصلني', 'يوصلنى', 'يأخذني', 'ياخذني', 'ياخذنى', 'يجيبني', 'يجيبنى', 'ينقلني', 'ينقلنى', 'توصيلة', 'مشوار شخصي', 'مشوار لي', 'اركب', 'يركبني', 'نقل شخص', 'نقلني'].map(normalizeAr);
 const DELIVERY_WORDS = ['يوصله', 'يوصلها', 'يوصلهم', 'توصيل', 'يجيبه', 'يجيبها', 'احضره', 'احضرها', 'استلام', 'يأخذ الغرض', 'ياخذ الغرض', 'جيب لي'].map(normalizeAr);
 const PICKUP_WORDS = ['يأخذ من', 'ياخذ من', 'استلام من', 'يستلم من', 'من بيت اخوي', 'من بيت اخي', 'من عند اخوي', 'من عند اخي', 'من بيت اخوه', 'من بيت أخوي'].map(normalizeAr);
 const PHARMACY_WORDS = ['صيدلية', 'دواء', 'دوا', 'ادوية', 'علاج', 'روشتة', 'وصفة طبية'].map(normalizeAr);
+const SHOPPING_WORDS = ['مقاضي', 'مقاضي البيت', 'بقالة', 'بقاله', 'مواد غذائية', 'مواد غذائيه', 'اغراض البيت', 'أغراض البيت', 'مستلزمات البيت', 'مشتريات البيت', 'مشتريات', 'سوبرماركت', 'ماركت', 'من السوق'].map(normalizeAr);
 const AGRI_PLOW = ['يحرث', 'احرث', 'حرث', 'حراثة', 'تجهيز الأرض', 'تجهيز الارض', 'يجهز الأرض', 'يجهز الارض'].map(normalizeAr);
 const AGRI_HARVEST = ['يحصد', 'احصد', 'حصاد', 'حصد', 'محصول يحصد', 'حصيدة'].map(normalizeAr);
 const AGRI_CROP = ['نقل المحصول', 'انقل المحصول', 'ينقل المحصول', 'نقل محاصيل', 'محاصيل من المزرعة', 'محصول إلى السوق'].map(normalizeAr);
@@ -39,7 +40,7 @@ function deterministic(text, { catalog, locale = 'ar' }) {
     const purchase = hasAny(norm, PURCHASE_WORDS);
     const delivery = hasAny(norm, DELIVERY_WORDS) || /يوصل|توصيل|يجيب/.test(norm);
     const pickupDelivery = hasAny(norm, PICKUP_WORDS) && delivery;
-    const shopping = hasAny(norm, ['تسوق لي', 'تسوق عني', 'تسوق', 'اشتر لي', 'اشترِ لي', 'شراء بالنيابة'].map(normalizeAr));
+    const shopping = hasAny(norm, [...SHOPPING_WORDS, 'تسوق لي', 'تسوق عني', 'تسوق', 'اشتر لي', 'اشترِ لي', 'شراء بالنيابة'].map(normalizeAr));
     const plow = hasAny(norm, AGRI_PLOW), harvest = hasAny(norm, AGRI_HARVEST), crop = hasAny(norm, AGRI_CROP);
     let forcedSlug = null;
     if (plow)
@@ -52,11 +53,13 @@ function deterministic(text, { catalog, locale = 'ar' }) {
         forcedSlug = norm.includes('دباب') || norm.includes('موتوسيكل') ? 'motorcycle-trips' : 'passenger-transport';
     else if (pharmacy && (purchase || delivery))
         forcedSlug = 'pharmacy-purchase';
-    else if (shopping)
-        forcedSlug = 'shopping-for-me';
     else if (purchase && delivery)
         forcedSlug = 'purchase-and-delivery';
-    else if (delivery && !purchase)
+    else if (shopping && delivery)
+        forcedSlug = 'shopping-delivery';
+    else if (shopping || purchase)
+        forcedSlug = 'shopping-for-me';
+    else if (delivery)
         forcedSlug = 'parcel-delivery';
     for (const svc of data.services) {
         const cat = activeCats.get(svc.category_id);

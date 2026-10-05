@@ -56,6 +56,7 @@ export function registerChatRoutes(app, r) {
             const id = uuid();
             app.db.run('INSERT INTO order_messages(id,order_id,sender_id,sender_role,body,attachments,idempotency_key,location_lat,location_lng,location_accuracy_m,location_address_text,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', id, o.id, ctx.user.id, ctx.user.role, (b.body || '').trim() || (attachmentFileIds.length ? '📎 ملف مرفق' : '📍 الموقع المرسل'), JSON.stringify(attachmentFileIds), idem || null, b.location?.lat ?? null, b.location?.lng ?? null, b.location?.accuracy ?? null, b.location?.addressText ?? null, createdAt);
             executionEvent(app, o.id, 'CHAT_MESSAGE', 'رسالة جديدة في محادثة الطلب', undefined, ctx.user.role, ctx.user.id, { messageId: id });
+            const senderName = app.db.get('SELECT full_name FROM users WHERE id=?', ctx.user.id)?.full_name || 'مشارك في الطلب';
             const targets = new Set();
             if (o.customer_id !== ctx.user.id)
                 targets.add(o.customer_id);
@@ -66,7 +67,7 @@ export function registerChatRoutes(app, r) {
             }
             for (const uid of targets) {
                 const code = app.db.get('SELECT code FROM orders WHERE id=?', o.id)?.code || '';
-                app.notifications.notify(uid, 'CHAT_MESSAGE', { code }, { orderId: o.id, open: 'chat' });
+                app.notifications.notify(uid, 'CHAT_MESSAGE', { code, sender: senderName }, { orderId: o.id, open: 'chat' });
                 app.sse.send(uid, 'chat_message', { orderId: o.id, message: out(app, app.db.get('SELECT * FROM order_messages WHERE id=?', id)) });
             }
             ctx.status = 201;
