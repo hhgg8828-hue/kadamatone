@@ -264,16 +264,12 @@ function authBox(){
       if(providerReg){payload.provider={providerType:b.providerType,displayName:b.displayName,bio:b.bio,specialty:b.specialty};if(b.providerType==='COMPANY')payload.provider.companyName=b.displayName;delete payload.providerType;delete payload.displayName;delete payload.bio;}
       const j=mode==='login'?await api('/auth/login',{method:'POST',body:JSON.stringify({...b,role:selected})}):await api('/auth/register',{method:'POST',body:JSON.stringify(payload)});
       saveSession(j);startRealtime().catch(()=>{});startNotificationPolling();if('Notification' in window&&Notification.permission==='granted')registerWebPushSubscription().catch(()=>{});
-      // Registration on the customer home page stays on `/`, so explicitly render the authenticated customer UI.
-      // A successful registration must never leave the user on the registration form.
+      // Always perform a real navigation after authentication. This is especially important
+      // for CUSTOMER because its authenticated home is the same `/` route as the auth screen.
+      // Rendering in-place can leave stale DOM/auth UI mounted, so force a fresh app bootstrap.
       const target=roleHome(j.user.role);
-      if(location.pathname===target){
-        if(j.user.role==='CUSTOMER') await customer();
-        else if(j.user.role==='PROVIDER') await provider();
-        else if(j.user.role==='ADMIN') await admin();
-      }else{
-        location.replace(target);
-      }
+      const next=target==='/' ? '/?auth=success' : `${target}?auth=success`;
+      window.location.replace(next);
     }catch(x){const submitButton=form.querySelector('button[type=submit]') as HTMLButtonElement|null;if(submitButton){submitButton.disabled=false;submitButton.textContent=submitButton.dataset.originalText||'إرسال'}const err:any=x;formHost.querySelectorAll('.field-error').forEach((el:any)=>el.remove());const details=Array.isArray(err.details)?err.details:[];if(details.length){for(const d of details){const field=String(d.path||'').split('.').pop()||'';const input=form.querySelector(`[name="${CSS.escape(field)}"]`) as HTMLElement|null;if(input){const p=document.createElement('small');p.className='field-error error';p.textContent=String(d.message||err.message);input.parentElement?.appendChild(p);}}}const msg=document.getElementById('msg')!;msg.textContent=details.length?'راجع الحقول المحددة أعلاه.':err.message;msg.className='error';}});
   };
   draw();

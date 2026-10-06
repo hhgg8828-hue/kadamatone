@@ -656,20 +656,12 @@ function authBox() {
                 startNotificationPolling();
                 if ('Notification' in window && Notification.permission === 'granted')
                     registerWebPushSubscription().catch(() => { });
-                // Registration on the customer home page stays on `/`, so explicitly render the authenticated customer UI.
-                // A successful registration must never leave the user on the registration form.
+                // Always perform a real navigation after authentication. This is especially important
+                // for CUSTOMER because its authenticated home is the same `/` route as the auth screen.
+                // Rendering in-place can leave stale DOM/auth UI mounted, so force a fresh app bootstrap.
                 const target = roleHome(j.user.role);
-                if (location.pathname === target) {
-                    if (j.user.role === 'CUSTOMER')
-                        await customer();
-                    else if (j.user.role === 'PROVIDER')
-                        await provider();
-                    else if (j.user.role === 'ADMIN')
-                        await admin();
-                }
-                else {
-                    location.replace(target);
-                }
+                const next = target === '/' ? '/?auth=success' : `${target}?auth=success`;
+                window.location.replace(next);
             }
             catch (x) {
                 const submitButton = form.querySelector('button[type=submit]');
