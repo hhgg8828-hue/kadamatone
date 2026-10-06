@@ -260,7 +260,7 @@ function authBox(){
     applyFieldPlaceholders(formHost);
     const form=document.getElementById('form') as HTMLFormElement;
     form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const b:any={};f.forEach((v,k)=>b[k]=v);try{
-      const payload:any={...b,role:selected,locale:'ar'};
+      const payload:any={...b,role:selected,locale:'ar'}; if (!payload.email) delete payload.email;
       if(providerReg){payload.provider={providerType:b.providerType,displayName:b.displayName,bio:b.bio,specialty:b.specialty};if(b.providerType==='COMPANY')payload.provider.companyName=b.displayName;delete payload.providerType;delete payload.displayName;delete payload.bio;}
       const j=mode==='login'?await api('/auth/login',{method:'POST',body:JSON.stringify({...b,role:selected})}):await api('/auth/register',{method:'POST',body:JSON.stringify(payload)});
       saveSession(j);startRealtime().catch(()=>{});startNotificationPolling();if('Notification' in window&&Notification.permission==='granted')registerWebPushSubscription().catch(()=>{});redirectToRole(j.user.role);

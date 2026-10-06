@@ -634,6 +634,8 @@ function authBox() {
             f.forEach((v, k) => b[k] = v);
             try {
                 const payload = { ...b, role: selected, locale: 'ar' };
+                if (!payload.email)
+                    delete payload.email;
                 if (providerReg) {
                     payload.provider = { providerType: b.providerType, displayName: b.displayName, bio: b.bio, specialty: b.specialty };
                     if (b.providerType === 'COMPANY')
