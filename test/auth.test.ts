@@ -96,6 +96,15 @@ describe('Login', () => {
     assert.equal(a.status, 401); assert.equal(b.status, 401);
     assert.deepEqual([a.body.error.code, a.body.error.message], [b.body.error.code, b.body.error.message]);
   });
+  test('اختيار نوع حساب خاطئ عند الدخول مرفوض ولا يغيّر الدور', async () => {
+    const customer = await registerUser(api);
+    const wrong = await api('POST', '/api/v1/auth/login', { body: { identifier: customer.creds.phone, password: customer.creds.password, role: 'PROVIDER' } });
+    assert.equal(wrong.status, 403);
+    assert.equal(wrong.body.error.code, 'ROLE_MISMATCH');
+    const ok = await api('POST', '/api/v1/auth/login', { body: { identifier: customer.creds.phone, password: customer.creds.password, role: 'CUSTOMER' } });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.user.role, 'CUSTOMER');
+  });
   test('حساب معلّق لا يستطيع الدخول', async () => {
     const u = await registerUser(api);
     t.app.db.run(`UPDATE users SET status = 'SUSPENDED' WHERE id = ?`, u.body.user.id);

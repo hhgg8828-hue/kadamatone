@@ -53,6 +53,13 @@ export async function seedBase(db: Db, config: Config) {
       'seasonal-harvest':['حصيدة','حصد المحصول','وقت الحصاد','عمال حصاد'],
       'seasonal-crop-transport':['نقل المحصول','نقل الحصيدة','من المزرعة للسوق','شاحنة للمحصول'],
       'farm-worker':['عامل مزرعة','شغيل مزرعة','عامل زراعة'],
+      'water-tank-delivery':['ماء','مياه','وايت','صهريج','تعبئة خزان','توصيل ماء'],
+      'solar-maintenance':['طاقة شمسية','لوح شمسي','ألواح','بطارية شمسية','انفرتر','صيانة الطاقة'],
+      'internet-router-support':['نت','انترنت','إنترنت','راوتر','واي فاي','شبكة','ضعف النت'],
+      'tailoring-alterations':['خياط','خياطة','تفصيل','تعديل ملابس','تضييق','توسيع'],
+      'home-cooking-catering':['طبخ منزلي','طبخ','طباخ','تجهيز مناسبة','وليمة','عزومة'],
+      'laundry-ironing':['غسيل ملابس','غسيل','كي الملابس','كي'],
+      'water-pump-maintenance':['مضخة ماء','مضخة مياه','موتور ماء','طرمبة ماء','موتور الماء'],
     };
     for (const [slug, phrases] of Object.entries(aliasMap)) {
       const svc=db.get<{id:string}>('SELECT id FROM services WHERE slug=?',slug); if(!svc) continue;

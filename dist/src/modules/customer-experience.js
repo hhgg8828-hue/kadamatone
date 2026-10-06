@@ -6,7 +6,7 @@ import { auth, roles } from './auth.middleware.js';
 const serializeBeneficiary = (app, b, locale) => ({ id: b.id, label: b.label, fullName: b.full_name, phone: b.phone, location: b.location_id ? app.locations.serialize(app.db.get('SELECT * FROM locations WHERE id=?', b.location_id), locale) : null });
 const beneficiarySchema = s.obj({
     label: s.str({ min: 1, max: 40 }), fullName: s.str({ min: 2, max: 80 }), phone: s.str({ min: 8, max: 24 }),
-    location: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }), accuracy: s.num({ min: 0, max: 100000, optional: true }), addressText: s.str({ max: 300, optional: true }), source: s.oneOf(['gps', 'map', 'manual'], { optional: true, default: 'manual' }) }, { optional: true })
+    location: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }), accuracy: s.num({ min: 0, max: 100000, optional: true }), addressText: s.str({ max: 300, optional: true }), landmarkText: s.str({ max: 200, optional: true }), localityText: s.str({ max: 200, optional: true }), accessNotes: s.str({ max: 500, optional: true }), source: s.oneOf(['gps', 'map', 'manual'], { optional: true, default: 'manual' }) }, { optional: true })
 });
 export function registerCustomerExperienceRoutes(app, r) {
     const { db } = app;
@@ -54,7 +54,7 @@ export function registerCustomerExperienceRoutes(app, r) {
         const old = db.get('SELECT * FROM customer_beneficiaries WHERE id=? AND customer_id=?', ctx.params.id, ctx.user.id);
         if (!old)
             throw E.notFound('المستفيد غير موجود');
-        const b = parse(s.obj({ label: s.str({ min: 1, max: 40, optional: true }), fullName: s.str({ min: 2, max: 80, optional: true }), phone: s.str({ min: 8, max: 24, optional: true }), location: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }), accuracy: s.num({ min: 0, max: 100000, optional: true }), addressText: s.str({ max: 300, optional: true }), source: s.oneOf(['gps', 'map', 'manual'], { optional: true, default: 'manual' }) }, { optional: true }) }), ctx.body);
+        const b = parse(s.obj({ label: s.str({ min: 1, max: 40, optional: true }), fullName: s.str({ min: 2, max: 80, optional: true }), phone: s.str({ min: 8, max: 24, optional: true }), location: s.obj({ lat: s.num({ min: -90, max: 90 }), lng: s.num({ min: -180, max: 180 }), accuracy: s.num({ min: 0, max: 100000, optional: true }), addressText: s.str({ max: 300, optional: true }), landmarkText: s.str({ max: 200, optional: true }), localityText: s.str({ max: 200, optional: true }), accessNotes: s.str({ max: 500, optional: true }), source: s.oneOf(['gps', 'map', 'manual'], { optional: true, default: 'manual' }) }, { optional: true }) }), ctx.body);
         const loc = b.location ? app.locations.create(b.location).id : old.location_id;
         const now = iso(app.clock.now());
         db.run('UPDATE customer_beneficiaries SET label=COALESCE(?,label),full_name=COALESCE(?,full_name),phone=COALESCE(?,phone),location_id=?,updated_at=? WHERE id=?', b.label ?? null, b.fullName ?? null, b.phone ?? null, loc, now, old.id);

@@ -84,7 +84,7 @@ export function registerAuthRoutes(app, r) {
         return { user: serializeUser(userRow), ...svc.issueSession(ctx, userRow) };
     });
     r.post('/auth/login', limit('login-ip', { max: 30, windowMs: 60_000 }), limit('login-id', { max: 8, windowMs: 15 * 60_000, key: (c) => String(c.body?.identifier || '').toLowerCase().slice(0, 100) }), async (ctx) => {
-        const b = parse(s.obj({ identifier: s.str({ min: 3, max: 160 }), password: s.str({ min: 1, max: 128, trim: false }) }), ctx.body);
+        const b = parse(s.obj({ identifier: s.str({ min: 3, max: 160 }), password: s.str({ min: 1, max: 128, trim: false }), role: s.oneOf(['CUSTOMER', 'PROVIDER', 'ADMIN'], { optional: true }) }), ctx.body);
         const id = b.identifier.includes('@') ? b.identifier.toLowerCase() : normalizePhone(b.identifier);
         const u = svc.loadUser(id.includes('@') ? 'u.email = ?' : 'u.phone = ?', id);
         if (!u) {
@@ -96,6 +96,8 @@ export function registerAuthRoutes(app, r) {
             throw E.unauthorized('بيانات الدخول غير صحيحة', 'INVALID_CREDENTIALS');
         if (u.status !== 'ACTIVE')
             throw E.forbidden('هذا الحساب موقوف. تواصل مع الدعم.', 'ACCOUNT_INACTIVE');
+        if (b.role && u.role !== b.role)
+            throw E.forbidden('نوع الحساب المختار لا يطابق هذا الحساب. اختر نوع الحساب الصحيح ثم حاول مرة أخرى.', 'ROLE_MISMATCH');
         db.run('UPDATE users SET last_login_at = ? WHERE id = ?', iso(app.clock.now()), u.id);
         if (u.role === 'ADMIN')
             app.audit.log({ ctx, actor: { id: u.id, role: 'ADMIN' }, action: 'auth.admin_login', entityType: 'user', entityId: u.id });

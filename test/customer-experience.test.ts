@@ -37,3 +37,9 @@ describe('V60 Fixed update: customer experience',()=>{
     assert.equal(r.status,200); assert.ok(Number(r.body.distanceKm)>0); assert.ok(['STRAIGHT_LINE_TEST','ROAD_ROUTING'].includes(r.body.method));
   });
 });
+
+test('V75: المستفيد يمكن حفظ موقعه ووصف الوصول لإعادة استخدامه في طلبات الأسرة', async()=>{
+  const c=await registerUser(t.api); const tok=c.body.accessToken as string;
+  const b=await t.api('POST','/api/v1/me/beneficiaries',{token:tok,body:{label:'أمي',fullName:'أمي اختبار',phone:'+967772222222',location:{lat:13.9759,lng:44.1709,accuracy:25,addressText:'البيت',localityText:'قرية الاختبار',landmarkText:'بجوار المدرسة',accessNotes:'المدخل من الجهة الشرقية',source:'manual'}}});
+  assert.equal(b.status,201); assert.equal(b.body.beneficiary.location.localityText,'قرية الاختبار'); assert.equal(b.body.beneficiary.location.landmarkText,'بجوار المدرسة');
+});

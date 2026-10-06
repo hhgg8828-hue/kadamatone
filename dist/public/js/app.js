@@ -3,6 +3,15 @@ const root = document.getElementById('app');
 const page = root.dataset.page || 'customer';
 const state = { token: null, user: null, cats: [], orders: [], services: [], temporaryServices: [], campaigns: [], popularity: [], config: { currency: 'YER' } };
 const currencyLabel = () => String(state.config?.currency || 'YER');
+const A11Y_KEYS = { largeText: 'khadamat_a11y_large_text', highContrast: 'khadamat_a11y_high_contrast', reduceMotion: 'khadamat_a11y_reduce_motion' };
+function applyAccessibilityPreferences() {
+    const b = document.body;
+    b.classList.toggle('a11y-large-text', localStorage.getItem(A11Y_KEYS.largeText) === '1');
+    b.classList.toggle('a11y-high-contrast', localStorage.getItem(A11Y_KEYS.highContrast) === '1');
+    b.classList.toggle('a11y-reduce-motion', localStorage.getItem(A11Y_KEYS.reduceMotion) === '1');
+}
+function setAccessibilityPreference(key, enabled) { localStorage.setItem(A11Y_KEYS[key], enabled ? '1' : '0'); applyAccessibilityPreferences(); }
+applyAccessibilityPreferences();
 const SESSION_KEY = 'khadamat_session_v7';
 let leafletPromise = null;
 async function ensureLeaflet() {
@@ -111,9 +120,37 @@ function maybeSystemNotification(title, body) {
 function toast(title, body) { let box = document.getElementById('liveToasts'); if (!box) {
     box = document.createElement('div');
     box.id = 'liveToasts';
-    box.style.cssText = 'position:fixed;top:16px;left:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px));';
+    box.style.cssText = 'position:fixed;right:14px;left:14px;bottom:82px;z-index:99999;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:520px;margin-right:auto;margin-left:auto;pointer-events:none;';
     document.body.appendChild(box);
-} const el = document.createElement('div'); el.style.cssText = 'background:#fff;border:1px solid #d9e1ea;border-radius:14px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.14);font-family:Arial,sans-serif;cursor:pointer'; el.innerHTML = `<b>${esc(title)}</b><div style="margin-top:4px;color:#667085;font-size:13px">${esc(body)}</div>`; el.onclick = () => el.remove(); box.appendChild(el); setTimeout(() => el.remove(), 7000); }
+} const el = document.createElement('div'); el.style.cssText = 'width:min(100%,460px);background:#fff;border:1px solid #d9e1ea;border-radius:14px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.14);font-family:Arial,sans-serif;cursor:pointer;pointer-events:auto;direction:rtl;text-align:right'; el.innerHTML = `<b>${esc(title)}</b><div style="margin-top:4px;color:#667085;font-size:13px">${esc(body)}</div>`; el.onclick = () => el.remove(); box.appendChild(el); setTimeout(() => el.remove(), 7000); }
+// V72 UX: keep errors inside the app instead of browser-native blocking dialogs.
+const nativeAlert = window.alert.bind(window);
+window.alert = (message) => {
+    try {
+        toast('تنبيه', String(message ?? 'حدث خطأ غير متوقع'));
+    }
+    catch {
+        nativeAlert(String(message ?? 'حدث خطأ غير متوقع'));
+    }
+};
+function updateConnectionBanner() {
+    const id = 'connectionBanner';
+    let el = document.getElementById(id);
+    if (navigator.onLine) {
+        el?.remove();
+        return;
+    }
+    if (!el) {
+        el = document.createElement('div');
+        el.id = id;
+        el.setAttribute('role', 'status');
+        el.innerHTML = '<span>📴</span><div><b>أنت غير متصل بالإنترنت</b><small>يمكنك متابعة ما يدعم العمل دون اتصال، وسيتم إرسال الطلبات والرسائل المحفوظة عند عودة الاتصال.</small></div>';
+        document.body.appendChild(el);
+    }
+}
+window.addEventListener('offline', updateConnectionBanner);
+window.addEventListener('online', () => { updateConnectionBanner(); toast('عاد الاتصال', 'جارٍ مزامنة البيانات والطلبات المحفوظة.'); });
+updateConnectionBanner();
 async function startRealtime() {
     stopRealtime();
     if (!state.user || !state.token)
@@ -512,86 +549,131 @@ function openAbout() {
     <footer class="about-app-footer"><strong>تطبيق خدمات</strong><span>كل خدمة تحتاجها... في مكان واحد.</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
   </article>`);
 }
-function shell(content, title = 'خدمات') { const portal = page === 'provider' ? `<a class="portal-link portal-customer" href="/" aria-label="الانتقال إلى واجهة العميل">↩ واجهة العميل</a>` : page === 'admin' ? `<a class="portal-link portal-customer" href="/" aria-label="الانتقال إلى واجهة العميل">↩ واجهة العميل</a>` : `<a class="portal-link portal-provider" href="/provider.html" data-provider-link aria-label="الانتقال إلى واجهة مقدم الخدمة">↗ واجهة مقدم الخدمة</a>`; const adminLink = state.user?.role === 'ADMIN' && page !== 'admin' ? `<a class="portal-link portal-admin" href="/admin" aria-label="الانتقال إلى لوحة الإدارة">⚙ لوحة الإدارة</a>` : ''; root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="/" aria-label="خدمات"><span class="brand-mark">خ</span><span><strong>خدمات</strong><small>كل خدمة تحتاجها في مكان واحد</small></span></a><div class="row top-actions">${portal}${adminLink}<button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>${state.user ? `<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button><button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button">🔔 <span id="notificationCount"></span></button><button class="btn secondary small logout-btn" id="logout">خروج</button>` : ''}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
-    refreshNotificationBadge().catch(() => { }); document.querySelectorAll('[data-provider-link]').forEach(x => x.addEventListener('click', e => { e.preventDefault(); window.location.assign('/provider.html'); })); applyFieldPlaceholders(root); }
+function roleHome(role) { return role === 'PROVIDER' ? '/provider.html' : role === 'ADMIN' ? '/admin' : '/'; }
+function redirectToRole(role) { const target = roleHome(role); if (location.pathname !== target && !(target === '/' && location.pathname === '/'))
+    location.replace(target); }
+function shell(content, title = 'خدمات') { const home = state.user ? roleHome(state.user.role) : '/'; root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="خدمات"><span class="brand-mark">خ</span><span><strong>خدمات</strong><small>كل خدمة تحتاجها في مكان واحد</small></span></a><div class="row top-actions"><button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>${state.user ? `<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button><button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button">🔔 <span id="notificationCount"></span></button><button class="btn secondary small logout-btn" id="logout">خروج</button>` : ''}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
+    refreshNotificationBadge().catch(() => { }); applyFieldPlaceholders(root); }
 async function openAccount() {
     try {
         const j = await api('/auth/me');
         const u = j.user || state.user || {};
         const isProvider = u.role === 'PROVIDER';
-        showModal(`<h2>حسابي</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" disabled></div><div class="field"><label>الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form>`);
-        document.getElementById('accountForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const msg = document.getElementById('accountMsg'); try {
-            if (isProvider) {
-                const avatar = document.getElementById('providerAvatarFile')?.files?.[0];
-                let avatarFileId;
-                if (avatar) {
-                    if (avatar.size > 5 * 1024 * 1024)
-                        throw new Error('حجم الصورة يتجاوز 5MB');
-                    const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(avatar); });
-                    const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'avatar', name: avatar.name, dataBase64: data }) });
-                    avatarFileId = up.file.id;
+        const large = localStorage.getItem(A11Y_KEYS.largeText) === '1', contrast = localStorage.getItem(A11Y_KEYS.highContrast) === '1', reduce = localStorage.getItem(A11Y_KEYS.reduceMotion) === '1';
+        showModal(`<h2>حسابي</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" disabled></div><div class="field"><label>الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<div class="account-accessibility card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>سهولة الاستخدام</b><p class="muted">إعدادات اختيارية مفيدة لكبار السن ومن يحتاج نصًا أكبر أو حركة أقل.</p></div><span class="status">تُحفظ على هذا الجهاز</span></div><div class="a11y-options"><label><input type="checkbox" id="a11yLargeText" ${large ? 'checked' : ''}> تكبير النص والأزرار</label><label><input type="checkbox" id="a11yHighContrast" ${contrast ? 'checked' : ''}> تباين أعلى</label><label><input type="checkbox" id="a11yReduceMotion" ${reduce ? 'checked' : ''}> تقليل الحركة</label></div></div><button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form>`);
+        document.getElementById('a11yLargeText')?.addEventListener('change', (e) => setAccessibilityPreference('largeText', e.currentTarget.checked));
+        document.getElementById('a11yHighContrast')?.addEventListener('change', (e) => setAccessibilityPreference('highContrast', e.currentTarget.checked));
+        document.getElementById('a11yReduceMotion')?.addEventListener('change', (e) => setAccessibilityPreference('reduceMotion', e.currentTarget.checked));
+        document.getElementById('accountForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            const msg = document.getElementById('accountMsg');
+            try {
+                if (isProvider) {
+                    const avatar = document.getElementById('providerAvatarFile')?.files?.[0];
+                    let avatarFileId;
+                    if (avatar) {
+                        if (avatar.size > 5 * 1024 * 1024)
+                            throw new Error('حجم الصورة يتجاوز 5MB');
+                        const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(avatar); });
+                        const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'avatar', name: avatar.name, dataBase64: data }) });
+                        avatarFileId = up.file.id;
+                    }
+                    await api('/provider/profile', { method: 'PATCH', body: JSON.stringify({ displayName: String(f.get('displayName') || ''), bio: String(f.get('bio') || '') }) });
+                    if (avatarFileId) {
+                        const me = await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ avatarFileId }) });
+                        state.user = me.user;
+                        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ accessToken: state.token, user: state.user }));
+                    }
                 }
-                await api('/provider/profile', { method: 'PATCH', body: JSON.stringify({ displayName: String(f.get('displayName') || ''), bio: String(f.get('bio') || '') }) });
-                if (avatarFileId) {
-                    const me = await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ avatarFileId }) });
-                    state.user = me.user;
-                    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ accessToken: state.token, user: state.user }));
+                else {
+                    await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ fullName: String(f.get('fullName') || '') }) });
                 }
+                msg.textContent = 'تم حفظ التغييرات بنجاح';
+                msg.className = 'success';
             }
-            else {
-                await api('/me/profile', { method: 'PATCH', body: JSON.stringify({ fullName: String(f.get('fullName') || '') }) });
+            catch (x) {
+                msg.textContent = x.message;
+                msg.className = 'error';
             }
-            msg.textContent = 'تم حفظ التغييرات بنجاح';
-            msg.className = 'success';
-        }
-        catch (x) {
-            msg.textContent = x.message;
-            msg.className = 'error';
-        } });
+        });
     }
     catch (e) {
         alert(e.message);
     }
 }
-function authBox(next = page) { const isProvider = next === 'provider'; const isAdmin = next === 'admin'; shell(`<div class="hero"><h1>${isAdmin ? 'دخول لوحة الإدارة' : isProvider ? 'منصة مقدم الخدمة' : 'كل خدمة تحتاجها... في مكان واحد.'}</h1><p class="muted">${isAdmin ? 'هذه الصفحة مخصصة لحسابات الإدارة المعتمدة فقط.' : 'لا تبحث عن مقدم الخدمة، اطلب الخدمة فقط.'}</p></div><div class="card"><div class="nav">${isAdmin ? '' : '<button class="btn" id="tabLogin">دخول</button><button class="btn secondary" id="tabReg">حساب جديد</button>'}</div><div id="authForm"></div><div class="auth-switch">${isAdmin ? '<span class="muted">لا يوجد إنشاء حساب مدير من هذه الصفحة.</span>' : `<span class="muted">${isProvider ? 'تريد طلب خدمة بدل تقديمها؟' : 'هل تريد تقديم خدمة للعملاء؟'}</span> <a class="choose-link" href="${isProvider ? '/' : '/provider.html'}">${isProvider ? 'العودة لواجهة العميل' : 'الدخول إلى منصة مقدم الخدمة'}</a>`}</div></div>`); let mode = 'login'; const draw = () => { const providerReg = next === 'provider'; document.getElementById('authForm').innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" value="${isAdmin ? 'admin@khadamat.local' : ''}" required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn">دخول</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني${providerReg ? " (إلزامي)" : " (اختياري)"}</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" ${providerReg ? "required" : ""}></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div>${providerReg ? `<div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>التخصص</label><input name="specialty" maxlength="120" placeholder="مثال: تكييف وتبريد"></div><div class="field"><label>نبذة مختصرة</label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div>` : ''}<button class="btn">${providerReg ? 'إنشاء حساب مقدم خدمة' : 'إنشاء حساب عميل'}</button><p id="msg"></p></form>`; applyFieldPlaceholders(document.getElementById('authForm')); const form = document.getElementById('form'); form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); const b = {}; f.forEach((v, k) => b[k] = v); try {
-    const payload = { ...b, role: providerReg ? 'PROVIDER' : 'CUSTOMER', locale: 'ar' };
-    if (providerReg) {
-        payload.provider = { providerType: b.providerType, displayName: b.displayName, bio: b.bio, specialty: b.specialty };
-        if (b.providerType === 'COMPANY') {
-            payload.provider.companyName = b.displayName;
-        }
-        delete payload.providerType;
-        delete payload.displayName;
-        delete payload.bio;
-    }
-    const j = mode === 'login' ? await api('/auth/login', { method: 'POST', body: JSON.stringify(b) }) : await api('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
-    saveSession(j);
-    startRealtime().catch(() => { });
-    startNotificationPolling();
-    if ('Notification' in window && Notification.permission === 'granted')
-        registerWebPushSubscription().catch(() => { });
-    location.href = next === 'provider' ? '/provider.html' : next === 'admin' ? '/admin' : '/';
-}
-catch (x) {
-    const err = x;
-    document.querySelectorAll('#authForm .field-error').forEach((el) => el.remove());
-    const details = Array.isArray(err.details) ? err.details : [];
-    if (details.length) {
-        for (const d of details) {
-            const field = String(d.path || '').split('.').pop() || '';
-            const input = form.querySelector(`[name="${CSS.escape(field)}"]`);
-            if (input) {
-                const p = document.createElement('small');
-                p.className = 'field-error error';
-                p.textContent = String(d.message || err.message);
-                input.parentElement?.appendChild(p);
+function authBox() {
+    let selected = null;
+    let mode = 'login';
+    const draw = () => {
+        const selectedLabel = selected === 'CUSTOMER' ? 'حساب عميل' : selected === 'PROVIDER' ? 'حساب مقدم خدمة' : selected === 'ADMIN' ? 'حساب إدارة' : '';
+        const admin = selected === 'ADMIN';
+        const provider = selected === 'PROVIDER';
+        shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.</p></div>
+      <div class="card account-type-card"><h2>ما نوع الحساب الذي تريد استخدامه؟</h2><div class="grid auth-role-grid">
+        <button class="card auth-role-choice ${selected === 'CUSTOMER' ? 'selected' : ''}" type="button" data-role="CUSTOMER"><span class="auth-role-icon">👤</span><b>عميل</b><small>أطلب الخدمات وأتابع طلباتي.</small></button>
+        <button class="card auth-role-choice ${selected === 'PROVIDER' ? 'selected' : ''}" type="button" data-role="PROVIDER"><span class="auth-role-icon">🛠️</span><b>مقدم خدمة</b><small>أقدم خدمات وأستقبل الطلبات المناسبة لي.</small></button>
+        <button class="card auth-role-choice ${selected === 'ADMIN' ? 'selected' : ''}" type="button" data-role="ADMIN"><span class="auth-role-icon">⚙️</span><b>الإدارة</b><small>دخول الإدارة للحسابات المعتمدة فقط، بدون إنشاء حساب عام.</small></button>
+      </div>${selected ? `<div class="auth-selected-head"><b>${selectedLabel}</b>${!admin ? `<div class="nav"><button class="btn ${mode === 'login' ? '' : 'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode === 'register' ? '' : 'secondary'}" id="tabReg">حساب جديد</button></div>` : ''}</div><div id="authForm"></div>` : '<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
+        document.querySelectorAll('[data-role]').forEach(x => x.addEventListener('click', () => { selected = x.dataset.role; mode = 'login'; draw(); }));
+        if (!selected)
+            return;
+        document.getElementById('tabLogin')?.addEventListener('click', () => { mode = 'login'; draw(); });
+        document.getElementById('tabReg')?.addEventListener('click', () => { mode = 'register'; draw(); });
+        const formHost = document.getElementById('authForm');
+        if (!formHost)
+            return;
+        const providerReg = provider && mode === 'register';
+        formHost.innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" ${admin ? 'value="admin@khadamat.local"' : ''} required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn">دخول</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني${providerReg ? ' (إلزامي)' : ' (اختياري)'}</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" ${providerReg ? 'required' : ''}></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div>${providerReg ? `<div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>التخصص</label><input name="specialty" maxlength="120" placeholder="مثال: تكييف وتبريد"></div><div class="field"><label>نبذة مختصرة</label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div>` : ''}<button class="btn">${providerReg ? 'إنشاء حساب مقدم خدمة' : 'إنشاء حساب عميل'}</button><p id="msg"></p></form>`;
+        applyFieldPlaceholders(formHost);
+        const form = document.getElementById('form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const f = new FormData(form);
+            const b = {};
+            f.forEach((v, k) => b[k] = v);
+            try {
+                const payload = { ...b, role: selected, locale: 'ar' };
+                if (providerReg) {
+                    payload.provider = { providerType: b.providerType, displayName: b.displayName, bio: b.bio, specialty: b.specialty };
+                    if (b.providerType === 'COMPANY')
+                        payload.provider.companyName = b.displayName;
+                    delete payload.providerType;
+                    delete payload.displayName;
+                    delete payload.bio;
+                }
+                const j = mode === 'login' ? await api('/auth/login', { method: 'POST', body: JSON.stringify({ ...b, role: selected }) }) : await api('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
+                saveSession(j);
+                startRealtime().catch(() => { });
+                startNotificationPolling();
+                if ('Notification' in window && Notification.permission === 'granted')
+                    registerWebPushSubscription().catch(() => { });
+                redirectToRole(j.user.role);
             }
-        }
-    }
-    const msg = document.getElementById('msg');
-    msg.textContent = details.length ? 'راجع الحقول المحددة أعلاه.' : err.message;
-    msg.className = 'error';
-} }); }; document.getElementById('tabLogin')?.addEventListener('click', () => { mode = 'login'; draw(); }); document.getElementById('tabReg')?.addEventListener('click', () => { mode = 'reg'; draw(); }); draw(); }
+            catch (x) {
+                const err = x;
+                formHost.querySelectorAll('.field-error').forEach((el) => el.remove());
+                const details = Array.isArray(err.details) ? err.details : [];
+                if (details.length) {
+                    for (const d of details) {
+                        const field = String(d.path || '').split('.').pop() || '';
+                        const input = form.querySelector(`[name="${CSS.escape(field)}"]`);
+                        if (input) {
+                            const p = document.createElement('small');
+                            p.className = 'field-error error';
+                            p.textContent = String(d.message || err.message);
+                            input.parentElement?.appendChild(p);
+                        }
+                    }
+                }
+                const msg = document.getElementById('msg');
+                msg.textContent = details.length ? 'راجع الحقول المحددة أعلاه.' : err.message;
+                msg.className = 'error';
+            }
+        });
+    };
+    draw();
+}
 async function handleNotificationDeepLink() {
     const q = new URLSearchParams(location.search);
     const orderId = q.get('order');
@@ -623,12 +705,14 @@ async function fetchAllCustomerOrders() {
 }
 async function customer() {
     if (!state.user) {
-        authBox();
+        if (page !== 'customer')
+            location.replace('/');
+        else
+            authBox();
         return;
     }
     if (state.user.role !== 'CUSTOMER') {
-        shell(`<div class="notice">هذا الحساب ليس حساب عميل. <button class="btn" id="go">فتح الواجهة المناسبة</button></div>`);
-        document.getElementById('go').onclick = () => location.href = state.user.role === 'PROVIDER' ? '/provider.html' : '/admin';
+        redirectToRole(state.user.role);
         return;
     }
     try {
@@ -813,21 +897,43 @@ async function openFavorites() { try {
 catch (e) {
     alert(e.message);
 } }
-async function openBeneficiaries() { try {
-    const j = await api('/me/beneficiaries');
-    showModal(`<h2>👨‍👩‍👧 المستفيدون</h2><p class="muted">احفظ أفراد الأسرة أو أي شخص تطلب له الخدمة باستمرار.</p><button class="btn" id="addBeneficiary">+ إضافة مستفيد</button><div style="margin-top:12px">${(j.beneficiaries || []).map((b) => `<div class="card"><b>${esc(b.label)}</b><p>${esc(b.fullName)} · ${esc(b.phone)}</p><button class="btn danger small" data-del-beneficiary="${esc(b.id)}" type="button">حذف</button></div>`).join('') || '<div class="empty">لا يوجد مستفيدون محفوظون.</div>'}</div>`);
-    document.getElementById('addBeneficiary')?.addEventListener('click', () => { showModal(`<h2>إضافة مستفيد</h2><form id="beneficiaryForm"><input name="label" placeholder="أبي / أمي / شخص آخر" required maxlength="40"><input name="fullName" placeholder="الاسم" required maxlength="80"><input name="phone" placeholder="الهاتف" required maxlength="24"><button class="btn">حفظ</button></form>`); document.getElementById('beneficiaryForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); try {
-        await api('/me/beneficiaries', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify({ label: String(f.get('label')), fullName: String(f.get('fullName')), phone: String(f.get('phone')) }) });
-        openBeneficiaries();
+async function openBeneficiaries() {
+    try {
+        const j = await api('/me/beneficiaries');
+        showModal(`<h2>👨‍👩‍👧 المستفيدون</h2><p class="muted">احفظ أفراد الأسرة أو أي شخص تطلب له الخدمة باستمرار. يمكنك حفظ موقعه الحالي لتسهيل الطلبات اللاحقة.</p><button class="btn" id="addBeneficiary">+ إضافة مستفيد</button><div style="margin-top:12px">${(j.beneficiaries || []).map((b) => `<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(b.label)}</b>${b.location ? '<span class="status">📍 موقع محفوظ</span>' : '<span class="status">بدون موقع</span>'}</div><p>${esc(b.fullName)} · ${esc(b.phone)}</p>${b.location ? `<small class="muted">${esc(b.location.localityText || b.location.addressText || b.location.landmarkText || 'موقع محفوظ')}</small>` : ''}<button class="btn danger small" data-del-beneficiary="${esc(b.id)}" type="button">حذف</button></div>`).join('') || '<div class="empty">لا يوجد مستفيدون محفوظون.</div>'}</div>`);
+        document.getElementById('addBeneficiary')?.addEventListener('click', () => {
+            showModal(`<h2>إضافة مستفيد</h2><form id="beneficiaryForm"><div class="field"><label>صلة أو وصف المستفيد</label><input name="label" placeholder="أبي / أمي / شخص آخر" required maxlength="40"></div><div class="field"><label>الاسم</label><input name="fullName" placeholder="الاسم" required maxlength="80"></div><div class="field"><label>الهاتف</label><input name="phone" placeholder="الهاتف" required maxlength="24" inputmode="tel"></div><div class="field"><label>موقع المستفيد (اختياري)</label><div class="row"><button class="btn secondary small" id="beneficiaryUseLocation" type="button">📍 حفظ موقعي الحالي</button><span id="beneficiaryLocationStatus" class="muted">يمكن تركه فارغًا.</span></div><div class="field"><input name="localityText" maxlength="200" placeholder="القرية / الحي / المنطقة"></div><div class="field"><input name="landmarkText" maxlength="200" placeholder="أقرب معلم"></div><div class="field"><textarea name="accessNotes" maxlength="500" placeholder="وصف الوصول"></textarea></div><input name="lat" type="hidden"><input name="lng" type="hidden"><input name="accuracy" type="hidden"></div><button class="btn">حفظ</button><p id="beneficiaryMsg"></p></form>`);
+            let loc = null;
+            document.getElementById('beneficiaryUseLocation')?.addEventListener('click', () => { const st = document.getElementById('beneficiaryLocationStatus'); if (!navigator.geolocation) {
+                if (st)
+                    st.textContent = 'الموقع غير متاح على هذا الجهاز.';
+                return;
+            } if (st)
+                st.textContent = 'جارٍ تحديد الموقع...'; navigator.geolocation.getCurrentPosition(pos => { loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: 'gps' }; document.querySelector('[name="lat"]').value = String(loc.lat); document.querySelector('[name="lng"]').value = String(loc.lng); document.querySelector('[name="accuracy"]').value = String(loc.accuracy || ''); if (st)
+                st.textContent = '✓ تم حفظ الموقع الحالي لهذا المستفيد'; }, () => { if (st)
+                st.textContent = 'تعذر تحديد الموقع؛ يمكنك الحفظ بدون موقع.'; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }); });
+            document.getElementById('beneficiaryForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); try {
+                const body = { label: String(f.get('label')), fullName: String(f.get('fullName')), phone: String(f.get('phone')) };
+                if (loc) {
+                    body.location = { ...loc, addressText: String(f.get('localityText') || ''), localityText: String(f.get('localityText') || ''), landmarkText: String(f.get('landmarkText') || ''), accessNotes: String(f.get('accessNotes') || '') };
+                }
+                await api('/me/beneficiaries', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
+                openBeneficiaries();
+            }
+            catch (x) {
+                const m = document.getElementById('beneficiaryMsg');
+                if (m) {
+                    m.textContent = x.message;
+                    m.className = 'error';
+                }
+            } });
+        });
+        document.querySelectorAll('[data-del-beneficiary]').forEach(x => x.addEventListener('click', async () => { await api('/me/beneficiaries/' + x.dataset.delBeneficiary, { method: 'DELETE' }); openBeneficiaries(); }));
     }
-    catch (x) {
-        alert(x.message);
-    } }); });
-    document.querySelectorAll('[data-del-beneficiary]').forEach(x => x.addEventListener('click', async () => { await api('/me/beneficiaries/' + x.dataset.delBeneficiary, { method: 'DELETE' }); openBeneficiaries(); }));
+    catch (e) {
+        alert(e.message);
+    }
 }
-catch (e) {
-    alert(e.message);
-} }
 async function loadPersonalRecommendations() {
     const box = document.getElementById('personalRecommendations');
     if (!box)
@@ -847,7 +953,7 @@ async function loadPersonalRecommendations() {
     }
 }
 function customerMainCategories(cats) { const all = []; const walk = (items) => items.forEach(x => { all.push(x); if (Array.isArray(x.children))
-    walk(x.children); }); walk(cats); const order = ['transport', 'delivery', 'home-services', 'maintenance', 'on-demand-labor', 'agriculture']; const by = new Map(all.map(c => [c.slug, c])); return order.map(x => by.get(x)).filter(Boolean).map((x) => x.slug === 'maintenance' ? ({ ...x, name: 'الصيانة والسيارات', description: 'الصيانة المنزلية والسيارات' }) : x); }
+    walk(x.children); }); walk(cats); const order = ['transport', 'delivery', 'home-services', 'essential-yemen', 'maintenance', 'on-demand-labor', 'agriculture', 'family-life']; const by = new Map(all.map(c => [c.slug, c])); return order.map(x => by.get(x)).filter(Boolean).map((x) => x.slug === 'maintenance' ? ({ ...x, name: 'الصيانة والسيارات', description: 'الصيانة المنزلية والسيارات' }) : x); }
 function pickQuickServices(services, limit = 7, popularity = []) { const rank = new Map(popularity.map((x) => [x.serviceId, Number(x.count || 0)])); const ranked = services.slice().sort((a, b) => (rank.get(b.id) || 0) - (rank.get(a.id) || 0)); const picked = []; const seenCats = new Set(); for (const sv of ranked) {
     const key = String(sv.categoryId || sv.categorySlug || '');
     if (!seenCats.has(key)) {
@@ -2113,15 +2219,11 @@ function startProviderLocationTracking(online) { if (providerLocationWatch !== u
 catch { } }, () => { }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }); }
 async function provider() {
     if (!state.user) {
-        authBox('provider');
+        location.replace('/');
         return;
     }
     if (state.user.role !== 'PROVIDER') {
-        authBox('provider');
-        const notice = document.createElement('div');
-        notice.className = 'notice';
-        notice.textContent = 'هذا الحساب حساب عميل. سجّل حساب مقدم خدمة مستقلًا للدخول إلى منصة مقدم الخدمة.';
-        document.getElementById('authForm')?.before(notice);
+        redirectToRole(state.user.role);
         return;
     }
     try {
@@ -2586,11 +2688,11 @@ catch (e) {
 } }
 async function admin() {
     if (!state.user) {
-        authBox('admin');
+        location.replace('/');
         return;
     }
     if (state.user.role !== 'ADMIN') {
-        location.href = '/';
+        redirectToRole(state.user.role);
         return;
     }
     let activeTab = (new URLSearchParams(location.search).get('tab') || 'overview'), orderStatus = '', providerStatus = 'PENDING';
@@ -2999,10 +3101,18 @@ if (restored) {
     flushMessageOutbox().catch(() => { });
     if ('Notification' in window && Notification.permission === 'granted')
         registerWebPushSubscription().catch(() => { });
+    const expected = roleHome(state.user.role);
+    if (location.pathname !== expected && !(expected === '/' && location.pathname === '/'))
+        location.replace(expected);
+    else if (page === 'provider')
+        provider();
+    else if (page === 'admin')
+        admin();
+    else
+        customer();
 }
-if (page === 'provider')
-    provider();
-else if (page === 'admin')
-    admin();
+else if (page !== 'customer') {
+    location.replace('/');
+}
 else
     customer();

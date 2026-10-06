@@ -242,3 +242,37 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 .provider-command-strip small{color:var(--muted,#667085)}
 .admin-alias-list{max-height:360px;overflow:auto;margin-top:10px}
 @media(max-width:700px){.location-human-fields{grid-template-columns:1fr}.location-human-fields .field:last-child{grid-column:auto}.provider-command-strip{grid-template-columns:1fr 1fr}.provider-command-strip>div:first-child{grid-column:1/-1}}
+
+/* V72 Yemen-first UX: persistent but unobtrusive connectivity state */
+#connectionBanner{position:fixed;right:14px;left:14px;bottom:14px;z-index:10001;display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid #f0cf83;border-radius:16px;background:#fffaf0;color:#694b0b;box-shadow:0 14px 38px rgba(16,24,40,.16);direction:rtl}
+#connectionBanner>span{font-size:22px;flex:none}
+#connectionBanner b{display:block;font-size:13px}
+#connectionBanner small{display:block;margin-top:3px;color:#7a6540;line-height:1.55}
+@media(max-width:600px){#connectionBanner{right:10px;left:10px;bottom:10px;border-radius:14px}}
+
+/* V75 Yemen-first accessibility: optional, local-device preferences for elders and low-vision users. */
+.a11y-large-text{font-size:18px}
+.a11y-large-text .btn,.a11y-large-text input,.a11y-large-text select,.a11y-large-text textarea{font-size:1.06em;min-height:46px}
+.a11y-large-text .muted,.a11y-large-text small{font-size:1em}
+.a11y-high-contrast{--muted:#4b5563}
+.a11y-high-contrast .card,.a11y-high-contrast input,.a11y-high-contrast select,.a11y-high-contrast textarea{border-color:#9ca3af}
+.a11y-high-contrast .muted{color:#374151!important}
+.a11y-reduce-motion *,.a11y-reduce-motion *:before,.a11y-reduce-motion *:after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+.account-accessibility{margin:14px 0;padding:14px}
+.a11y-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.a11y-options label{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd8e8;border-radius:12px;background:#fff;cursor:pointer}
+.a11y-options input{width:18px;height:18px;accent-color:var(--primary)}
+#liveToasts{right:14px!important;left:14px!important;bottom:82px!important;top:auto!important;max-width:520px!important;margin:0 auto!important;align-items:flex-end!important;pointer-events:none!important}
+#liveToasts>div{width:min(100%,460px)!important;direction:rtl!important;text-align:right!important;pointer-events:auto!important}
+@media(max-width:650px){.a11y-options{grid-template-columns:1fr}.a11y-large-text{font-size:17px}}
+
+/* V76: single-role entry and isolated account experience */
+.auth-role-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px}
+.auth-role-choice{appearance:none;border:1px solid #dfe4ec;background:#fff;text-align:right;cursor:pointer;min-height:150px;padding:18px;display:flex;flex-direction:column;gap:8px;transition:.18s}
+.auth-role-choice:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(45,35,80,.10)}
+.auth-role-choice.selected{border-color:#6f42c1;box-shadow:0 0 0 3px rgba(111,66,193,.12);background:#fbf9ff}
+.auth-role-icon{font-size:32px;line-height:1}
+.auth-role-choice b{font-size:18px}
+.auth-role-choice small{color:#667085;line-height:1.7}
+.auth-selected-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;padding-top:16px;border-top:1px solid #edf0f4}
+@media(max-width:700px){.auth-role-grid{grid-template-columns:1fr}.auth-role-choice{min-height:auto;display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center}.auth-role-choice small{grid-column:2}.auth-role-icon{grid-row:1 / span 2}.auth-selected-head{flex-direction:column;align-items:stretch}}

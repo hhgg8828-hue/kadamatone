@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
   "version": "0.6.30",
-  "description": "خدمات (Khadamat) — V70 Yemen rural-first service marketplace with smart intent, order chat, local landmarks and operational settlement",
+  "description": "خدمات (Khadamat) — V75 Yemen-first service marketplace with smart intent, order chat, local landmarks and operational settlement",
   "private": true,
   "type": "module",
   "engines": {

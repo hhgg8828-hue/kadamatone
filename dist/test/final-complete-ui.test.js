@@ -19,4 +19,17 @@ test('الملفات الخاصة: عرض وثائق الإدارة يمر عب�
     assert.match(appTs, /openPrivateFile\(/);
     assert.equal(/data-admin-file=\"\$\{esc\(x\.fileUrl\)\}\"[^<]*href=/.test(appTs), false);
 });
+test('V75: سهولة الاستخدام ومركز التنبيهات لا يحجبان رأس الصفحة', () => {
+    assert.match(appTs, /A11Y_KEYS/);
+    assert.match(appTs, /a11yLargeText/);
+    assert.match(appTs, /a11yHighContrast/);
+    assert.match(appTs, /a11yReduceMotion/);
+    assert.match(appTs, /bottom:82px/);
+});
+test('V75: المستفيدون يدعمون حفظ موقع ووصف وصول اختياري', () => {
+    assert.match(appTs, /beneficiaryUseLocation/);
+    assert.match(appTs, /landmarkText/);
+    assert.match(appTs, /accessNotes/);
+    assert.match(appTs, /body\.location/);
+});
 //# sourceMappingURL=final-complete-ui.test.js.map
