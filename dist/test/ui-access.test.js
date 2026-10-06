@@ -17,8 +17,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 });
 test('provider page and frontend assets use the current version', () => {
     assert.ok(provider.includes('data-page="provider"'));
-    assert.ok(provider.includes('app.js?v=69.0'));
-    assert.ok(index.includes('app.js?v=69.0'));
+    assert.ok(provider.includes('app.js?v=71.0'));
+    assert.ok(index.includes('app.js?v=71.0'));
 });
 test('provider order action is not nested inside the clickable order detail button', () => {
     assert.match(app, /class=\"order-card-main\"/);

@@ -1,7 +1,8 @@
 "use strict";
 const root = document.getElementById('app');
 const page = root.dataset.page || 'customer';
-const state = { token: null, user: null, cats: [], orders: [], services: [], temporaryServices: [], campaigns: [], popularity: [] };
+const state = { token: null, user: null, cats: [], orders: [], services: [], temporaryServices: [], campaigns: [], popularity: [], config: { currency: 'YER' } };
+const currencyLabel = () => String(state.config?.currency || 'YER');
 const SESSION_KEY = 'khadamat_session_v7';
 let leafletPromise = null;
 async function ensureLeaflet() {
@@ -631,7 +632,8 @@ async function customer() {
         return;
     }
     try {
-        const [catalogPayload, o] = await Promise.all([api('/catalog/bootstrap'), api('/orders')]);
+        const [catalogPayload, o, platformConfig] = await Promise.all([api('/catalog/bootstrap'), api('/orders'), api('/config').catch(() => ({ currency: 'YER' }))]);
+        state.config = platformConfig || { currency: 'YER' };
         state.cats = catalogPayload.categories || [];
         state.orders = await fetchAllCustomerOrders();
         state.services = catalogPayload.services || [];
@@ -1065,7 +1067,7 @@ async function openMotorcycleTripForm(service, savedAddresses) {
     <div class="field"><label>الغرض من المشوار</label><select id="tripPurpose" required>${Object.entries(purposeLabels).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div class="card" style="margin-bottom:10px"><h3>تفاصيل الشراء عند الحاجة</h3><div class="grid"><input id="purchaseMaxPrice" type="number" min="0" placeholder="الحد الأقصى للسعر"><input id="purchaseQuantity" type="number" min="1" value="1" placeholder="الكمية"><input id="purchaseAlternatives" maxlength="500" placeholder="البدائل المقبولة"><label><input id="purchaseApproval" type="checkbox" checked> أريد الموافقة إذا تغير السعر أو المنتج</label></div></div>
     <div class="trip-location-card"><div class="row trip-location-head"><b>📍 نقطة الانطلاق</b><button type="button" class="btn secondary small" id="tripOriginGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripOriginMapBtn">فتح الخريطة</button></div><select id="tripOriginSaved"><option value="">تحديد نقطة جديدة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripOriginMap" class="trip-map hide"></div><p id="tripOriginText" class="muted">GPS أو موقع محفوظ أو وصف للمكان. الخريطة اختيارية.</p><textarea id="tripOriginNote" maxlength="300" placeholder="وصف إضافي: أنا في منطقة كذا، جوار كذا، شارع كذا"></textarea><input id="tripOriginLat" type="hidden"><input id="tripOriginLng" type="hidden"></div>
     <div class="trip-location-card"><div class="row trip-location-head"><b>🎯 الوجهة</b><button type="button" class="btn secondary small" id="tripDestinationGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripDestinationMapBtn">فتح الخريطة</button></div><select id="tripDestinationSaved"><option value="">تحديد الوجهة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripDestinationMap" class="trip-map hide"></div><p id="tripDestinationText" class="muted">الوجهة اختيارية. يمكنك إرسال الطلب بدونها، أو تحديدها لاحقًا بالدبوس أو الوصف.</p><textarea id="tripDestinationNote" maxlength="300" placeholder="وصف إضافي لمكان الوصول: جوار كذا، شارع كذا..."></textarea><input id="tripDestinationLat" type="hidden"><input id="tripDestinationLng" type="hidden"></div><div class="card" style="margin-top:10px"><div class="row" style="justify-content:space-between"><b>نقاط توقف إضافية</b><button type="button" class="btn secondary small" id="addTripStop">+ إضافة توقف</button></div><div id="tripStops"></div><small class="muted">يمكن إضافة حتى 5 نقاط توقف. استخدم مواقعك المحفوظة أو اتركها فارغة.</small></div>
-    <div class="trip-meter card"><div class="trip-meter-label">عداد المشوار</div><div class="trip-meter-main"><span id="tripDistance">—</span><small>كم</small></div><div class="trip-meter-fare"><span id="tripFare">—</span><small>ريال يمني</small></div><p id="tripEstimateNote" class="muted">حدد الوجهة إذا أردت تقدير المسافة والأجرة الآن. بدون وجهة سيُرسل الطلب ويُستكمل تحديدها لاحقًا.</p></div>
+    <div class="trip-meter card"><div class="trip-meter-label">عداد المشوار</div><div class="trip-meter-main"><span id="tripDistance">—</span><small>كم</small></div><div class="trip-meter-fare"><span id="tripFare">—</span><small>${esc(currencyLabel())}</small></div><p id="tripEstimateNote" class="muted">حدد الوجهة إذا أردت تقدير المسافة والأجرة الآن. بدون وجهة سيُرسل الطلب ويُستكمل تحديدها لاحقًا.</p></div>
     <div class="field"><label>تفاصيل الغرض</label><textarea id="tripDescription" maxlength="1000" required placeholder="اكتب ما يحتاج معرفته مقدم الخدمة"></textarea></div><div class="field"><label>رقم التواصل</label><input id="tripPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>ملاحظات إضافية</label><textarea id="tripNotes" maxlength="500"></textarea></div><p id="tripMsg"></p><button class="btn submit-order-btn" id="tripSubmit" type="submit" disabled>إرسال طلب المشوار</button></form></div>`);
     const L = null;
     const maps = {};

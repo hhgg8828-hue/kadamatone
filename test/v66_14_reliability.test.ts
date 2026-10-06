@@ -102,5 +102,5 @@ test('V66.14: رد الإدارة على الشكوى يرسل realtime للإد
 test('V66.14: العميل يرى الطلبات الملغاة أيضًا، والواجهة تحتوي على dropdown للقدرات ومسار اعتماد المركبة والمحادثات الحية', async()=>{
   const app=fs.readFileSync('public/app.ts','utf8'); const html=fs.readFileSync('public/provider.html','utf8'); const index=fs.readFileSync('public/index.html','utf8'); const admin=fs.readFileSync('public/admin.html','utf8'); const sw=fs.readFileSync('public/sw.js','utf8');
   assert.match(app,/fetchAllCustomerOrders/); assert.match(app,/capability-dropdown/); assert.match(app,/data-capability/); assert.match(app,/\/verification/); assert.match(app,/khadamat:chat-message/); assert.match(app,/MESSAGE_OUTBOX/); assert.match(app,/data-campaign-action/); assert.match(app,/data-temp-id/); assert.match(app,/providerAvatarFile/); assert.match(app,/quick-services-strip/); assert.match(app,/complaint_message/);
-  assert.ok(html.includes('app.js?v=69.0')); assert.ok(index.includes('app.js?v=69.0')); assert.ok(admin.includes('app.js?v=69.0')); assert.ok(sw.includes('khadamat-shell-v69'));
+  assert.ok(html.includes('app.js?v=71.0')); assert.ok(index.includes('app.js?v=71.0')); assert.ok(admin.includes('app.js?v=71.0')); assert.ok(sw.includes('khadamat-shell-v71'));
 });
