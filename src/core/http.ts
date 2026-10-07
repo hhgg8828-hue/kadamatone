@@ -114,6 +114,7 @@ function serveStatic(config: StaticConfig, urlPath: string, res: ServerResponse,
   if (rel === '/' || rel === '') rel = '/index.html';
   if (rel === '/admin' || rel === '/admin/') rel = '/admin.html';
   if (rel === '/provider' || rel === '/provider/') rel = '/provider.html';
+  if (rel === '/customer' || rel === '/customer/') rel = '/customer.html';
   const file = path.resolve(base, '.' + rel);
   if (!file.startsWith(base + path.sep) && file !== base) return false; // منع Path Traversal
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return false;

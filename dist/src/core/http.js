@@ -101,6 +101,8 @@ function serveStatic(config, urlPath, res, headers) {
         rel = '/admin.html';
     if (rel === '/provider' || rel === '/provider/')
         rel = '/provider.html';
+    if (rel === '/customer' || rel === '/customer/')
+        rel = '/customer.html';
     const file = path.resolve(base, '.' + rel);
     if (!file.startsWith(base + path.sep) && file !== base)
         return false; // منع Path Traversal

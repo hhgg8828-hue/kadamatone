@@ -549,8 +549,8 @@ function openAbout() {
     <footer class="about-app-footer"><strong>تطبيق خدمات</strong><span>كل خدمة تحتاجها... في مكان واحد.</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
   </article>`);
 }
-function roleHome(role) { return role === 'PROVIDER' ? '/provider.html' : role === 'ADMIN' ? '/admin' : '/'; }
-function redirectToRole(role) { const target = roleHome(role); if (location.pathname !== target && !(target === '/' && location.pathname === '/'))
+function roleHome(role) { return role === 'PROVIDER' ? '/provider.html' : role === 'ADMIN' ? '/admin' : '/customer'; }
+function redirectToRole(role) { const target = roleHome(role); if (location.pathname !== target)
     location.replace(target); }
 function shell(content, title = 'خدمات') { const home = state.user ? roleHome(state.user.role) : '/'; root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="خدمات"><span class="brand-mark">خ</span><span><strong>خدمات</strong><small>كل خدمة تحتاجها في مكان واحد</small></span></a><div class="row top-actions"><button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>${state.user ? `<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button><button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button">🔔 <span id="notificationCount"></span></button><button class="btn secondary small logout-btn" id="logout">خروج</button>` : ''}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
     refreshNotificationBadge().catch(() => { }); applyFieldPlaceholders(root); }
@@ -602,20 +602,21 @@ async function openAccount() {
         alert(e.message);
     }
 }
-function authBox() {
-    let selected = null;
+function authBox(forcedRole = null) {
+    let selected = forcedRole;
     let mode = 'login';
     const draw = () => {
         const selectedLabel = selected === 'CUSTOMER' ? 'حساب عميل' : selected === 'PROVIDER' ? 'حساب مقدم خدمة' : selected === 'ADMIN' ? 'حساب إدارة' : '';
         const isAdmin = selected === 'ADMIN';
         const isProvider = selected === 'PROVIDER';
-        shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.</p></div>
-      <div class="card account-type-card"><h2>ما نوع الحساب الذي تريد استخدامه؟</h2><div class="grid auth-role-grid">
+        shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">${forcedRole ? 'هذه واجهة مستقلة للحساب المحدد. بعد تسجيل الدخول ستبقى داخل واجهتك فقط.' : 'اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.'}</p></div>
+      <div class="card account-type-card">${forcedRole ? `<div class="auth-fixed-role"><span class="auth-role-icon">${forcedRole === 'CUSTOMER' ? '👤' : forcedRole === 'PROVIDER' ? '🛠️' : '⚙️'}</span><div><b>${selectedLabel}</b><small class="muted">مسار مستقل</small></div></div>` : `<h2>ما نوع الحساب الذي تريد استخدامه؟</h2><div class="grid auth-role-grid">
         <button class="card auth-role-choice ${selected === 'CUSTOMER' ? 'selected' : ''}" type="button" data-role="CUSTOMER"><span class="auth-role-icon">👤</span><b>عميل</b><small>أطلب الخدمات وأتابع طلباتي.</small></button>
         <button class="card auth-role-choice ${selected === 'PROVIDER' ? 'selected' : ''}" type="button" data-role="PROVIDER"><span class="auth-role-icon">🛠️</span><b>مقدم خدمة</b><small>أقدم خدمات وأستقبل الطلبات المناسبة لي.</small></button>
         <button class="card auth-role-choice ${selected === 'ADMIN' ? 'selected' : ''}" type="button" data-role="ADMIN"><span class="auth-role-icon">⚙️</span><b>الإدارة</b><small>دخول الإدارة للحسابات المعتمدة فقط، بدون إنشاء حساب عام.</small></button>
-      </div>${selected ? `<div class="auth-selected-head"><b>${selectedLabel}</b>${!isAdmin ? `<div class="nav"><button class="btn ${mode === 'login' ? '' : 'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode === 'register' ? '' : 'secondary'}" id="tabReg">حساب جديد</button></div>` : ''}</div><div id="authForm"></div>` : '<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
-        document.querySelectorAll('[data-role]').forEach(x => x.addEventListener('click', () => { selected = x.dataset.role; mode = 'login'; draw(); }));
+      </div>`}${selected ? `<div class="auth-selected-head"><b>${selectedLabel}</b>${!isAdmin ? `<div class="nav"><button class="btn ${mode === 'login' ? '' : 'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode === 'register' ? '' : 'secondary'}" id="tabReg">حساب جديد</button></div>` : ''}</div><div id="authForm"></div>` : '<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
+        if (!forcedRole)
+            document.querySelectorAll('[data-role]').forEach(x => x.addEventListener('click', () => { selected = x.dataset.role; mode = 'login'; draw(); }));
         if (!selected)
             return;
         document.getElementById('tabLogin')?.addEventListener('click', () => { mode = 'login'; draw(); });
@@ -660,7 +661,7 @@ function authBox() {
                 // for CUSTOMER because its authenticated home is the same `/` route as the auth screen.
                 // Rendering in-place can leave stale DOM/auth UI mounted, so force a fresh app bootstrap.
                 const target = roleHome(j.user.role);
-                const next = target === '/' ? '/?auth=success' : `${target}?auth=success`;
+                const next = `${target}${target.includes('?') ? '&' : '?'}auth=success`;
                 window.location.replace(next);
             }
             catch (x) {
@@ -723,10 +724,7 @@ async function fetchAllCustomerOrders() {
 }
 async function customer() {
     if (!state.user) {
-        if (page !== 'customer')
-            location.replace('/');
-        else
-            authBox();
+        authBox(location.pathname === '/customer' ? 'CUSTOMER' : null);
         return;
     }
     if (state.user.role !== 'CUSTOMER') {
@@ -2237,7 +2235,7 @@ function startProviderLocationTracking(online) { if (providerLocationWatch !== u
 catch { } }, () => { }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }); }
 async function provider() {
     if (!state.user) {
-        location.replace('/');
+        authBox('PROVIDER');
         return;
     }
     if (state.user.role !== 'PROVIDER') {
@@ -2706,7 +2704,7 @@ catch (e) {
 } }
 async function admin() {
     if (!state.user) {
-        location.replace('/');
+        authBox('ADMIN');
         return;
     }
     if (state.user.role !== 'ADMIN') {
@@ -3120,7 +3118,7 @@ if (restored) {
     if ('Notification' in window && Notification.permission === 'granted')
         registerWebPushSubscription().catch(() => { });
     const expected = roleHome(state.user.role);
-    if (location.pathname !== expected && !(expected === '/' && location.pathname === '/'))
+    if (location.pathname !== expected)
         location.replace(expected);
     else if (page === 'provider')
         provider();
@@ -3129,8 +3127,12 @@ if (restored) {
     else
         customer();
 }
-else if (page !== 'customer') {
-    location.replace('/');
+else if (page === 'provider') {
+    authBox('PROVIDER');
 }
-else
-    customer();
+else if (page === 'admin') {
+    authBox('ADMIN');
+}
+else {
+    authBox(location.pathname === '/customer' ? 'CUSTOMER' : null);
+}

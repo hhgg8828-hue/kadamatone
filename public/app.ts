@@ -197,8 +197,8 @@ function openAbout(){
   </article>`);
 }
 
-function roleHome(role:string){return role==='PROVIDER'?'/provider.html':role==='ADMIN'?'/admin':'/';}
-function redirectToRole(role:string){const target=roleHome(role);if(location.pathname!==target && !(target==='/'&&location.pathname==='/')) location.replace(target);}
+function roleHome(role:string){return role==='PROVIDER'?'/provider.html':role==='ADMIN'?'/admin':'/customer';}
+function redirectToRole(role:string){const target=roleHome(role);if(location.pathname!==target) location.replace(target);}
 function shell(content:string,title='خدمات'){const home=state.user?roleHome(state.user.role):'/';root.innerHTML=`<main class="shell ${page==='admin'?'admin-page admin-shell':''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="خدمات"><span class="brand-mark">خ</span><span><strong>خدمات</strong><small>كل خدمة تحتاجها في مكان واحد</small></span></a><div class="row top-actions"><button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>${state.user?`<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button><button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button">🔔 <span id="notificationCount"></span></button><button class="btn secondary small logout-btn" id="logout">خروج</button>`:''}</div></div>${content}</main>`;document.getElementById('aboutBtn')?.addEventListener('click',openAbout);document.getElementById('logout')?.addEventListener('click',logout);document.getElementById('notificationsBtn')?.addEventListener('click',openNotifications);document.getElementById('accountBtn')?.addEventListener('click',openAccount);if(state.user)refreshNotificationBadge().catch(()=>{});applyFieldPlaceholders(root)}
 async function openAccount(){
   try{
@@ -237,20 +237,20 @@ async function openAccount(){
   }catch(e){alert((e as Error).message)}
 }
 
-function authBox(){
-  let selected:'CUSTOMER'|'PROVIDER'|'ADMIN'|null=null;
+function authBox(forcedRole:'CUSTOMER'|'PROVIDER'|'ADMIN'|null=null){
+  let selected:'CUSTOMER'|'PROVIDER'|'ADMIN'|null=forcedRole;
   let mode:'login'|'register'='login';
   const draw=()=>{
     const selectedLabel=selected==='CUSTOMER'?'حساب عميل':selected==='PROVIDER'?'حساب مقدم خدمة':selected==='ADMIN'?'حساب إدارة':'';
     const isAdmin=selected==='ADMIN';
     const isProvider=selected==='PROVIDER';
-    shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.</p></div>
-      <div class="card account-type-card"><h2>ما نوع الحساب الذي تريد استخدامه؟</h2><div class="grid auth-role-grid">
+    shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">${forcedRole?'هذه واجهة مستقلة للحساب المحدد. بعد تسجيل الدخول ستبقى داخل واجهتك فقط.':'اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.'}</p></div>
+      <div class="card account-type-card">${forcedRole?`<div class="auth-fixed-role"><span class="auth-role-icon">${forcedRole==='CUSTOMER'?'👤':forcedRole==='PROVIDER'?'🛠️':'⚙️'}</span><div><b>${selectedLabel}</b><small class="muted">مسار مستقل</small></div></div>`:`<h2>ما نوع الحساب الذي تريد استخدامه؟</h2><div class="grid auth-role-grid">
         <button class="card auth-role-choice ${selected==='CUSTOMER'?'selected':''}" type="button" data-role="CUSTOMER"><span class="auth-role-icon">👤</span><b>عميل</b><small>أطلب الخدمات وأتابع طلباتي.</small></button>
         <button class="card auth-role-choice ${selected==='PROVIDER'?'selected':''}" type="button" data-role="PROVIDER"><span class="auth-role-icon">🛠️</span><b>مقدم خدمة</b><small>أقدم خدمات وأستقبل الطلبات المناسبة لي.</small></button>
         <button class="card auth-role-choice ${selected==='ADMIN'?'selected':''}" type="button" data-role="ADMIN"><span class="auth-role-icon">⚙️</span><b>الإدارة</b><small>دخول الإدارة للحسابات المعتمدة فقط، بدون إنشاء حساب عام.</small></button>
-      </div>${selected?`<div class="auth-selected-head"><b>${selectedLabel}</b>${!isAdmin?`<div class="nav"><button class="btn ${mode==='login'?'':'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode==='register'?'':'secondary'}" id="tabReg">حساب جديد</button></div>`:''}</div><div id="authForm"></div>`:'<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
-    document.querySelectorAll('[data-role]').forEach(x=>x.addEventListener('click',()=>{selected=(x as HTMLElement).dataset.role as any;mode='login';draw()}));
+      </div>`}${selected?`<div class="auth-selected-head"><b>${selectedLabel}</b>${!isAdmin?`<div class="nav"><button class="btn ${mode==='login'?'':'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode==='register'?'':'secondary'}" id="tabReg">حساب جديد</button></div>`:''}</div><div id="authForm"></div>`:'<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
+    if(!forcedRole) document.querySelectorAll('[data-role]').forEach(x=>x.addEventListener('click',()=>{selected=(x as HTMLElement).dataset.role as any;mode='login';draw()}));
     if(!selected)return;
     document.getElementById('tabLogin')?.addEventListener('click',()=>{mode='login';draw()});
     document.getElementById('tabReg')?.addEventListener('click',()=>{mode='register';draw()});
@@ -268,7 +268,7 @@ function authBox(){
       // for CUSTOMER because its authenticated home is the same `/` route as the auth screen.
       // Rendering in-place can leave stale DOM/auth UI mounted, so force a fresh app bootstrap.
       const target=roleHome(j.user.role);
-      const next=target==='/' ? '/?auth=success' : `${target}?auth=success`;
+      const next=`${target}${target.includes('?')?'&':'?'}auth=success`;
       window.location.replace(next);
     }catch(x){const submitButton=form.querySelector('button[type=submit]') as HTMLButtonElement|null;if(submitButton){submitButton.disabled=false;submitButton.textContent=submitButton.dataset.originalText||'إرسال'}const err:any=x;formHost.querySelectorAll('.field-error').forEach((el:any)=>el.remove());const details=Array.isArray(err.details)?err.details:[];if(details.length){for(const d of details){const field=String(d.path||'').split('.').pop()||'';const input=form.querySelector(`[name="${CSS.escape(field)}"]`) as HTMLElement|null;if(input){const p=document.createElement('small');p.className='field-error error';p.textContent=String(d.message||err.message);input.parentElement?.appendChild(p);}}}const msg=document.getElementById('msg')!;msg.textContent=details.length?'راجع الحقول المحددة أعلاه.':err.message;msg.className='error';}});
   };
@@ -289,7 +289,7 @@ async function fetchAllCustomerOrders(){
   }
   return uniqueOrders(all);
 }
-async function customer(){if(!state.user){if(page!=='customer')location.replace('/');else authBox();return}if(state.user!.role!=='CUSTOMER'){redirectToRole(state.user!.role);return}try{const [catalogPayload,o,platformConfig]=await Promise.all([api('/catalog/bootstrap'),api('/orders'),api('/config').catch(()=>({currency:'YER'}))]);state.config=platformConfig||{currency:'YER'};state.cats=catalogPayload.categories||[];state.orders=await fetchAllCustomerOrders();state.services=catalogPayload.services||[];state.temporaryServices=catalogPayload.temporaryServices||[];state.campaigns=catalogPayload.campaigns||[];state.popularity=catalogPayload.popularity||[];renderCustomer();
+async function customer(){if(!state.user){authBox(location.pathname==='/customer'?'CUSTOMER':null);return}if(state.user!.role!=='CUSTOMER'){redirectToRole(state.user!.role);return}try{const [catalogPayload,o,platformConfig]=await Promise.all([api('/catalog/bootstrap'),api('/orders'),api('/config').catch(()=>({currency:'YER'}))]);state.config=platformConfig||{currency:'YER'};state.cats=catalogPayload.categories||[];state.orders=await fetchAllCustomerOrders();state.services=catalogPayload.services||[];state.temporaryServices=catalogPayload.temporaryServices||[];state.campaigns=catalogPayload.campaigns||[];state.popularity=catalogPayload.popularity||[];renderCustomer();
     handleNotificationDeepLink().catch(()=>{});
     stopPollers();
     customerPollTimer=window.setInterval(async()=>{try{state.orders=await fetchAllCustomerOrders();const box=document.getElementById('orders');if(box)box.innerHTML=state.orders.length?state.orders.map(orderCard).join(''):'<div class="card empty">لا توجد طلبات حتى الآن<br><span class="muted">ابدأ باختيار خدمة من القائمة أعلاه</span></div>';const count=document.querySelector('#ordersTab .count');if(count)count.textContent=String(state.orders.length);document.querySelectorAll('[data-order]').forEach(x=>{x.addEventListener('click',e=>{if((e.target as HTMLElement).closest('[data-rate-order]'))return;openOrder((x as HTMLElement).dataset.order!)});x.addEventListener('keydown',e=>{if((e as KeyboardEvent).key==='Enter'||(e as KeyboardEvent).key===' '){e.preventDefault();openOrder((x as HTMLElement).dataset.order!)}})});document.querySelectorAll('[data-rate-order]').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();openRating((x as HTMLElement).dataset.rateOrder!)}));document.querySelectorAll('[data-reorder-order]').forEach(x=>x.addEventListener('click',async e=>{e.stopPropagation();try{const j=await api('/orders/'+(x as HTMLElement).dataset.reorderOrder+'/reorder',{method:'POST',body:'{}'});openOrderForm(j.draft.serviceId,j.draft)}catch(err){alert((err as Error).message)}}));}catch{}} ,5000);
@@ -896,7 +896,7 @@ async function openProviderQuote(orderId:string){
 function startProviderPresenceHeartbeat(online:boolean){if(providerHeartbeatTimer!==undefined){clearInterval(providerHeartbeatTimer);providerHeartbeatTimer=undefined;}if(!online||!state.token)return;const beat=()=>{api('/provider/presence-heartbeat',{method:'POST',body:'{}'}).catch(()=>{})};beat();providerHeartbeatTimer=window.setInterval(beat,30000);}
 function startProviderLocationTracking(online:boolean){if(providerLocationWatch!==undefined){navigator.geolocation?.clearWatch(providerLocationWatch);providerLocationWatch=undefined;}if(!online||!navigator.geolocation||!state.token)return;providerLocationWatch=navigator.geolocation.watchPosition(async pos=>{const now=Date.now();if(now-providerLocationLastSent<4000)return;providerLocationLastSent=now;try{await api('/provider/live-location',{method:'POST',body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:Number.isFinite(pos.coords.heading??NaN)?pos.coords.heading:undefined,speedMps:Number.isFinite(pos.coords.speed??NaN)?pos.coords.speed:undefined})});}catch{}},()=>{},{enableHighAccuracy:true,maximumAge:3000,timeout:10000});}
 async function provider(){
-  if(!state.user){location.replace('/');return}
+  if(!state.user){authBox('PROVIDER');return}
   if(state.user!.role!=='PROVIDER'){redirectToRole(state.user!.role);return}
   try{
     const [p,o,e,catalogPayload,capabilities,vehicleData,offers,dashboard,providerNotifications]=await Promise.all([api('/provider/profile'),api('/provider/orders'),api('/provider/earnings'),api('/catalog/bootstrap'),api('/provider/capabilities').catch(()=>({capabilities:[]})),api('/provider/vehicles').catch(()=>({vehicles:[]})),api('/provider/offers'),api('/provider/dashboard').catch(()=>({})),api('/notifications?limit=5').catch(()=>({notifications:[]}))]);
@@ -992,7 +992,7 @@ function trJson(v:any){try{const x=typeof v==='string'?JSON.parse(v):v;return St
 async function openAliasManager(){try{const [j,cat]=await Promise.all([api('/admin/service-aliases'),api('/catalog/bootstrap')]);const aliases=j.aliases||[];const services=cat.services||[];showModal(`<h2>🗣️ قاموس العبارات اليمنية</h2><p class="muted">أضف كلمات أو عبارات يستخدمها الناس فعليًا. سيستخدمها محرك المطابقة مباشرة دون الحاجة لتعديل الكود.</p><div class="card"><form id="aliasForm"><div class="field"><label>الخدمة</label><select name="serviceId" required>${services.map((x:any)=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>العبارة</label><input name="phrase" maxlength="120" placeholder="مثال: حراث" required></div><button class="btn">إضافة العبارة</button></form></div><div class="card"><b>العبارات الحالية</b><div class="admin-alias-list">${aliases.slice(0,150).map((a:any)=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0"><span><b>${esc(a.phrase)}</b><small class="muted"> · ${esc(a.serviceName||a.serviceSlug)} · ${a.isActive?'نشطة':'معطلة'}</small></span><span class="row"><button type="button" class="btn secondary small" data-edit-alias="${esc(a.id)}">تعديل</button><button type="button" class="btn danger small" data-delete-alias="${esc(a.id)}">حذف</button></span></div>`).join('')||'<p class="muted">لا توجد عبارات مضافة.</p>'}</div></div>`);document.getElementById('aliasForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget as HTMLFormElement);try{await api('/admin/service-aliases',{method:'POST',body:JSON.stringify({serviceId:String(f.get('serviceId')),phrase:String(f.get('phrase'))})});await openAliasManager()}catch(x){alert((x as Error).message)}});document.querySelectorAll('[data-edit-alias]').forEach(x=>x.addEventListener('click',async()=>{const a=aliases.find((z:any)=>z.id===(x as HTMLElement).dataset.editAlias);if(!a)return;const phrase=prompt('العبارة الجديدة:',a.phrase);if(phrase===null)return;try{await api('/admin/service-aliases/'+encodeURIComponent(a.id),{method:'PATCH',body:JSON.stringify({phrase,isActive:a.isActive})});await openAliasManager()}catch(e){alert((e as Error).message)}}));document.querySelectorAll('[data-delete-alias]').forEach(x=>x.addEventListener('click',async()=>{const id=(x as HTMLElement).dataset.deleteAlias||'';if(!confirm('حذف هذه العبارة من قاموس المطابقة؟'))return;try{await api('/admin/service-aliases/'+encodeURIComponent(id),{method:'DELETE'});await openAliasManager()}catch(e){alert((e as Error).message)}}))}catch(e){alert((e as Error).message)}}
 
 async function admin(){
-  if(!state.user){location.replace('/');return}
+  if(!state.user){authBox('ADMIN');return}
   if(state.user!.role!=='ADMIN'){redirectToRole(state.user!.role);return}
   let activeTab=(new URLSearchParams(location.search).get('tab')||'overview'), orderStatus='', providerStatus='PENDING';
   const load=async()=>{
@@ -1136,8 +1136,12 @@ const restored=restoreSession();
 if(restored){
   startRealtime().catch(()=>{});startNotificationPolling();flushOrderQueue().catch(()=>{});flushMessageOutbox().catch(()=>{});if('Notification' in window&&Notification.permission==='granted')registerWebPushSubscription().catch(()=>{});
   const expected=roleHome(state.user!.role);
-  if(location.pathname!==expected && !(expected==='/'&&location.pathname==='/')) location.replace(expected);
+  if(location.pathname!==expected) location.replace(expected);
   else if(page==='provider')provider();else if(page==='admin')admin();else customer();
-}else if(page!=='customer'){
-  location.replace('/');
-}else customer();
+}else if(page==='provider'){
+  authBox('PROVIDER');
+}else if(page==='admin'){
+  authBox('ADMIN');
+}else{
+  authBox(location.pathname==='/customer'?'CUSTOMER':null);
+}

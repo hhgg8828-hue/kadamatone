@@ -76,7 +76,7 @@ export function createNotifications(app: App): Notifications {
         const userMeta = db.get<{ locale: Locale; role: string }>('SELECT u.locale, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id = ?', userId);
         const locale = userMeta?.locale || 'ar';
         const rendered = renderNotification(row, locale);
-        const targetPage = userMeta?.role === 'PROVIDER' ? '/provider.html' : userMeta?.role === 'ADMIN' ? '/admin' : '/';
+        const targetPage = userMeta?.role === 'PROVIDER' ? '/provider.html' : userMeta?.role === 'ADMIN' ? '/admin' : '/customer';
         rendered.data = { ...(rendered.data as Record<string, unknown> || {}), targetPage };
         for (const ch of channels) { try { ch.deliver(userId, rendered); } catch (e) { app.log.warn('channel_failed', { channel: ch.name, err: String(e) }); } }
       });
