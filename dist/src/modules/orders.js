@@ -57,8 +57,8 @@ export function createOrders(app) {
                 createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason, commissionRate: o.commission_rate_snapshot, commissionAmount: o.commission_amount, providerPayoutAmount: o.provider_payout_amount, settlementStatus: o.settlement_status,
             };
             if (ctx.user?.role === 'PROVIDER' || ctx.user?.role === 'ADMIN') {
-                const cu = db.get('SELECT id, full_name, phone FROM users WHERE id = ?', o.customer_id);
-                out.customer = { id: cu.id, fullName: cu.full_name, phone: ctx.user?.role === 'ADMIN' ? cu.phone : null };
+                const cu = db.get('SELECT id, full_name, phone, avatar_file_id FROM users WHERE id = ?', o.customer_id);
+                out.customer = { id: cu.id, fullName: cu.full_name, phone: ctx.user?.role === 'ADMIN' ? cu.phone : null, avatarUrl: cu.avatar_file_id ? `/api/v1/files/${cu.avatar_file_id}` : null };
             }
             const trip = serializeTrip(app, o.id, ctx.locale);
             if (trip)

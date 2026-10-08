@@ -10,10 +10,11 @@ import type { OrderRow, OrderAssignmentRow, OrderStatus } from '../types/domain.
 
 export interface AssignmentService {
   assignWave(orderId: string): { offered: number };
+  offerOpenOrdersToProvider(providerId: string): { offered: number };
   reassignAfterProviderCancellation(orderId: string, providerId: string, reason?: string): { offered: number };
   acceptOffer(assignmentId: string, ctx: Ctx): OrderRow;
   rejectOffer(assignmentId: string, ctx: Ctx): void;
-  listOffers(providerId: string): Array<OrderAssignmentRow & { orderCode: string; serviceName: string; areaName: string; priority: string }>;
+  listOffers(providerId: string): Array<OrderAssignmentRow & { orderCode: string; serviceName: string; areaName: string; priority: string; customerAvatarUrl: string | null }>;
   tick(): { expired: number; waved: number; exhausted: number };
 }
 
@@ -52,6 +53,30 @@ export function createAssignmentService(app: App): AssignmentService {
         notifiedExhausted.delete(o.id);
         return { offered: candidates.length };
       });
+    },
+
+    offerOpenOrdersToProvider(providerId) {
+      const openMinutes = app.settings.get<number>('assignment.request_open_minutes');
+      const cutoff = new Date(app.clock.now() - openMinutes * 60_000).toISOString();
+      const rows = db.all<OrderRow>(`SELECT * FROM orders WHERE status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL AND created_at >= ? ORDER BY created_at ASC LIMIT 100`, cutoff);
+      let offered = 0;
+      for (const o of rows) {
+        const excluded = db.all<{provider_id:string}>("SELECT provider_id FROM order_assignments WHERE order_id=? AND provider_id=? AND status IN ('REJECTED','EXPIRED','ACCEPTED')", o.id, providerId);
+        if (excluded.length) continue;
+        const candidates = app.matcher.findCandidates(o, { excludeProviderIds: [], limit: 50 });
+        const candidate = candidates.find((c) => c.providerId === providerId);
+        if (!candidate) continue;
+        const nowIso = iso(app.clock.now());
+        const expiresAt = iso(app.clock.now() + app.settings.get<number>('assignment.offer_ttl_sec') * 1000);
+        const wave = o.wave + 1;
+        const existing = db.get<{id:string}>('SELECT id FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, providerId);
+        if (existing) db.run("UPDATE order_assignments SET status='OFFERED',wave=?,score=?,distance_km=?,offered_at=?,expires_at=?,responded_at=NULL,decision_reason=NULL WHERE id=?", wave, candidate.score, candidate.distanceKm, nowIso, expiresAt, existing.id);
+        else db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)', uuid(), o.id, providerId, 'OFFERED', wave, candidate.score, candidate.distanceKm, nowIso, expiresAt);
+        if (o.status === 'SEARCHING') db.run("UPDATE orders SET status='ASSIGNED',wave=?,search_exhausted_at=NULL,updated_at=?,version=version+1 WHERE id=? AND version=?", wave, nowIso, o.id, o.version);
+        app.notifications.notify(db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',providerId)!.user_id, 'NEW_OFFER', { service: tr(catalog.all().byService.get(o.service_id)!.name_i18n, 'ar') }, { orderId:o.id });
+        offered++;
+      }
+      return { offered };
     },
 
     reassignAfterProviderCancellation(orderId, providerId, reason = 'provider_cancelled') {
@@ -119,13 +144,13 @@ export function createAssignmentService(app: App): AssignmentService {
 
     listOffers(providerId) {
       const now = iso(app.clock.now());
-      return db.all<OrderAssignmentRow & { code: string; service_id: string; area_id: string; priority: string }>(
-        `SELECT a.*, o.code, o.service_id, o.area_id, o.priority FROM order_assignments a JOIN orders o ON o.id = a.order_id
+      return db.all<OrderAssignmentRow & { code: string; service_id: string; area_id: string; priority: string; customer_avatar_file_id: string | null }>(
+        `SELECT a.*, o.code, o.service_id, o.area_id, o.priority, u.avatar_file_id customer_avatar_file_id FROM order_assignments a JOIN orders o ON o.id = a.order_id JOIN users u ON u.id=o.customer_id
           WHERE a.provider_id = ? AND a.status = 'OFFERED' AND a.expires_at > ? ORDER BY a.offered_at`, providerId, now)
         .map((a) => {
           const svcRow = catalog.all().byService.get(a.service_id);
           const areaRow = catalog.all().areas.find((x) => x.id === a.area_id);
-          return { ...a, orderCode: a.code, serviceName: svcRow ? tr(svcRow.name_i18n, 'ar') : '', areaName: areaRow ? tr(areaRow.name_i18n, 'ar') : '', priority: a.priority };
+          return { ...a, orderCode: a.code, serviceName: svcRow ? tr(svcRow.name_i18n, 'ar') : '', areaName: areaRow ? tr(areaRow.name_i18n, 'ar') : '', priority: a.priority, customerAvatarUrl: a.customer_avatar_file_id ? `/api/v1/files/${a.customer_avatar_file_id}` : null };
         });
     },
 
@@ -146,6 +171,9 @@ export function createAssignmentService(app: App): AssignmentService {
         }
         if (!o.search_exhausted_at) {
           const full = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!;
+          const openMinutes = app.settings.get<number>('assignment.request_open_minutes');
+          const stillOpen = Date.parse(full.created_at) + openMinutes * 60_000 > now;
+          if (stillOpen) continue;
           const stamp = iso(app.clock.now());
           db.run("UPDATE orders SET status='SEARCHING', search_exhausted_at=?, updated_at=?, version=version+1 WHERE id=?", stamp, stamp, o.id);
           app.notifications.notify(full.customer_id, 'NO_PROVIDER_FOUND', { code: full.code });
@@ -175,7 +203,7 @@ export function registerAssignmentRoutes(app: App, r: Router): void {
     offers: app.assignment.listOffers(ctx.user!.providerId!).map((a) => {
       const pricingType = app.db.get<{pricing_type:string}>('SELECT pricing_type FROM orders WHERE id=?', a.order_id)?.pricing_type || 'FIXED';
       const quote = pricingType === 'QUOTE' ? app.db.get<{id:string; amount:number; status:string}>('SELECT id, amount, status FROM quotes WHERE order_id=? AND provider_id=?', a.order_id, ctx.user!.providerId) : undefined;
-      return { id: a.id, orderId: a.order_id, orderCode: a.orderCode, serviceName: a.serviceName, areaName: a.areaName, priority: a.priority, distanceKm: a.distance_km, offeredAt: a.offered_at, expiresAt: a.expires_at, pricingType, quoteStatus: quote?.status || null, quoteId: quote?.id || null, quoteAmount: quote?.amount ?? null };
+      return { id: a.id, orderId: a.order_id, orderCode: a.orderCode, serviceName: a.serviceName, areaName: a.areaName, priority: a.priority, customerAvatarUrl: a.customerAvatarUrl, distanceKm: a.distance_km, offeredAt: a.offered_at, expiresAt: a.expires_at, pricingType, quoteStatus: quote?.status || null, quoteId: quote?.id || null, quoteAmount: quote?.amount ?? null };
     })
   }));
 

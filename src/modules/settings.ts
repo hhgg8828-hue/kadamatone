@@ -16,6 +16,7 @@ export const SETTINGS: Record<string, SettingMeta> = {
   'assignment.batch_size': { def: 5, schema: s.int({ min: 1, max: 50 }), desc: 'عدد المزودين في كل موجة (المطابقة الافتراضية: الأقرب أولًا)' },
   'assignment.max_waves': { def: 3, schema: s.int({ min: 1, max: 20 }), desc: 'أقصى عدد موجات إسناد' },
   'assignment.search_retry_minutes': { def: 10, schema: s.int({ min: 1, max: 1440 }), desc: 'دقائق إعادة البحث عن مقدم خدمة بعد استنفاد الموجات' },
+  'assignment.request_open_minutes': { def: 15, schema: s.int({ min: 1, max: 1440 }), desc: 'مدة بقاء الطلب مفتوحًا لمقدمي الخدمة منذ إنشائه' },
   'assignment.auto_reassign_provider_cancel': { def: true, schema: s.bool(), desc: 'إعادة البحث تلقائيًا إذا ألغى مقدم الخدمة بعد القبول وقبل بدء التنفيذ' },
   'presence.timeout_sec': { def: 300, schema: s.int({ min: 30, max: 86400 }), desc: 'مهلة اعتبار مقدم الخدمة غير متصل عند غياب نبضة الحياة' },
   'operations.acceptance_sla_sec': { def: 180, schema: s.int({ min: 30, max: 86400 }), desc: 'مدة انتظار القبول قبل تنبيه الإدارة' },

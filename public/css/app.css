@@ -380,3 +380,6 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
  .customer-shell .simple-request-send>div{display:grid;grid-template-columns:1fr}
  .customer-shell .simple-submit-btn{width:100%}
 }
+/* V82.6 */
+.customer-mini-profile{display:flex;align-items:center;gap:12px}
+.customer-mini-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;flex:0 0 42px;border:2px solid rgba(35,122,115,.14);background:#f3f6f5;display:grid;place-items:center}

@@ -1,6 +1,6 @@
 {
   "name": "khadamat",
-  "version": "0.6.32",
+  "version": "0.6.33",
   "description": "خدمات (Khadamat) — V81 separate installable customer/provider/admin experiences",
   "private": true,
   "type": "module",

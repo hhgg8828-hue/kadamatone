@@ -36,7 +36,7 @@ export interface OrderOut {
   id: string; code: string; status: OrderStatus; priority: Priority; description: string; formData: Record<string, unknown>;
   service: { id: string; name: string; icon: string | null; categoryName: string }; location: ReturnType<App['locations']['serialize']> | null;
   contactPhone: string | null; recipient?: { fullName: string; phone: string } | null; scheduledAt: string | null; pricingType: string; priceSnapshot: number | null; agreedPrice: number | null; currency: string;
-  paymentMethod: string; notes: string | null; attachments: string[]; wave: number; customer?: { id: string; fullName: string; phone: string | null };
+  paymentMethod: string; notes: string | null; attachments: string[]; wave: number; customer?: { id: string; fullName: string; phone: string | null; avatarUrl?: string | null };
   provider?: { id: string; displayName: string; avatarUrl: string | null; rating: number } | null;
   createdAt: string; commissionRate: number | null; commissionAmount: number | null; providerPayoutAmount: number | null; settlementStatus: string; acceptedAt: string | null; startedAt: string | null; completedAt: string | null; cancelledAt: string | null; cancelReason: string | null;
   trip?: ReturnType<typeof serializeTrip>;
@@ -80,8 +80,8 @@ export function createOrders(app: App): Orders {
         createdAt: o.created_at, acceptedAt: o.accepted_at, startedAt: o.started_at, completedAt: o.completed_at, cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason, commissionRate: o.commission_rate_snapshot, commissionAmount: o.commission_amount, providerPayoutAmount: o.provider_payout_amount, settlementStatus: o.settlement_status,
       };
       if (ctx.user?.role === 'PROVIDER' || ctx.user?.role === 'ADMIN') {
-        const cu = db.get<{ id: string; full_name: string; phone: string }>('SELECT id, full_name, phone FROM users WHERE id = ?', o.customer_id)!;
-        out.customer = { id: cu.id, fullName: cu.full_name, phone: ctx.user?.role === 'ADMIN' ? cu.phone : null };
+        const cu = db.get<{ id: string; full_name: string; phone: string; avatar_file_id: string | null }>('SELECT id, full_name, phone, avatar_file_id FROM users WHERE id = ?', o.customer_id)!;
+        out.customer = { id: cu.id, fullName: cu.full_name, phone: ctx.user?.role === 'ADMIN' ? cu.phone : null, avatarUrl: cu.avatar_file_id ? `/api/v1/files/${cu.avatar_file_id}` : null };
       }
       const trip = serializeTrip(app, o.id, ctx.locale);
       if (trip) out.trip = trip;
