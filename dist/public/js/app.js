@@ -605,27 +605,71 @@ async function openAccount() {
 function authBox(forcedRole = null) {
     let selected = forcedRole;
     let mode = 'login';
+    let customerOtpPhone = '';
+    let customerOtpSent = false;
+    const authenticate = async (j) => { saveSession(j); startRealtime().catch(() => { }); startNotificationPolling(); if ('Notification' in window && Notification.permission === 'granted')
+        registerWebPushSubscription().catch(() => { }); const target = roleHome(j.user.role); const next = `${target}${target.includes('?') ? '&' : '?'}auth=success`; window.location.replace(next); };
     const draw = () => {
         const selectedLabel = selected === 'CUSTOMER' ? 'حساب عميل' : selected === 'PROVIDER' ? 'حساب مقدم خدمة' : selected === 'ADMIN' ? 'حساب إدارة' : '';
         const isAdmin = selected === 'ADMIN';
         const isProvider = selected === 'PROVIDER';
-        shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">${forcedRole ? 'هذه واجهة مستقلة للحساب المحدد. بعد تسجيل الدخول ستبقى داخل واجهتك فقط.' : 'اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.'}</p></div>
+        shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">${selected === 'CUSTOMER' ? 'تسجيل العميل سريع: رقم الهاتف ← رمز واتساب ← دخول. لا نطلب منك استبيانًا طويلًا.' : forcedRole ? 'هذه واجهة مستقلة للحساب المحدد. بعد تسجيل الدخول ستبقى داخل واجهتك فقط.' : 'اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.'}</p></div>
       <div class="card account-type-card">${forcedRole ? `<div class="auth-fixed-role"><span class="auth-role-icon">${forcedRole === 'CUSTOMER' ? '👤' : forcedRole === 'PROVIDER' ? '🛠️' : '⚙️'}</span><div><b>${selectedLabel}</b><small class="muted">مسار مستقل</small></div></div>` : `<h2>ما نوع الحساب الذي تريد استخدامه؟</h2><div class="grid auth-role-grid">
         <button class="card auth-role-choice ${selected === 'CUSTOMER' ? 'selected' : ''}" type="button" data-role="CUSTOMER"><span class="auth-role-icon">👤</span><b>عميل</b><small>أطلب الخدمات وأتابع طلباتي.</small></button>
         <button class="card auth-role-choice ${selected === 'PROVIDER' ? 'selected' : ''}" type="button" data-role="PROVIDER"><span class="auth-role-icon">🛠️</span><b>مقدم خدمة</b><small>أقدم خدمات وأستقبل الطلبات المناسبة لي.</small></button>
         <button class="card auth-role-choice ${selected === 'ADMIN' ? 'selected' : ''}" type="button" data-role="ADMIN"><span class="auth-role-icon">⚙️</span><b>الإدارة</b><small>دخول الإدارة للحسابات المعتمدة فقط، بدون إنشاء حساب عام.</small></button>
-      </div>`}${selected ? `<div class="auth-selected-head"><b>${selectedLabel}</b>${!isAdmin ? `<div class="nav"><button class="btn ${mode === 'login' ? '' : 'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode === 'register' ? '' : 'secondary'}" id="tabReg">حساب جديد</button></div>` : ''}</div><div id="authForm"></div>` : '<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
+      </div>`}${selected ? `<div class="auth-selected-head"><b>${selectedLabel}</b>${!isAdmin && selected !== 'CUSTOMER' ? `<div class="nav"><button class="btn ${mode === 'login' ? '' : 'secondary'}" id="tabLogin">دخول</button><button class="btn ${mode === 'register' ? '' : 'secondary'}" id="tabReg">حساب جديد</button></div>` : ''}</div><div id="authForm"></div>` : '<div class="notice">اختر نوع الحساب للمتابعة.</div>'}</div>`);
         if (!forcedRole)
-            document.querySelectorAll('[data-role]').forEach(x => x.addEventListener('click', () => { selected = x.dataset.role; mode = 'login'; draw(); }));
+            document.querySelectorAll('[data-role]').forEach(x => x.addEventListener('click', () => { selected = x.dataset.role; mode = 'login'; customerOtpSent = false; draw(); }));
         if (!selected)
             return;
+        if (selected === 'CUSTOMER') {
+            const host = document.getElementById('authForm');
+            host.innerHTML = customerOtpSent ? `<form id="customerOtpForm" novalidate><div class="field"><label>رمز التحقق</label><input id="customerOtp" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" placeholder="••••" required><small class="muted">أرسلنا الرمز عبر واتساب إلى ${esc(customerOtpPhone.replace(/^(.{4}).*(.{2})$/, '$1••••$2'))}. الصق الرمز هنا عند وصوله.</small></div><button class="btn" type="submit">تحقق ودخول</button><button class="btn secondary" type="button" id="changeOtpPhone">تغيير الرقم</button><p id="msg"></p></form>` :
+                `<form id="customerPhoneForm" novalidate><div class="field"><label>رقم الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="مثال: +9677xxxxxxxx" required></div><button class="btn" type="submit">إرسال رمز التحقق عبر واتساب</button><p class="muted">رقم الهاتف للتوثيق فقط، ولن يظهر لمقدم الخدمة.</p><p id="msg"></p></form>`;
+            if (customerOtpSent) {
+                const f = document.getElementById('customerOtpForm');
+                document.getElementById('changeOtpPhone')?.addEventListener('click', () => { customerOtpSent = false; draw(); });
+                f.addEventListener('submit', async (e) => { e.preventDefault(); const btn = f.querySelector('button[type=submit]'); btn.disabled = true; const msg = document.getElementById('msg'); try {
+                    const code = String(new FormData(f).get('code') || '').trim();
+                    const j = await api('/auth/whatsapp/verify', { method: 'POST', body: JSON.stringify({ phone: customerOtpPhone, code }) });
+                    await authenticate(j);
+                }
+                catch (x) {
+                    btn.disabled = false;
+                    msg.textContent = x.message;
+                    msg.className = 'error';
+                } });
+                setTimeout(() => document.getElementById('customerOtp')?.focus(), 50);
+            }
+            else {
+                const f = document.getElementById('customerPhoneForm');
+                f.addEventListener('submit', async (e) => { e.preventDefault(); const btn = f.querySelector('button[type=submit]'); btn.disabled = true; const msg = document.getElementById('msg'); try {
+                    customerOtpPhone = String(new FormData(f).get('phone') || '').trim();
+                    const j = await api('/auth/whatsapp/request', { method: 'POST', body: JSON.stringify({ phone: customerOtpPhone }) });
+                    customerOtpPhone = customerOtpPhone;
+                    customerOtpSent = true;
+                    draw();
+                    const input = document.getElementById('customerOtp');
+                    if (j.devCode && input) {
+                        input.value = j.devCode;
+                    }
+                }
+                catch (x) {
+                    btn.disabled = false;
+                    msg.textContent = x.message;
+                    msg.className = 'error';
+                } });
+            }
+            return;
+        }
         document.getElementById('tabLogin')?.addEventListener('click', () => { mode = 'login'; draw(); });
         document.getElementById('tabReg')?.addEventListener('click', () => { mode = 'register'; draw(); });
         const formHost = document.getElementById('authForm');
         if (!formHost)
             return;
         const providerReg = isProvider && mode === 'register';
-        formHost.innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" ${isAdmin ? 'value="admin@khadamat.local"' : ''} required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn" type="submit">دخول</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني${providerReg ? ' (إلزامي)' : ' (اختياري)'}</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" ${providerReg ? 'required' : ''}></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div>${providerReg ? `<div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>التخصص</label><input name="specialty" maxlength="120" placeholder="مثال: تكييف وتبريد"></div><div class="field"><label>نبذة مختصرة</label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div>` : ''}<button class="btn" type="submit">${providerReg ? 'إنشاء حساب مقدم خدمة' : 'إنشاء حساب عميل'}</button><p id="msg"></p></form>`;
+        formHost.innerHTML = mode === 'login' ? `<form id="form" autocomplete="on" novalidate><div class="field"><label>الهاتف أو البريد الإلكتروني</label><input name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" ${isAdmin ? 'value="admin@khadamat.local"' : ''} required></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn" type="submit">دخول</button><p id="msg"></p></form>` : `<form id="form" autocomplete="on" novalidate><div class="field"><label>الاسم</label><input name="fullName" type="text" autocomplete="name" required></div><div class="field"><label>الهاتف</label><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+967..."></div><div class="field"><label>البريد الإلكتروني${providerReg ? ' (إلزامي)' : ' (اختياري)'}</label><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" ${providerReg ? 'required' : ''}></div><div class="field"><label>كلمة المرور</label><input name="password" type="password" autocomplete="new-password" required></div>${providerReg ? `<div class="field"><label>نوع مقدم الخدمة</label><select name="providerType"><option value="INDIVIDUAL">فرد</option><option value="TECHNICIAN">فني</option><option value="WORKER">عامل</option><option value="DRIVER">سائق</option><option value="COMPANY">شركة</option></select></div><div class="field"><label>اسم النشاط أو الاسم الظاهر</label><input name="displayName" required></div><div class="field"><label>التخصص</label><input name="specialty" maxlength="120" placeholder="مثال: تكييف وتبريد"></div><div class="field"><label>نبذة مختصرة</label><textarea name="bio" placeholder="ما الخدمات التي تقدمها؟"></textarea></div>` : ''}<button class="btn" type="submit">${providerReg ? 'إنشاء حساب مقدم خدمة' : 'إنشاء حساب'}</button><p id="msg"></p></form>`;
         applyFieldPlaceholders(formHost);
         const form = document.getElementById('form');
         form.addEventListener('submit', async (e) => {
@@ -634,7 +678,7 @@ function authBox(forcedRole = null) {
             if (submitButton) {
                 submitButton.disabled = true;
                 submitButton.dataset.originalText = submitButton.textContent || '';
-                submitButton.textContent = mode === 'login' ? 'جارٍ الدخول...' : (providerReg ? 'جارٍ إنشاء حساب مقدم الخدمة...' : 'جارٍ إنشاء حساب العميل...');
+                submitButton.textContent = mode === 'login' ? 'جارٍ الدخول...' : (providerReg ? 'جارٍ إنشاء حساب مقدم الخدمة...' : 'جارٍ إنشاء الحساب...');
             }
             const f = new FormData(form);
             const b = {};
@@ -652,17 +696,7 @@ function authBox(forcedRole = null) {
                     delete payload.bio;
                 }
                 const j = mode === 'login' ? await api('/auth/login', { method: 'POST', body: JSON.stringify({ ...b, role: selected }) }) : await api('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
-                saveSession(j);
-                startRealtime().catch(() => { });
-                startNotificationPolling();
-                if ('Notification' in window && Notification.permission === 'granted')
-                    registerWebPushSubscription().catch(() => { });
-                // Always perform a real navigation after authentication. This is especially important
-                // for CUSTOMER because its authenticated home is the same `/` route as the auth screen.
-                // Rendering in-place can leave stale DOM/auth UI mounted, so force a fresh app bootstrap.
-                const target = roleHome(j.user.role);
-                const next = `${target}${target.includes('?') ? '&' : '?'}auth=success`;
-                window.location.replace(next);
+                await authenticate(j);
             }
             catch (x) {
                 const submitButton = form.querySelector('button[type=submit]');
@@ -671,22 +705,8 @@ function authBox(forcedRole = null) {
                     submitButton.textContent = submitButton.dataset.originalText || 'إرسال';
                 }
                 const err = x;
-                formHost.querySelectorAll('.field-error').forEach((el) => el.remove());
-                const details = Array.isArray(err.details) ? err.details : [];
-                if (details.length) {
-                    for (const d of details) {
-                        const field = String(d.path || '').split('.').pop() || '';
-                        const input = form.querySelector(`[name="${CSS.escape(field)}"]`);
-                        if (input) {
-                            const p = document.createElement('small');
-                            p.className = 'field-error error';
-                            p.textContent = String(d.message || err.message);
-                            input.parentElement?.appendChild(p);
-                        }
-                    }
-                }
                 const msg = document.getElementById('msg');
-                msg.textContent = details.length ? 'راجع الحقول المحددة أعلاه.' : err.message;
+                msg.textContent = err.message;
                 msg.className = 'error';
             }
         });
@@ -985,21 +1005,187 @@ function pickQuickServices(services, limit = 7, popularity = []) { const rank = 
             break;
     }
 } return picked; }
+async function setupSimpleRequestComposer() {
+    const form = document.getElementById('simpleRequestForm');
+    if (!form)
+        return;
+    const textEl = document.getElementById('simpleRequestText');
+    const submit = document.getElementById('simpleRequestSubmit');
+    const msg = document.getElementById('simpleRequestMessage');
+    const latEl = document.getElementById('simpleLat');
+    const lngEl = document.getElementById('simpleLng');
+    const accEl = document.getElementById('simpleAccuracy');
+    const label = document.getElementById('simpleLocationLabel');
+    const status = document.getElementById('simpleLocationStatus');
+    const setLocation = (pos) => {
+        latEl.value = String(pos.coords.latitude);
+        lngEl.value = String(pos.coords.longitude);
+        accEl.value = String(pos.coords.accuracy || '');
+        label.textContent = '✓ تم تحديد موقعك';
+        status.textContent = `الإحداثيات جاهزة للمسار${pos.coords.accuracy ? ` · دقة تقريبية ${Math.round(pos.coords.accuracy)}م` : ''}`;
+    };
+    const locate = () => new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('الموقع غير متاح على هذا الجهاز'));
+            return;
+        }
+        label.textContent = 'جارٍ تحديد موقعك...';
+        status.textContent = 'اسمح للموقع من المتصفح، ولا تحتاج أن تكون منطقتك مسجلة في الخريطة.';
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+    });
+    const ensureLocation = async () => {
+        if (latEl.value && lngEl.value)
+            return true;
+        try {
+            setLocation(await locate());
+            return true;
+        }
+        catch {
+            label.textContent = 'لم يتحدد الموقع تلقائيًا';
+            status.textContent = 'اضغط «تحديد موقعي» وحاول مرة أخرى.';
+            return false;
+        }
+    };
+    ensureLocation().catch(() => { });
+    document.getElementById('simpleUseLocation')?.addEventListener('click', async () => { try {
+        setLocation(await locate());
+    }
+    catch (e) {
+        label.textContent = 'تعذر تحديد الموقع';
+        status.textContent = 'تأكد من السماح للموقع في الهاتف ثم حاول مرة أخرى.';
+    } });
+    const voice = document.getElementById('simpleRequestVoice');
+    const voiceStatus = document.getElementById('simpleRequestVoiceStatus');
+    voice.addEventListener('click', () => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            voiceStatus.textContent = 'الصوت غير مدعوم هنا؛ اكتب طلبك.';
+            return;
+        }
+        const r = new SR();
+        r.lang = 'ar-YE';
+        r.interimResults = false;
+        r.continuous = false;
+        voice.textContent = '⏹️ استماع...';
+        voiceStatus.textContent = 'تحدث الآن...';
+        r.onresult = (e) => { const t = e.results?.[0]?.[0]?.transcript || ''; if (t)
+            textEl.value = (textEl.value.trim() ? textEl.value.trim() + ' ' : '') + t.trim(); voiceStatus.textContent = '✓ تم التقاط الطلب.'; };
+        r.onerror = () => { voiceStatus.textContent = 'تعذر التقاط الصوت؛ يمكنك الكتابة بدلًا منه.'; };
+        r.onend = () => { voice.textContent = '🎤 تحدث'; };
+        try {
+            r.start();
+        }
+        catch {
+            voice.textContent = '🎤 تحدث';
+        }
+    });
+    const imageInput = document.getElementById('simpleRequestImageFile');
+    document.getElementById('simpleRequestImage')?.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', () => { const f = imageInput.files?.[0]; if (f) {
+        window.__khadamatSimpleImage = f;
+        toast('تم إرفاق الصورة', 'سنستخدمها مع وصف الطلب لفهم الخدمة.');
+    } });
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.textContent = '';
+        const text = textEl.value.trim();
+        if (text.length < 2) {
+            msg.textContent = 'اكتب ما تحتاجه فقط، حتى لو بكلمات بسيطة.';
+            return;
+        }
+        if (!(await ensureLocation())) {
+            msg.textContent = 'نحتاج موقعك لإرسال الطلب. اضغط «تحديد موقعي» ثم أعد الإرسال.';
+            return;
+        }
+        submit.disabled = true;
+        submit.textContent = 'جارٍ فهم الطلب وإرساله...';
+        let selectedServiceId;
+        try {
+            let imageFileId;
+            const imageFile = window.__khadamatSimpleImage;
+            if (imageFile) {
+                const data = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('تعذر قراءة الصورة')); fr.readAsDataURL(imageFile); });
+                const up = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'order_attachment', name: imageFile.name, dataBase64: data }) });
+                imageFileId = up.file.id;
+            }
+            const understood = await api('/assist/request', { method: 'POST', body: JSON.stringify({ text, ...(imageFileId ? { imageFileId } : {}) }) });
+            const recommended = understood.recommended || understood.matches?.[0];
+            const serviceId = recommended?.serviceId || understood.customService;
+            selectedServiceId = serviceId;
+            if (!serviceId)
+                throw new Error('لم نتمكن من تحديد الخدمة بعد. اكتب الطلب بطريقة أبسط وسنحاول مرة أخرى.');
+            const steps = (understood.steps || []).slice(0, 20).map((x) => ({ title: String(x.serviceName || x.title || 'تنفيذ الطلب'), taskType: x.taskType ? String(x.taskType).slice(0, 50) : undefined, details: x.details ? String(x.details).slice(0, 1000) : undefined }));
+            const svcPayload = await api('/services/' + encodeURIComponent(serviceId));
+            const schema = svcPayload.service?.formSchema || [];
+            const structured = understood.extracted?.structured || {};
+            const lower = text.toLowerCase();
+            const numbers = (text.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+            const formData = {};
+            for (const f of schema) {
+                if (!f.required)
+                    continue;
+                const key = String(f.key || '');
+                if (key === 'item' || key === 'items' || key === 'medicine' || key === 'appliance' || key === 'device' || key === 'transaction_type' || key === 'document_type' || key === 'crop_type' || key === 'issue') {
+                    const val = structured.item || structured.deliveryText || structured.pickupText;
+                    if (val)
+                        formData[key] = String(val).slice(0, 1000);
+                }
+                else if (key === 'quantity' || key === 'workers_count' || key === 'passengers' || key === 'hours' || key === 'land_area') {
+                    const n = Number(structured.quantity) || numbers[0];
+                    if (Number.isFinite(n) && n > 0)
+                        formData[key] = n;
+                }
+                else if (key === 'destination') {
+                    const val = structured.destinationText || structured.deliveryText;
+                    if (val)
+                        formData[key] = String(val).slice(0, 200);
+                }
+                else if (f.type === 'select' && Array.isArray(f.options)) {
+                    const hit = f.options.find((o) => lower.includes(String(o.label || '').toLowerCase()) || lower.includes(String(o.value || '').toLowerCase()));
+                    const other = f.options.find((o) => String(o.value).toLowerCase() === 'other');
+                    if (hit)
+                        formData[key] = hit.value;
+                    else if (other)
+                        formData[key] = other.value;
+                }
+            }
+            const body = { serviceId, description: text, location: { lat: Number(latEl.value), lng: Number(lngEl.value), accuracy: Number(accEl.value) || undefined, source: 'gps' }, contactPhone: String(state.user?.phone || '') || '00000000', priority: understood.priority || 'NORMAL', formData, attachmentFileIds: imageFileId ? [imageFileId] : undefined, tasks: steps.length > 1 ? steps : undefined };
+            const j = await api('/orders', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
+            toast('تم إرسال طلبك', 'بدأ النظام البحث عن مقدم الخدمة المناسب.');
+            textEl.value = '';
+            imageInput.value = '';
+            window.__khadamatSimpleImage = null;
+            await customer();
+            if (j.order?.id)
+                openOrder(j.order.id);
+        }
+        catch (err) {
+            const x = err;
+            if (x.code === 'FORM_INVALID' || x.code === 'VALIDATION_ERROR' || x.code === 'INVALID_FORM_DATA') {
+                msg.textContent = 'هذه الخدمة تحتاج معلومة تشغيلية إضافية؛ سأفتح لك الطلب المختصر لإكمالها فقط.';
+                setTimeout(() => selectedServiceId && openOrderForm(selectedServiceId, { description: text, location: { lat: Number(latEl.value), lng: Number(lngEl.value), accuracy: Number(accEl.value) || undefined, source: 'gps' } }), 250);
+            }
+            else
+                msg.textContent = x?.message || 'تعذر إرسال الطلب الآن، حاول مرة أخرى.';
+        }
+        finally {
+            submit.disabled = false;
+            submit.textContent = 'إرسال الطلب ←';
+        }
+    });
+}
 function renderCustomer() {
-    shell(`<section class="hero">
-    ${(state.campaigns || []).slice(0, 1).map((c) => `<div class="card" style="margin-bottom:12px"><b>📣 ${esc(c.title)}</b><p>${esc(c.description || '')}</p>${c.buttonLabel ? `<button type="button" class="btn small" data-campaign-action="${esc(c.actionType)}" data-campaign-value="${esc(c.actionValue || '')}">${esc(c.buttonLabel)}</button>` : ''}</div>`).join('')}<div><h1>ماذا تحتاج اليوم؟</h1><p class="muted">اكتب ما تحتاجه كما تتكلم، أو اختر من الاحتياجات السريعة.</p></div>
-    <div class="search-wrap">
-      <div class="row search-row">
-        <div class="search-box">
-          <span class="search-icon">⌕</span>
-          <input id="search" autocomplete="off" placeholder="ابحث عن خدمة...">
-          <button class="clear-search" id="clearSearch" type="button" aria-label="مسح">×</button>
-        </div>
-        <button class="btn" id="request">➕ اطلب خدمة</button>
-      </div>
-      <div id="suggestions" class="suggestions hide"></div>
-    </div>
+    shell(`<section class="hero customer-simple-hero">
+    ${(state.campaigns || []).slice(0, 1).map((c) => `<div class="card" style="margin-bottom:12px"><b>📣 ${esc(c.title)}</b><p>${esc(c.description || '')}</p>${c.buttonLabel ? `<button type="button" class="btn small" data-campaign-action="${esc(c.actionType)}" data-campaign-value="${esc(c.actionValue || '')}">${esc(c.buttonLabel)}</button>` : ''}</div>`).join('')}
+    <div class="simple-request-head"><div><h1>ماذا تحتاج؟</h1><p class="muted">قل طلبك بطريقتك، ونحن نفهمه ونبحث لك عن مقدم الخدمة.</p></div><span class="simple-request-badge">3 خطوات فقط</span></div>
+    <form id="simpleRequestForm" class="simple-request-card">
+      <div class="simple-request-step"><span>1</span><div class="field"><label for="simpleRequestText">طلبك</label><textarea id="simpleRequestText" maxlength="1000" rows="4" placeholder="مثال: أريد واحد يشتري لي بيبسي من البقالة ويوصله للبيت"></textarea><div class="row simple-request-tools"><button class="btn secondary small" id="simpleRequestVoice" type="button">🎤 تحدث</button><button class="btn secondary small" id="simpleRequestImage" type="button">📷 صورة</button><small id="simpleRequestVoiceStatus" class="muted"></small></div></div></div>
+      <div class="simple-request-step"><span>2</span><div class="field"><label>موقعك</label><div class="location-simple-box"><div><b id="simpleLocationLabel">جارٍ تحديد موقعك تلقائيًا...</b><small id="simpleLocationStatus" class="muted">سنستخدم الإحداثيات حتى لو كانت القرية غير مسجلة في الخريطة.</small></div><button class="btn secondary" id="simpleUseLocation" type="button">📍 تحديد موقعي</button></div><input id="simpleLat" type="hidden"><input id="simpleLng" type="hidden"><input id="simpleAccuracy" type="hidden"></div></div>
+      <div class="simple-request-step simple-request-send"><span>3</span><div><b>إرسال الطلب</b><p class="muted">بعد الإرسال يفهم النظام الطلب ويرشح مقدم الخدمة المناسب، وإذا كانت هناك معلومة ضرورية فقط سنطلبها منك.</p><button class="btn simple-submit-btn" id="simpleRequestSubmit" type="submit">إرسال الطلب ←</button><p id="simpleRequestMessage" class="muted"></p></div></div>
+    </form>
+    <input id="simpleRequestImageFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
   </section>
+  <div class="card manual-service-fallback"><b>تريد اختيار الخدمة بنفسك؟</b><p class="muted">يمكنك ذلك من الخدمات الموجودة أسفل الصفحة، وهذا الخيار لا يلغي الطلب الذكي.</p><div class="search-wrap"><div class="row search-row"><div class="search-box"><span class="search-icon">⌕</span><input id="search" autocomplete="off" placeholder="ابحث عن خدمة..."><button class="clear-search" id="clearSearch" type="button" aria-label="مسح">×</button></div></div><div id="suggestions" class="suggestions hide"></div></div></div>
   <div id="customerPriority" class="priority-stack"></div><div id="personalRecommendations"></div>
 
   <nav class="section-nav" aria-label="التنقل">
@@ -1010,7 +1196,6 @@ function renderCustomer() {
   <section id="servicesSection">
     <div class="section-heading"><div><h2>الخدمات القريبة من احتياجك</h2><p class="muted">لا تحتاج معرفة اسم مقدم الخدمة؛ اختر ما تحتاجه وسنتولى البحث.</p></div></div>
     ${(state.temporaryServices || []).length ? `<div class="temporary-priority card"><div class="section-heading"><div><h2>🔥 متاح الآن</h2><p class="muted">خدمات موسمية أو مؤقتة متاحة حاليًا</p></div></div><div class="grid">${state.temporaryServices.slice(0, 4).map((x) => `<div class="card service temporary-service-card" data-temp-id="${esc(x.id)}"><div class="icon">${esc(x.icon || '🎉')}</div><b>${esc(x.title || x.name)}</b><p>${esc(x.description || '')}</p><button class="btn small" type="button" data-temp-action="${esc(x.id)}">${esc(x.actionLabel || 'اطلب الآن')} ←</button></div>`).join('')}</div></div>` : ''}
-    <div class="card ask-me-hero" style="margin-bottom:14px"><div><h2>🛎️ اطلب لي</h2><p class="muted">اكتب طلبك بطريقتك، حتى باللهجة اليمنية. سنفهمه ونقترح الخدمة المناسبة، وإذا لم توجد خدمة جاهزة سننشئ لك طلبًا خاصًا.</p><div class="row"><button class="btn" id="askMeBtn" type="button">اكتب ماذا تحتاج</button><button class="btn secondary" id="customRequestBtn" type="button">➕ طلب خاص</button></div></div></div>
     <div class="section-heading quick-heading"><div><h2>ابدأ بسرعة</h2><p class="muted">أكثر الاحتياجات شيوعًا</p></div></div><div class="quick-services-strip"><div class="quick-services" id="quickServices">${pickQuickServices(state.services, 8, state.popularity).map(s => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join('')}</div>${state.services.length > 8 ? '<button class="btn secondary small" id="showMoreServices" type="button">عرض المزيد</button>' : ''}</div>
     <div class="section-heading"><div><h2>الأقسام الأساسية</h2><p class="muted">نرتبها حسب احتياجاتك اليومية والموسمية، ويمكنك دائمًا كتابة طلبك بدل البحث.</p></div></div>
     <div class="grid category-grid" id="cats">${customerMainCategories(state.cats).map(c => `<button class="card service category-card" data-cat="${esc(c.slug)}" type="button"><div class="icon">${esc(c.icon || '🛠️')}</div><b>${esc(c.name)}</b><p class="muted">${esc(c.description || ('خدمات ' + c.name))}</p><span class="choose-link">عرض ←</span></button>`).join('')}</div>
@@ -1134,7 +1319,7 @@ function renderCustomer() {
     document.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService)));
     document.getElementById('showMoreServices')?.addEventListener('click', () => { const box = document.getElementById('quickServices'); if (!box)
         return; const more = state.services.slice(8); box.innerHTML += more.map((s) => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${esc(s.icon || s.categoryIcon || '🛠️')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join(''); box.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService))); document.getElementById('showMoreServices').remove(); });
-    document.getElementById('request').onclick = () => openCategory('');
+    setupSimpleRequestComposer();
     document.getElementById('servicesTab').onclick = () => switchCustomerSection('services');
     document.getElementById('ordersTab').onclick = () => switchCustomerSection('orders');
     document.querySelectorAll('[data-order]').forEach(x => { x.addEventListener('click', e => { if (e.target.closest('[data-rate-order]'))
@@ -1709,17 +1894,6 @@ async function openTripTracking(id) { try {
 catch (e) {
     alert(e.message);
 } }
-async function callOrderParticipant(orderId) { try {
-    const j = await api('/orders/' + encodeURIComponent(orderId) + '/contact');
-    if (!j.phone)
-        throw new Error('لا يوجد رقم متاح لهذا الطلب');
-    const ok = confirm(`الاتصال بـ ${j.name}؟`);
-    if (ok)
-        location.href = 'tel:' + String(j.phone).replace(/[^0-9+]/g, '');
-}
-catch (e) {
-    alert(e.message);
-} }
 async function openOrderChat(orderId) {
     try {
         const orderSummary = await api('/orders/' + encodeURIComponent(orderId));
@@ -1740,9 +1914,8 @@ async function openOrderChat(orderId) {
                 box.querySelectorAll('[data-chat-file]').forEach((x) => x.addEventListener('click', () => openPrivateFile(String(x.dataset.chatFile || ''))));
             }
         };
-        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب ${esc(orderInfo.code || '')}</h2><p class="muted">${esc(orderInfo.service?.name || '')} · محادثة خاصة بهذا الطلب فقط${orderInfo.provider?.displayName ? ` · ${esc(orderInfo.provider.displayName)}` : ''}</p><p class="muted">الرسائل مباشرة وتُحفظ عند ضعف الاتصال، ولا تظهر خارج أطراف هذا الطلب.</p></div><div class="row"><button class="btn secondary small" id="callOrderParticipant" type="button">📞 اتصال</button><span class="chat-live-badge">● مباشر</span></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button type="button" class="btn secondary" id="recordChatVoice">🎙️ تسجيل صوتي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
+        showModal(`<div class="chat-modal"><div class="chat-header"><div><h2>💬 محادثة الطلب ${esc(orderInfo.code || '')}</h2><p class="muted">${esc(orderInfo.service?.name || '')} · محادثة خاصة بهذا الطلب فقط${orderInfo.provider?.displayName ? ` · ${esc(orderInfo.provider.displayName)}` : ''}</p><p class="muted">الرسائل مباشرة وتُحفظ عند ضعف الاتصال، ولا تظهر خارج أطراف هذا الطلب.</p></div><div class="row"><span class="chat-live-badge">● مباشر · التواصل داخل خدمات</span></div></div><div id="chatMessages" class="chat-messages"></div><div class="chat-quick"><b>اقتراحات سريعة</b><div class="chat-quick-list">${quick.map(q => `<button type="button" class="chat-quick-btn" data-chat-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div></div><form id="chatForm" class="chat-form"><textarea id="chatBody" maxlength="2000" placeholder="اكتب رسالتك هنا..."></textarea><div class="row"><label class="btn secondary" for="chatFile">📎 صورة/ملف</label><input id="chatFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden><button type="button" class="btn secondary" id="sendChatLocation">📍 إرسال موقعي</button><button type="button" class="btn secondary" id="recordChatVoice">🎙️ تسجيل صوتي</button><button class="btn" id="sendChat">إرسال</button></div><small id="chatFileStatus" class="muted"></small></form></div>`);
         await render();
-        document.getElementById('callOrderParticipant')?.addEventListener('click', () => callOrderParticipant(orderId));
         document.querySelectorAll('[data-chat-quick]').forEach(x => x.addEventListener('click', () => { const body = document.getElementById('chatBody'); if (body) {
             body.value = x.dataset.chatQuick || '';
             body.focus();
@@ -2536,7 +2709,7 @@ async function openProviderOrder(id, autoChat = false) { try {
     const lat = Number(loc.lat), lng = Number(loc.lng);
     const mapUrl = hasLoc ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}` : '';
     const g = hasLoc ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}&travelmode=driving` : '';
-    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${o.trip.destination ? esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`) : 'لم تُحدد بعد — يمكن تحديدها لاحقًا'}</p></div>` : ''}${o.customer ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">التواصل عبر محادثة الطلب داخل خدمات. رقم الهاتف لا يظهر في الملف العام.</p></div>${state.user?.role === 'PROVIDER' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<div class="card provider-chat-summary"><div class="row" style="justify-content:space-between"><div><h3>💬 التواصل المباشر</h3><p class="muted">${(msgsPayload.messages || []).length ? `آخر رسالة: ${esc((msgsPayload.messages || []).slice(-1)[0]?.body || '')}` : 'لا توجد رسائل بعد.'}</p></div><button class="btn" id="providerChatBtn" type="button">💬 فتح محادثة الطلب</button><button class="btn secondary" id="providerCallBtn" type="button">📞 اتصال</button></div></div>` : ''}` : ''}${o.service?.deliveryProofType === 'PIN' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>🔐 تأكيد التسليم بالرمز</b><p class="muted">أدخل رمز التسليم الذي يقدمه المستلم قبل إنهاء الطلب.</p><div class="row"><input id="deliveryPinInput" inputmode="numeric" maxlength="6" placeholder="رمز من 6 أرقام"><button class="btn" id="verifyDeliveryPin" type="button">تأكيد الرمز</button></div></div>` : o.service?.deliveryProofType === 'RECIPIENT_CONFIRMATION' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>👤 تأكيد المستلم</b><p class="muted">يؤكد المستلم اسمه من جهاز العميل قبل إنهاء الطلب.</p><div class="row"><input id="recipientConfirmName" maxlength="120" placeholder="اسم المستلم"><span id="recipientProofStatus" class="muted">بانتظار التأكيد</span></div></div>` : o.service?.deliveryProofType === 'PHOTO' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>📷 صورة إثبات التسليم</b><p class="muted">التقط صورة واضحة لإثبات التسليم ثم ارفعها.</p><input id="deliveryProofPhoto" type="file" accept="image/jpeg,image/png,image/webp"><button class="btn" id="uploadDeliveryProof" type="button" style="margin-top:8px">رفع إثبات التسليم</button><p id="deliveryProofPhotoStatus" class="muted"></p></div>` : ''}${o.trip && o.status === 'IN_PROGRESS' ? `<div class="row"><button class="btn secondary" id="startWaitBtn" type="button">⏱️ بدء الانتظار</button><button class="btn secondary" id="stopWaitBtn" type="button">⏹️ إنهاء الانتظار</button></div>` : ''}${(o.service?.slug === 'purchase-and-delivery' || o.service?.slug === 'pharmacy-purchase') && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn secondary" id="purchaseChangeBtn" type="button">🛒 طلب تعديل الشراء</button>` : ''}${complaintPayload.complaint ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ ${['RESOLVED', 'REJECTED', 'CLOSED'].includes(complaintPayload.complaint.status) ? 'عرض الشكوى' : 'متابعة الشكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
+    showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> ${esc(statusAr(o.status))}</p><p>${esc(o.description)}</p>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${o.trip.destination ? esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`) : 'لم تُحدد بعد — يمكن تحديدها لاحقًا'}</p></div>` : ''}${o.customer ? `<div class="card"><b>👤 العميل: ${esc(o.customer.fullName)}</b><p class="muted">التواصل عبر محادثة الطلب داخل خدمات. رقم الهاتف لا يظهر في الملف العام.</p></div>${state.user?.role === 'PROVIDER' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<div class="card provider-chat-summary"><div class="row" style="justify-content:space-between"><div><h3>💬 التواصل المباشر</h3><p class="muted">${(msgsPayload.messages || []).length ? `آخر رسالة: ${esc((msgsPayload.messages || []).slice(-1)[0]?.body || '')}` : 'لا توجد رسائل بعد.'}</p></div><button class="btn" id="providerChatBtn" type="button">💬 فتح محادثة الطلب</button></div></div>` : ''}` : ''}${o.service?.deliveryProofType === 'PIN' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>🔐 تأكيد التسليم بالرمز</b><p class="muted">أدخل رمز التسليم الذي يقدمه المستلم قبل إنهاء الطلب.</p><div class="row"><input id="deliveryPinInput" inputmode="numeric" maxlength="6" placeholder="رمز من 6 أرقام"><button class="btn" id="verifyDeliveryPin" type="button">تأكيد الرمز</button></div></div>` : o.service?.deliveryProofType === 'RECIPIENT_CONFIRMATION' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>👤 تأكيد المستلم</b><p class="muted">يؤكد المستلم اسمه من جهاز العميل قبل إنهاء الطلب.</p><div class="row"><input id="recipientConfirmName" maxlength="120" placeholder="اسم المستلم"><span id="recipientProofStatus" class="muted">بانتظار التأكيد</span></div></div>` : o.service?.deliveryProofType === 'PHOTO' && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>📷 صورة إثبات التسليم</b><p class="muted">التقط صورة واضحة لإثبات التسليم ثم ارفعها.</p><input id="deliveryProofPhoto" type="file" accept="image/jpeg,image/png,image/webp"><button class="btn" id="uploadDeliveryProof" type="button" style="margin-top:8px">رفع إثبات التسليم</button><p id="deliveryProofPhotoStatus" class="muted"></p></div>` : ''}${o.trip && o.status === 'IN_PROGRESS' ? `<div class="row"><button class="btn secondary" id="startWaitBtn" type="button">⏱️ بدء الانتظار</button><button class="btn secondary" id="stopWaitBtn" type="button">⏹️ إنهاء الانتظار</button></div>` : ''}${(o.service?.slug === 'purchase-and-delivery' || o.service?.slug === 'pharmacy-purchase') && ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn secondary" id="purchaseChangeBtn" type="button">🛒 طلب تعديل الشراء</button>` : ''}${complaintPayload.complaint ? `<button class="btn secondary" id="providerComplaintBtn" type="button">⚠️ ${['RESOLVED', 'REJECTED', 'CLOSED'].includes(complaintPayload.complaint.status) ? 'عرض الشكوى' : 'متابعة الشكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="field"><label>تقييم العميل</label><select id="customerScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select><textarea id="customerComment" placeholder="تعليق اختياري"></textarea><button class="btn" id="rateCustomer" type="button">إرسال تقييم العميل</button></div>` : ''}${hasLoc ? `<div class="card"><h3>📍 موقع العميل</h3><p class="muted">الإحداثيات المحفوظة في الطلب: ${lat.toFixed(6)} ، ${lng.toFixed(6)}</p><div id="providerOrderMap" style="height:280px;width:100%;border-radius:12px;overflow:hidden"></div><div class="row" style="margin-top:10px"><a class="btn secondary" target="_blank" rel="noopener" href="${mapUrl}">فتح الخريطة</a><a class="btn" target="_blank" rel="noopener" href="${g}">🧭 ابدأ الاتجاهات</a></div></div>` : '<div class="card error">لا يوجد موقع محفوظ لهذا الطلب</div>'}<div class="order-timeline">${renderOrderTimeline(o.status)}</div>`);
     if (hasLoc) {
         const el = document.getElementById('providerOrderMap');
         const L = await ensureLeaflet().catch(() => null);
@@ -2548,7 +2721,6 @@ async function openProviderOrder(id, autoChat = false) { try {
         }
     }
     document.getElementById('providerChatBtn')?.addEventListener('click', () => openOrderChat(id));
-    document.getElementById('providerCallBtn')?.addEventListener('click', () => callOrderParticipant(id));
     if (autoChat)
         setTimeout(() => document.getElementById('providerChatBtn')?.click(), 0);
     document.getElementById('verifyDeliveryPin')?.addEventListener('click', async () => { const btn = document.getElementById('verifyDeliveryPin'); const pin = document.getElementById('deliveryPinInput').value.trim(); btn.disabled = true; try {

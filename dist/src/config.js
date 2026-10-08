@@ -64,6 +64,12 @@ export function loadConfig(overrides = {}) {
         aiIntentTimeoutMs: int(env.AI_INTENT_TIMEOUT_MS, 1800),
         aiIntentAuto: bool(env.AI_INTENT_AUTO, true),
         aiIntentCircuitCooldownMs: int(env.AI_INTENT_CIRCUIT_COOLDOWN_MS, 30000),
+        whatsappAccessToken: env.WHATSAPP_ACCESS_TOKEN || null,
+        whatsappPhoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || null,
+        whatsappGraphVersion: env.WHATSAPP_GRAPH_VERSION || 'v23.0',
+        whatsappOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || 'khadamat_otp',
+        whatsappOtpLanguage: env.WHATSAPP_OTP_LANGUAGE || 'ar',
+        whatsappOtpEnabled: bool(env.WHATSAPP_OTP_ENABLED, false),
         admin: {
             name: env.ADMIN_NAME || 'مدير النظام',
             phone: env.ADMIN_PHONE || '+967700000000',

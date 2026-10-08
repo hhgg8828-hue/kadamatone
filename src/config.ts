@@ -24,6 +24,7 @@ export interface Config {
   env: string; isProd: boolean; port: number; dbPath: string; uploadDir: string; jwtSecret: string;
   accessTtlSec: number; refreshTtlDays: number; cookieSecure: boolean; trustProxy: boolean; corsOrigins: string[];
   mapProvider: string; routingUrl: string; routingTimeoutMs: number; assignmentTickMs: number; logLevel: string; disableScheduler: boolean; disableRateLimit: boolean; aiIntentUrl: string | null; aiIntentKey: string | null; aiIntentModel: string; aiIntentTimeoutMs: number; aiIntentAuto: boolean; aiIntentCircuitCooldownMs: number;
+  whatsappAccessToken: string | null; whatsappPhoneNumberId: string | null; whatsappGraphVersion: string; whatsappOtpTemplate: string; whatsappOtpLanguage: string; whatsappOtpEnabled: boolean;
   admin: AdminSeed; publicDir: string; sharedDir: string; root: string;
 }
 export interface ConfigOverrides { [key: string]: string | boolean | undefined; __skipDotEnv?: boolean }
@@ -69,6 +70,12 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     aiIntentTimeoutMs: int(env.AI_INTENT_TIMEOUT_MS, 1800),
     aiIntentAuto: bool(env.AI_INTENT_AUTO, true),
     aiIntentCircuitCooldownMs: int(env.AI_INTENT_CIRCUIT_COOLDOWN_MS, 30000),
+    whatsappAccessToken: env.WHATSAPP_ACCESS_TOKEN || null,
+    whatsappPhoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || null,
+    whatsappGraphVersion: env.WHATSAPP_GRAPH_VERSION || 'v23.0',
+    whatsappOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || 'khadamat_otp',
+    whatsappOtpLanguage: env.WHATSAPP_OTP_LANGUAGE || 'ar',
+    whatsappOtpEnabled: bool(env.WHATSAPP_OTP_ENABLED, false),
     admin: {
       name: env.ADMIN_NAME || 'مدير النظام',
       phone: env.ADMIN_PHONE || '+967700000000',

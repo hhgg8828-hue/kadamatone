@@ -12,26 +12,8 @@ function normalizePhrase(v) {
 }
 export function registerProductRoutes(app, r) {
     const { db, catalog } = app;
-    r.get('/orders/:id/contact', auth, roles('CUSTOMER', 'PROVIDER', 'ADMIN'), (ctx) => {
-        const o = db.get('SELECT id,customer_id,provider_id,status FROM orders WHERE id=?', ctx.params.id);
-        if (!o)
-            throw E.notFound('الطلب غير موجود');
-        const active = ['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status);
-        if (ctx.user.role === 'CUSTOMER' && o.customer_id !== ctx.user.id)
-            throw E.forbidden();
-        if (ctx.user.role === 'PROVIDER' && o.provider_id !== ctx.user.providerId)
-            throw E.forbidden();
-        if (ctx.user.role !== 'ADMIN' && !active && o.status !== 'COMPLETED')
-            throw E.unprocessable('التواصل الهاتفي متاح أثناء تنفيذ الطلب', 'ORDER_CONTACT_CLOSED');
-        const targetId = ctx.user.role === 'CUSTOMER'
-            ? db.get('SELECT user_id FROM service_providers WHERE id=?', o.provider_id)?.user_id
-            : o.customer_id;
-        if (!targetId)
-            throw E.unprocessable('لا يوجد طرف آخر مرتبط بالطلب', 'CONTACT_UNAVAILABLE');
-        const u = db.get('SELECT full_name,phone FROM users WHERE id=?', targetId);
-        if (!u)
-            throw E.notFound('جهة الاتصال غير موجودة');
-        return { name: u.full_name, phone: u.phone };
+    r.get('/orders/:id/contact', auth, roles('CUSTOMER', 'PROVIDER', 'ADMIN'), (_ctx) => {
+        throw E.forbidden('أرقام العملاء ومقدمي الخدمة خاصة. التواصل يتم داخل محادثة الطلب في خدمات.', 'CONTACT_PHONE_PRIVATE');
     });
     r.get('/provider/dashboard', auth, roles('PROVIDER'), (ctx) => {
         const pid = ctx.user.providerId;

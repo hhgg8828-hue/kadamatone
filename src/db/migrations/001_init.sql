@@ -48,6 +48,7 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX ix_refresh_user ON refresh_tokens(user_id);
 CREATE INDEX ix_refresh_family ON refresh_tokens(family_id);
 
+
 CREATE TABLE files (
   id TEXT PRIMARY KEY,
   owner_id TEXT NOT NULL REFERENCES users(id),

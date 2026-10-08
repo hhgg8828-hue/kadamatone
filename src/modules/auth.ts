@@ -1,4 +1,5 @@
 import { s, parse, normalizePhone, PHONE_RE, type Schema } from '../core/validate.js';
+import crypto from 'node:crypto';
 import { E } from '../core/errors.js';
 import { hashPassword, verifyPassword, fakeVerify, signJwt, randomToken, sha256, uuid } from '../core/security.js';
 import { iso } from '../core/util.js';
@@ -17,6 +18,56 @@ function cleanPhone(raw: string): string {
   const p = normalizePhone(raw);
   if (!PHONE_RE.test(p)) throw E.unprocessable('رقم هاتف غير صالح', 'VALIDATION_ERROR', [{ path: 'phone', message: 'رقم هاتف غير صالح' }]);
   return p;
+}
+
+function otpCode(): string { return String(crypto.randomInt(1000, 10000)); }
+function maskPhone(phone: string): string { return phone.length <= 6 ? phone : `${phone.slice(0, 4)}••••${phone.slice(-2)}`; }
+
+async function sendWhatsAppOtp(app: App, phone: string, code: string): Promise<void> {
+  const { config } = app;
+  // In the free/demo phase, keep customer onboarding usable without any paid WhatsApp service.
+  // The generated code is returned only when WhatsApp is disabled; this must be replaced by a real sender before public production use.
+  if (!config.whatsappOtpEnabled) return;
+  if (!config.whatsappAccessToken || !config.whatsappPhoneNumberId) {
+    throw E.serviceUnavailable('إعدادات واتساب غير مكتملة', 'WHATSAPP_OTP_NOT_CONFIGURED');
+  }
+  const url = `https://graph.facebook.com/${encodeURIComponent(config.whatsappGraphVersion)}/${encodeURIComponent(config.whatsappPhoneNumberId)}/messages`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${config.whatsappAccessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: phone.replace(/^\+/, ''),
+      type: 'template',
+      template: {
+        name: config.whatsappOtpTemplate,
+        language: { code: config.whatsappOtpLanguage },
+        components: [{ type: 'body', parameters: [{ type: 'text', text: code }] }]
+      }
+    })
+  });
+  if (!response.ok) {
+    let detail = ''; try { detail = (await response.text()).slice(0, 500); } catch {}
+    app.log.error?.(`WhatsApp OTP send failed: ${response.status} ${detail}`);
+    throw E.serviceUnavailable('تعذر إرسال رمز التحقق عبر واتساب، حاول مرة أخرى', 'WHATSAPP_OTP_SEND_FAILED');
+  }
+}
+
+async function issueCustomerOtp(app: App, phone: string): Promise<{ maskedPhone: string; devCode?: string }> {
+  const code = otpCode();
+  const now = app.clock.now();
+  const recent = app.db.get<{ id: string; created_at: string }>(
+    'SELECT id,created_at FROM whatsapp_otp_challenges WHERE phone=? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1', phone);
+  if (recent && now - Date.parse(recent.created_at) < 60_000) throw E.tooMany(60 - Math.floor((now - Date.parse(recent.created_at)) / 1000));
+  const id = uuid();
+  app.db.run('INSERT INTO whatsapp_otp_challenges(id,phone,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?,?)', id, phone, sha256(code), iso(now + 5 * 60_000), 0, iso(now));
+  try {
+    await sendWhatsAppOtp(app, phone, code);
+  } catch (err) {
+    app.db.run('DELETE FROM whatsapp_otp_challenges WHERE id=?', id);
+    throw err;
+  }
+  return { maskedPhone: maskPhone(phone), ...(!app.config.whatsappOtpEnabled ? { devCode: code } : {}) };
 }
 
 export interface UserOut { id: string; fullName: string; phone: string; email: string | null; role: string; locale: string; status: string; avatarUrl: string | null; adminLevel: string | null }
@@ -80,6 +131,45 @@ interface RegisterBody { fullName: string; phone: string; email?: string; passwo
 export function registerAuthRoutes(app: App, r: Router): void {
   const { db } = app;
   const svc = app.authService;
+
+  r.post('/auth/whatsapp/request',
+    limit('whatsapp-otp-ip', { max: 10, windowMs: 15 * 60_000 }),
+    limit('whatsapp-otp-phone', { max: 5, windowMs: 15 * 60_000, key: (c: Ctx) => normalizePhone(String((c.body as any)?.phone || '')) }),
+    async (ctx: Ctx) => {
+      const b = parse<{ phone: string }>(s.obj({ phone: PHONE }), ctx.body);
+      const phone = cleanPhone(b.phone);
+      const result = await issueCustomerOtp(app, phone);
+      return { ok: true, channel: 'WHATSAPP', ...result, message: `أرسلنا رمز التحقق إلى واتساب على الرقم ${result.maskedPhone}` };
+    });
+
+  r.post('/auth/whatsapp/verify',
+    limit('whatsapp-verify-ip', { max: 20, windowMs: 15 * 60_000 }),
+    async (ctx: Ctx) => {
+      const b = parse<{ phone: string; code: string }>(s.obj({ phone: PHONE, code: s.str({ min: 4, max: 4, trim: true }) }), ctx.body);
+      const phone = cleanPhone(b.phone);
+      const row = db.get<any>('SELECT * FROM whatsapp_otp_challenges WHERE phone=? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1', phone);
+      if (!row || Date.parse(row.expires_at) <= app.clock.now()) throw E.unauthorized('انتهت صلاحية الرمز. اطلب رمزًا جديدًا.', 'OTP_EXPIRED');
+      if (Number(row.attempts) >= 5) throw E.tooMany(300);
+      db.run('UPDATE whatsapp_otp_challenges SET attempts=attempts+1 WHERE id=?', row.id);
+      if (sha256(b.code) !== row.code_hash) throw E.unauthorized('رمز التحقق غير صحيح', 'OTP_INVALID');
+      db.run('UPDATE whatsapp_otp_challenges SET consumed_at=? WHERE id=?', iso(app.clock.now()), row.id);
+
+      let userRow = svc.loadUser('u.phone = ?', phone);
+      if (!userRow) {
+        const id = uuid();
+        const now = iso(app.clock.now());
+        const placeholderPassword = await hashPassword(randomToken(32));
+        db.run('INSERT INTO users(id,role_id,full_name,phone,email,password_hash,locale,created_at,updated_at,last_login_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+          id, 1, 'عميل خدمات', phone, null, placeholderPassword, 'ar', now, now, now);
+        userRow = svc.loadUser('u.id = ?', id);
+      } else {
+        if (userRow.role !== 'CUSTOMER') throw E.conflict('هذا الرقم مرتبط بحساب مقدم خدمة أو إدارة. استخدم مسار الدخول المناسب.', 'PHONE_ROLE_CONFLICT');
+        if (userRow.status !== 'ACTIVE') throw E.forbidden('هذا الحساب موقوف. تواصل مع الدعم.', 'ACCOUNT_INACTIVE');
+        db.run('UPDATE users SET last_login_at=?,updated_at=? WHERE id=?', iso(app.clock.now()), iso(app.clock.now()), userRow.id);
+        userRow = svc.loadUser('u.id = ?', userRow.id);
+      }
+      return { user: serializeUser(userRow), ...svc.issueSession(ctx, userRow) };
+    });
 
   r.post('/auth/register', limit('register', { max: 10, windowMs: 3600_000 }), async (ctx: Ctx) => {
     const b = parse<RegisterBody>(registerSchema, ctx.body);

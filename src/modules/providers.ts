@@ -136,6 +136,11 @@ export function registerProviderRoutes(app: App, r: Router): void {
       if (b.docType !== 'PHOTO_WORK') {
         db.run(`UPDATE service_providers SET verification_status = 'PENDING', rejection_reason = NULL, updated_at = ? WHERE id = ?`, now, pid(ctx));
         if (p.verification_status !== 'PENDING') app.notifications.notifyAdmins('PROVIDER_PENDING_ADMIN', { provider: p.display_name }, { providerId: pid(ctx) });
+        // A provider may upload the documents in separate steps. Always notify the
+        // realtime admin channel, even when the account was already PENDING, so the
+        // admin page never needs a manual refresh to see the newly uploaded file.
+        app.sse.broadcast('sync', { scope: 'provider', providerId: pid(ctx), reason: 'document-updated' });
+        app.sse.broadcast('sync', { scope: 'admin', providerId: pid(ctx), reason: 'document-updated' });
       }
       ctx.status = existing && b.docType !== 'PHOTO_WORK' ? 200 : 201;
       return { documents: app.providers.documents(pid(ctx)) };
@@ -147,6 +152,8 @@ export function registerProviderRoutes(app: App, r: Router): void {
     if (!d) throw E.notFound();
     if (d.doc_type !== 'PHOTO_WORK' && d.status === 'APPROVED') throw E.unprocessable('لا يمكن حذف مستند معتمد', 'DOCUMENT_LOCKED');
     db.run('DELETE FROM provider_documents WHERE id = ?', d.id);
+    app.sse.broadcast('sync', { scope: 'provider', providerId: pid(ctx), reason: 'document-deleted' });
+    app.sse.broadcast('sync', { scope: 'admin', providerId: pid(ctx), reason: 'document-deleted' });
     return undefined;
   });
 
@@ -225,6 +232,43 @@ export function registerProviderRoutes(app: App, r: Router): void {
 
 
   // إدارة توثيق مقدمي الخدمات من لوحة الإدارة
+  // Lightweight cross-tab change detector for the admin dashboard. SSE is the
+  // immediate path; this endpoint is intentionally cheap and catches any write
+  // made by a route that did not emit an SSE event.
+  r.get('/admin/realtime-state', auth, adminLevel('SUPPORT'), () => {
+    const row = db.get<any>(`
+      SELECT
+        (SELECT COUNT(*) FROM users) AS usersCount,
+        (SELECT MAX(updated_at) FROM users) AS usersUpdated,
+        (SELECT COUNT(*) FROM service_providers) AS providersCount,
+        (SELECT MAX(updated_at) FROM service_providers) AS providersUpdated,
+        (SELECT COUNT(*) FROM provider_documents) AS providerDocsCount,
+        (SELECT MAX(created_at) FROM provider_documents) AS providerDocsUpdated,
+        (SELECT COUNT(*) FROM provider_vehicles) AS vehiclesCount,
+        (SELECT MAX(updated_at) FROM provider_vehicles) AS vehiclesUpdated,
+        (SELECT COUNT(*) FROM vehicle_documents) AS vehicleDocsCount,
+        (SELECT MAX(created_at) FROM vehicle_documents) AS vehicleDocsUpdated,
+        (SELECT COUNT(*) FROM orders) AS ordersCount,
+        (SELECT MAX(updated_at) FROM orders) AS ordersUpdated,
+        (SELECT COUNT(*) FROM complaints) AS complaintsCount,
+        (SELECT MAX(updated_at) FROM complaints) AS complaintsUpdated,
+        (SELECT COUNT(*) FROM services) AS servicesCount,
+        (SELECT MAX(updated_at) FROM services) AS servicesUpdated,
+        (SELECT COUNT(*) FROM categories) AS categoriesCount,
+        (SELECT MAX(updated_at) FROM categories) AS categoriesUpdated,
+        (SELECT COUNT(*) FROM service_areas) AS areasCount,
+        (SELECT MAX(updated_at) FROM service_areas) AS areasUpdated,
+        (SELECT COUNT(*) FROM system_settings) AS settingsCount,
+        (SELECT MAX(updated_at) FROM system_settings) AS settingsUpdated,
+        (SELECT COUNT(*) FROM temporary_services) AS tempCount,
+        (SELECT MAX(updated_at) FROM temporary_services) AS tempUpdated,
+        (SELECT COUNT(*) FROM admin_campaigns) AS campaignsCount,
+        (SELECT MAX(updated_at) FROM admin_campaigns) AS campaignsUpdated,
+        (SELECT MAX(created_at) FROM system_events) AS eventsUpdated
+    `);
+    return { key: JSON.stringify(row) };
+  });
+
   r.get('/admin/providers', auth, adminLevel('SUPPORT'), (ctx: Ctx) => {
     const status = ctx.query['status'];
     const rows = db.all<any>(`SELECT sp.*, u.full_name, u.phone, u.email FROM service_providers sp JOIN users u ON u.id = sp.user_id ${status ? 'WHERE sp.verification_status = ?' : ''} ORDER BY sp.created_at DESC LIMIT 200`, ...(status ? [status] : []));
@@ -252,6 +296,8 @@ export function registerProviderRoutes(app: App, r: Router): void {
       const type = b.status === 'VERIFIED' ? 'PROVIDER_VERIFIED' : b.status === 'REJECTED' ? 'PROVIDER_REJECTED' : 'PROVIDER_SUSPENDED';
       app.notifications.notify(p.user_id, type, { reason: b.reason || '' });
       app.audit.log({ ctx, action: 'provider.verification_update', entityType: 'service_provider', entityId: p.id, before: { status: p.verification_status }, after: { status: b.status, reason: b.reason || null } });
+      app.sse.broadcast('sync', { scope: 'provider', providerId: p.id, reason: 'verification-updated' });
+      app.sse.broadcast('sync', { scope: 'admin', providerId: p.id, reason: 'verification-updated' });
       return { provider: app.providers.summary(p.id, ctx.locale) };
     });
   });
