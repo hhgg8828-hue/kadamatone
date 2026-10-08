@@ -88,6 +88,9 @@ function deterministic(text: string, { catalog, locale='ar' }: { catalog: Catalo
   const steps=top.slice(0,3).map(m=>({serviceId:m.serviceId,serviceSlug:m.serviceSlug,serviceName:m.serviceName,reason:forcedSlug===m.serviceSlug?'فهم مباشر للنية من صياغة الطلب':requiredCapabilities.length?'يتوافق مع القدرات المطلوبة للمهمة':'يتوافق مع كلمات الطلب',confidence:m.confidence}));
   let clarification:IntentResult['clarification']=null;
   if(!top.length){const custom=data.services.find(x=>x.slug==='custom-request');if(custom)clarification={question:'ما الخدمة التي تحتاجها؟ يمكنك وصفها بكلماتك أو إرسال صورة.',options:[{label:tr(custom.name_i18n,locale),serviceId:custom.id}]};}
+  else if((taskType==='DELIVERY' || taskType==='PICKUP_AND_DELIVERY' || taskType==='PURCHASE_AND_DELIVERY') && !item){
+    clarification={question:'ما الطلب الذي تريد توصيله؟ اكتب اسم الغرض أو صفه بكلماتك.',options:[]};
+  }
   else if(top[0].confidence<.35){clarification={question:'ما الذي تريد تنفيذه تحديدًا؟',options:top.slice(0,3).map(x=>({label:x.serviceName,serviceId:x.serviceId}))};}
   const best=data.byService.get(top[0]?.serviceId||'');
   return {matches:top,priority:urgent?'URGENT':(best?.default_priority||'NORMAL'),extracted:{urgent,when:/اليوم|today/.test(norm)?'today':/الان|حالا|فورا|now/.test(norm)?'now':null,destinationHint,purchaseIntent:purchase,compound,structured},steps,clarification,source:'RULES'};

@@ -130,6 +130,9 @@ function deterministic(text, { catalog, locale = 'ar' }) {
         if (custom)
             clarification = { question: 'ما الخدمة التي تحتاجها؟ يمكنك وصفها بكلماتك أو إرسال صورة.', options: [{ label: tr(custom.name_i18n, locale), serviceId: custom.id }] };
     }
+    else if ((taskType === 'DELIVERY' || taskType === 'PICKUP_AND_DELIVERY' || taskType === 'PURCHASE_AND_DELIVERY') && !item) {
+        clarification = { question: 'ما الطلب الذي تريد توصيله؟ اكتب اسم الغرض أو صفه بكلماتك.', options: [] };
+    }
     else if (top[0].confidence < .35) {
         clarification = { question: 'ما الذي تريد تنفيذه تحديدًا؟', options: top.slice(0, 3).map(x => ({ label: x.serviceName, serviceId: x.serviceId })) };
     }

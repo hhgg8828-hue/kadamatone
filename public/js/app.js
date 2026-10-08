@@ -740,7 +740,11 @@ async function fetchAllCustomerOrders() {
             break;
         cursor = q.nextCursor;
     }
-    return uniqueOrders(all);
+    const rank = (o) => { const st = String(o.status || ''); if (['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(st))
+        return 0; if (['PENDING', 'SEARCHING', 'ASSIGNED'].includes(st))
+        return 1; if (st === 'COMPLETED')
+        return 2; return 3; };
+    return uniqueOrders(all).sort((a, b) => rank(a) - rank(b) || (Date.parse(b.createdAt || '') - Date.parse(a.createdAt || '')));
 }
 async function customer() {
     if (!state.user) {
@@ -981,7 +985,7 @@ async function loadPersonalRecommendations() {
             box.innerHTML = '';
             return;
         }
-        box.innerHTML = `<div class="section-heading"><div><h2>مقترحة لك</h2><p class="muted">مبنية على طلباتك وعمليات بحثك أنت فقط.</p></div></div><div class="row" style="flex-wrap:wrap;gap:10px;margin-bottom:14px">${rs.slice(0, 6).map((x) => `<button class="card quick-service" data-personal-service="${esc(x.id)}" type="button"><div class="icon">${esc(x.icon || '🛠️')}</div><b>${esc(x.name)}</b><small class="muted">طلبتها/بحثت عنها ${esc(x.personalUses)} مرة</small></button>`).join('')}</div>`;
+        box.innerHTML = `<div class="section-heading"><div><h2>مقترحة لك</h2><p class="muted">مبنية على طلباتك وعمليات بحثك أنت فقط.</p></div></div><div class="personal-recommendations-grid">${rs.slice(0, 6).map((x) => `<button class="card quick-service" data-personal-service="${esc(x.id)}" type="button"><div class="icon">${esc(x.icon || '🛠️')}</div><b>${esc(x.name)}</b><small class="muted">طلبتها/بحثت عنها ${esc(x.personalUses)} مرة</small></button>`).join('')}</div>`;
         box.querySelectorAll('[data-personal-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.personalService)));
     }
     catch {
@@ -1109,6 +1113,13 @@ async function setupSimpleRequestComposer() {
                 imageFileId = up.file.id;
             }
             const understood = await api('/assist/request', { method: 'POST', body: JSON.stringify({ text, ...(imageFileId ? { imageFileId } : {}) }) });
+            if (understood.clarification?.question && !(understood.clarification.options || []).length) {
+                msg.innerHTML = `<b>${esc(understood.clarification.question)}</b>`;
+                msg.className = 'notice';
+                submit.disabled = false;
+                submit.textContent = 'إرسال الطلب ←';
+                return;
+            }
             const recommended = understood.recommended || understood.matches?.[0];
             const serviceId = recommended?.serviceId || understood.customService;
             selectedServiceId = serviceId;
@@ -1177,6 +1188,7 @@ async function setupSimpleRequestComposer() {
 function renderCustomer() {
     shell(`<section class="hero customer-simple-hero">
     ${(state.campaigns || []).slice(0, 1).map((c) => `<div class="card" style="margin-bottom:12px"><b>📣 ${esc(c.title)}</b><p>${esc(c.description || '')}</p>${c.buttonLabel ? `<button type="button" class="btn small" data-campaign-action="${esc(c.actionType)}" data-campaign-value="${esc(c.actionValue || '')}">${esc(c.buttonLabel)}</button>` : ''}</div>`).join('')}
+    <div class="khadamat-news-ticker" aria-label="رسالة خدمات"><div class="khadamat-news-track"><span>قول طلبك بطريقتك ونحن نفهمه ونبحث لك عن مقدم خدمة</span><span>اكتب أو تحدث أو ارفع صورة، وخدمات تتولى فهم طلبك</span><span>لا تحتاج معرفة اسم مقدم الخدمة؛ اشرح حاجتك فقط</span></div></div>
     <div class="simple-request-head"><div><h1>ماذا تحتاج؟</h1><p class="muted">قل طلبك بطريقتك، ونحن نفهمه ونبحث لك عن مقدم الخدمة.</p></div><span class="simple-request-badge">3 خطوات فقط</span></div>
     <form id="simpleRequestForm" class="simple-request-card">
       <div class="simple-request-step"><span>1</span><div class="field"><label for="simpleRequestText">طلبك</label><textarea id="simpleRequestText" maxlength="1000" rows="4" placeholder="مثال: أريد واحد يشتري لي بيبسي من البقالة ويوصله للبيت"></textarea><div class="row simple-request-tools"><button class="btn secondary small" id="simpleRequestVoice" type="button">🎤 تحدث</button><button class="btn secondary small" id="simpleRequestImage" type="button">📷 صورة</button><small id="simpleRequestVoiceStatus" class="muted"></small></div></div></div>
@@ -1349,7 +1361,6 @@ function switchCustomerSection(section) {
     orders.className = isServices ? 'hide-section' : '';
     st.classList.toggle('active', isServices);
     ot.classList.toggle('active', !isServices);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function openCategory(slug) { let services = []; try {
     if (slug) {
@@ -1535,10 +1546,14 @@ async function openOrderForm(serviceId, initial = null) {
         return;
     }
     const beneficiaries = beneficiaryPayload.beneficiaries || [];
-    const fields = (s.formSchema || []).map((f) => `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب التفاصيل التي تساعد مقدم الخدمة')}"></textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`).join('');
+    const requiredFields = (s.formSchema || []).filter((f) => f.required);
+    const optionalFields = (s.formSchema || []).filter((f) => !f.required);
+    const renderField = (f) => `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب المعلومة الضرورية فقط')}"></textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`;
+    const fields = requiredFields.map(renderField).join('');
+    const optionalFieldsHtml = optionalFields.length ? `<details class="optional-order-details"><summary>تفاصيل إضافية (فقط إذا كانت مهمة)</summary><div class="optional-order-fields">${optionalFields.map(renderField).join('')}</div></details>` : '';
     const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
     const suggestionHtml = descSuggestions.length ? `<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x => `<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : '';
-    showModal(`<h2>${esc(s.name)}</h2><div class="row" style="margin-bottom:10px"><button class="btn secondary small" id="nearbyProvidersBtn" type="button">📍 مقدمو الخدمة القريبون</button><span class="muted">اعرض المتاحين حول موقعك قبل إرسال الطلب.</span></div><div class="field"><label>المنطقة أو القرية (اختياري)</label><select id="orderAreaId"><option value="">سيحددها النظام من الموقع تلقائيًا</option></select><small class="muted">يمكنك اختيار مدينة أو مديرية أو عزلة أو قرية أو حارة حتى لو لم تكن منطقتك ظاهرة على الخريطة.</small></div><form id="orderForm"><div class="field description-field"><label>وصف الطلب</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه بالتفصيل">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}<div class="field location-field"><label>الموقع <span class="muted">(اختياري)</span></label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div class="location-human-fields"><div class="field"><label>القرية / الحي / المنطقة</label><input id="localityText" name="localityText" maxlength="200" placeholder="مثال: قرية كذا، عزلة كذا"></div><div class="field"><label>أقرب معلم</label><input id="landmarkText" name="landmarkText" maxlength="200" placeholder="مثال: بجانب المدرسة أو السوق"></div><div class="field"><label>وصف الوصول</label><textarea id="accessNotes" name="accessNotes" maxlength="500" placeholder="كيف يصل مقدم الخدمة إلى المكان؟"></textarea></div></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div><p class="muted">يمكنك اختيار مستفيد محفوظ أو إدخال شخص آخر دون إنشاء نظام طلب منفصل.</p></div><div class="grid"><div class="field"><label>أولوية الطلب</label><select id="orderPriority" name="priority"><option value="LOW">عادية منخفضة</option><option value="NORMAL" selected>عادية</option><option value="URGENT">🚨 مستعجل — بأسرع وقت</option></select></div><div class="field"><label>موعد التنفيذ <span class="muted">(اختياري)</span></label><input id="scheduledAt" name="scheduledAt" type="datetime-local"><small class="muted">إذا حددت موعدًا، سيظهر لمقدم الخدمة كطلب مجدول ولن يعامل كطلب فوري.</small></div></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
+    showModal(`<h2>${esc(s.name)}</h2><div class="row" style="margin-bottom:10px"><button class="btn secondary small" id="nearbyProvidersBtn" type="button">📍 مقدمو الخدمة القريبون</button><span class="muted">اعرض المتاحين حول موقعك قبل إرسال الطلب.</span></div><div class="field"><label>المنطقة أو القرية (اختياري)</label><select id="orderAreaId"><option value="">سيحددها النظام من الموقع تلقائيًا</option></select><small class="muted">يمكنك اختيار مدينة أو مديرية أو عزلة أو قرية أو حارة حتى لو لم تكن منطقتك ظاهرة على الخريطة.</small></div><form id="orderForm"><div class="field beneficiary-first"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div></div><div class="field description-field"><label>ماذا تريد؟</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}${optionalFieldsHtml}<div class="field location-field"><label>الموقع</label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div class="location-human-fields"><div class="field"><label>وصف الموقع عند الحاجة</label><input id="localityText" name="localityText" maxlength="300" placeholder="مثال: القرية أو الحي أو أقرب معلم"></div></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
     document.getElementById('nearbyProvidersBtn')?.addEventListener('click', () => { const la = Number(document.getElementById('lat')?.value); const ln = Number(document.getElementById('lng')?.value); openNearbyProviders(serviceId, Number.isFinite(la) ? la : undefined, Number.isFinite(ln) ? ln : undefined); });
     try {
         const areas = (await api('/areas')).areas || [];
@@ -1553,12 +1568,6 @@ async function openOrderForm(serviceId, initial = null) {
         }
     }
     catch { }
-    const priorityEl = document.getElementById('orderPriority');
-    if (priorityEl)
-        priorityEl.value = String(s.defaultPriority || 'NORMAL');
-    const scheduledEl = document.getElementById('scheduledAt');
-    if (scheduledEl)
-        scheduledEl.min = new Date().toISOString().slice(0, 16);
     document.getElementById('beneficiarySelect')?.addEventListener('change', e => { const v = e.target.value; document.getElementById('otherRecipient')?.classList.toggle('hide-section', v !== '__other__'); });
     document.querySelectorAll('[data-description-suggestion]').forEach(x => x.addEventListener('click', () => { const t = document.getElementById('orderDescription'); if (t) {
         t.value = x.dataset.descriptionSuggestion || '';
@@ -1758,8 +1767,8 @@ async function openOrderForm(serviceId, initial = null) {
                 msg.className = 'muted';
             }
         }
-        const chosenPriority = String(document.getElementById('orderPriority')?.value || s.defaultPriority || 'NORMAL');
-        const scheduledAt = String(document.getElementById('scheduledAt')?.value || '');
+        const chosenPriority = String(s.defaultPriority || 'NORMAL');
+        const scheduledAt = '';
         const b = { serviceId, description: String(fd.get('description')), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: chosenPriority, scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined, ...(initial?.assistantSessionId ? { assistantSessionId: initial.assistantSessionId } : {}) };
         const selectedAreaId = String(document.getElementById('orderAreaId')?.value || '');
         if (selectedAreaId)

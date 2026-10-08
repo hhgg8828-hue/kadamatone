@@ -46,9 +46,10 @@ export function createAssignmentService(app) {
             });
         },
         offerOpenOrdersToProvider(providerId) {
-            const openMinutes = app.settings.get('assignment.request_open_minutes');
-            const cutoff = new Date(app.clock.now() - openMinutes * 60_000).toISOString();
-            const rows = db.all(`SELECT * FROM orders WHERE status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL AND created_at >= ? ORDER BY created_at ASC LIMIT 100`, cutoff);
+            // الطلبات المفتوحة لا تعتمد على وقت فتح مقدم الخدمة ولا على مهلة عمر للطلب.
+            // إذا كان الطلب ما زال SEARCHING/ASSIGNED ولم يُسند، فيجب أن يدخل المطابقة
+            // لمقدم خدمة مناسب حتى لو أُنشئ قبل دخوله استقبال الطلبات بوقت.
+            const rows = db.all(`SELECT * FROM orders WHERE status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL ORDER BY created_at ASC LIMIT 500`);
             let offered = 0;
             for (const o of rows) {
                 const excluded = db.all("SELECT provider_id FROM order_assignments WHERE order_id=? AND provider_id=? AND status IN ('REJECTED','EXPIRED','ACCEPTED')", o.id, providerId);
@@ -180,16 +181,8 @@ export function createAssignmentService(app) {
                 }
                 if (!o.search_exhausted_at) {
                     const full = db.get('SELECT * FROM orders WHERE id = ?', o.id);
-                    const openMinutes = app.settings.get('assignment.request_open_minutes');
-                    const stillOpen = Date.parse(full.created_at) + openMinutes * 60_000 > now;
-                    if (stillOpen)
-                        continue;
-                    const stamp = iso(app.clock.now());
-                    db.run("UPDATE orders SET status='SEARCHING', search_exhausted_at=?, updated_at=?, version=version+1 WHERE id=?", stamp, stamp, o.id);
-                    app.notifications.notify(full.customer_id, 'NO_PROVIDER_FOUND', { code: full.code });
-                    app.notifications.notifyAdmins('NO_PROVIDER_FOUND_ADMIN', { code: full.code });
-                    notifiedExhausted.add(o.id);
-                    exhausted++;
+                    // عدم وجود مقدم خدمة الآن لا يعني انتهاء الطلب. يبقى الطلب مفتوحًا،
+                    // وسيُعاد عرضه تلقائيًا عندما يدخل مقدم خدمة مناسب وضع استقبال الطلبات.
                     continue;
                 }
                 if (Date.parse(o.search_exhausted_at) + retryMs <= now) {

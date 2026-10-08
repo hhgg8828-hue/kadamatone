@@ -193,8 +193,8 @@ export function registerProviderRoutes(app, r) {
         const now = iso(app.clock.now());
         db.run('UPDATE service_providers SET accepting_orders=?,last_seen_at=?,last_heartbeat_at=?,updated_at=? WHERE id=?', accepting ? 1 : 0, now, now, now, p.id);
         if (accepting) {
-            const openMinutes = app.settings.get('assignment.request_open_minutes');
-            const cutoff = new Date(app.clock.now() - openMinutes * 60_000).toISOString();
+            // عند فتح استقبال الطلبات، افحص الطلبات المفتوحة الموجودة أصلًا،
+            // وليس الطلبات التي أُنشئت بعد لحظة الفتح فقط.
             app.assignment.offerOpenOrdersToProvider(p.id);
         }
         for (const a of db.all("SELECT u.id FROM users u JOIN admin_users au ON au.user_id=u.id WHERE u.status='ACTIVE'"))

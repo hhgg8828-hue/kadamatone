@@ -383,3 +383,17 @@ body{background:radial-gradient(circle at 5% 0%,rgba(91,61,245,.12),transparent 
 /* V82.6 */
 .customer-mini-profile{display:flex;align-items:center;gap:12px}
 .customer-mini-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;flex:0 0 42px;border:2px solid rgba(35,122,115,.14);background:#f3f6f5;display:grid;place-items:center}
+
+
+/* V82.8 — واجهة عميل مختصرة */
+.khadamat-news-ticker{overflow:hidden;border:1px solid rgba(91,61,245,.12);background:#fff;border-radius:14px;margin:0 0 12px;padding:9px 0;direction:rtl;box-shadow:var(--shadow-sm)}
+.khadamat-news-track{display:flex;width:max-content;animation:khadamatTicker 24s linear infinite;gap:70px;padding-inline:28px;white-space:nowrap;color:#475467;font-size:13px;font-weight:700}
+.khadamat-news-track span::before{content:'•';margin-left:10px;color:#765cff}
+@keyframes khadamatTicker{from{transform:translateX(0)}to{transform:translateX(50%)}}
+.personal-recommendations-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.personal-recommendations-grid .quick-service{min-width:0}
+.optional-order-details{margin:10px 0 14px;border:1px solid var(--line);border-radius:14px;background:#fbfcfe;padding:11px 13px}
+.optional-order-details summary{cursor:pointer;font-weight:800;color:#475467}
+.optional-order-fields{padding-top:10px}
+.beneficiary-first{padding-bottom:4px}
+@media(max-width:420px){.personal-recommendations-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
