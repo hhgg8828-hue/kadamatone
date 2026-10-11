@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.2.0",
-  "description": "خدمات (Khadamat) — الإصدار 2.2: تسجيل دخول مستمر وتحديد الموقع قبل الدخول",
+  "version": "2.5.0",
+  "description": "خدمات (Khadamat) — الإصدار 2.5: واجهة وصول سريع مختصرة ومطابقة الخدمات المتاحة",
   "private": true,
   "type": "module",
   "engines": {
