@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, tr, round, haversineKm } from '../core/util.js';
 import { auth, roles, adminLevel } from './auth.middleware.js';
@@ -50,13 +51,24 @@ export function createProviders(app) {
                 verified: base.verified, rating: base.rating, completedOrders: base.completedOrders, isOnline: base.isOnline, acceptingOrders: base.acceptingOrders, lastHeartbeatAt: base.lastHeartbeatAt, lastLocationAt: base.lastLocationAt, acceptanceRate: base.acceptanceRate, responseTimeAvgSec: base.responseTimeAvgSec, responseTimeText: base.responseTimeText, availabilityStatus: base.availabilityStatus, availabilityStatusText: base.availabilityStatusText, featured: base.featured, services: base.services, areas: base.areas, availability: base.availability, workPhotos: works, recentReviews: reviews };
         },
         earnings(providerId) {
+            // Historical earnings must use the commission/payout snapshot captured at completion,
+            // not today's editable platform rate. Legacy rows fall back to the current rate only
+            // when no financial snapshot exists.
             const commission = app.settings.get('platform.commission_percent');
-            const row = db.get(`SELECT COUNT(*) n, COALESCE(SUM(agreed_price),0) gross FROM orders WHERE provider_id = ? AND status = 'COMPLETED'`, providerId);
+            const row = db.get(`SELECT COUNT(*) n,
+        COALESCE(SUM(COALESCE(agreed_price,price_snapshot,0)),0) gross,
+        COALESCE(SUM(COALESCE(commission_amount, ROUND(COALESCE(agreed_price,price_snapshot,0) * COALESCE(commission_rate_snapshot,?) / 100))),0) commission,
+        COALESCE(SUM(COALESCE(provider_payout_amount, COALESCE(agreed_price,price_snapshot,0) - ROUND(COALESCE(agreed_price,price_snapshot,0) * COALESCE(commission_rate_snapshot,?) / 100))),0) net
+        FROM orders WHERE provider_id = ? AND status = 'COMPLETED'`, commission, commission, providerId);
             const pending = db.get(`SELECT COALESCE(SUM(agreed_price),0) v, COUNT(*) n FROM orders WHERE provider_id = ? AND status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')`, providerId);
-            const byMonth = db.all(`SELECT substr(completed_at,1,7) month, COUNT(*) orders, COALESCE(SUM(agreed_price),0) gross FROM orders WHERE provider_id = ? AND status = 'COMPLETED' GROUP BY 1 ORDER BY 1 DESC LIMIT 12`, providerId)
-                .map((m) => ({ month: m.month, orders: m.orders, gross: round(m.gross), net: round(m.gross * (1 - commission / 100)) }));
-            return { currency: app.settings.get('platform.currency'), commissionPercent: commission, completedOrders: row.n, gross: round(row.gross), commission: round(row.gross * commission / 100), net: round(row.gross * (1 - commission / 100)),
-                pendingValue: round(pending.v), pendingOrders: pending.n, byMonth, note: 'الدفع نقدي مباشر بين العميل ومقدم الخدمة؛ الأرباح تقديرية وفق نسبة العمولة.' };
+            const byMonth = db.all(`SELECT substr(completed_at,1,7) month, COUNT(*) orders,
+        COALESCE(SUM(COALESCE(agreed_price,price_snapshot,0)),0) gross,
+        COALESCE(SUM(COALESCE(commission_amount, ROUND(COALESCE(agreed_price,price_snapshot,0) * COALESCE(commission_rate_snapshot,?) / 100))),0) commission,
+        COALESCE(SUM(COALESCE(provider_payout_amount, COALESCE(agreed_price,price_snapshot,0) - ROUND(COALESCE(agreed_price,price_snapshot,0) * COALESCE(commission_rate_snapshot,?) / 100))),0) net
+        FROM orders WHERE provider_id = ? AND status = 'COMPLETED' GROUP BY 1 ORDER BY 1 DESC LIMIT 12`, commission, commission, providerId)
+                .map((m) => ({ month: m.month, orders: m.orders, gross: round(m.gross), commission: round(m.commission), net: round(m.net) }));
+            return { currency: app.settings.get('platform.currency'), commissionPercent: commission, completedOrders: row.n, gross: round(row.gross), commission: round(row.commission), net: round(row.net),
+                pendingValue: round(pending.v), pendingOrders: pending.n, byMonth, note: 'الدفع نقدي مباشر بين العميل ومقدم الخدمة؛ الأرباح المكتملة محسوبة وفق لقطة العمولة المسجلة وقت إكمال الطلب.' };
         },
     };
     return svc;
@@ -219,6 +231,10 @@ export function registerProviderRoutes(app, r) {
             else
                 db.run(`UPDATE provider_presence_sessions SET ended_at=?,last_seen_at=? WHERE provider_id=? AND ended_at IS NULL`, now, now, pid(ctx));
         });
+        // When a provider comes online, immediately offer still-open matching orders
+        // created before this moment. Do not wait for the next periodic retry window.
+        if (online)
+            app.assignment.offerOpenOrdersToProvider(pid(ctx));
         app.sse.send(ctx.user.id, 'sync', { scope: 'provider' });
         for (const a of db.all("SELECT u.id FROM users u JOIN admin_users au ON au.user_id=u.id WHERE u.status='ACTIVE'"))
             app.sse.send(a.id, 'sync', { scope: 'provider', providerId: pid(ctx) });
@@ -300,7 +316,7 @@ export function registerProviderRoutes(app, r) {
     }));
     r.post('/provider/vehicles', ...isProvider, (ctx) => {
         const b = parse(s.obj({ vehicleType: s.oneOf(['MOTORCYCLE', 'CAR', 'PICKUP', 'VAN', 'TRUCK'], { optional: true, default: 'MOTORCYCLE' }), make: s.str({ max: 80, optional: true }), model: s.str({ max: 80, optional: true }), year: s.int({ min: 1950, max: 2100, optional: true }), color: s.str({ max: 40, optional: true }), plateNumber: s.str({ max: 40, optional: true }) }), ctx.body);
-        const idem = String(ctx.req.headers['idempotency-key'] || '').trim();
+        const idem = readIdempotencyKey(ctx.req.headers['idempotency-key']);
         const providerId = pid(ctx);
         if (idem) {
             const old = db.get('SELECT * FROM provider_vehicles WHERE provider_id=? AND idempotency_key=?', providerId, idem);

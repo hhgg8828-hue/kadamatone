@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.33",
-  "description": "خدمات (Khadamat) — V81 separate installable customer/provider/admin experiences",
+  "version": "0.6.54",
+  "description": "خدمات (Khadamat) — V84.10 trip share lifecycle privacy",
   "private": true,
   "type": "module",
   "engines": {
@@ -16,7 +16,7 @@
     "seed:demo": "node dist/src/db/cli.js seed --demo",
     "backup": "node dist/src/db/cli.js backup",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test --test-concurrency=1 \"dist/test/**/*.test.js\""
+    "test": "npm run build && bash scripts/run-tests.sh"
   },
   "devDependencies": {
     "typescript": "5.8.3",

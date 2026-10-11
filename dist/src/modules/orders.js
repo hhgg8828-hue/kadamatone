@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, tr, pageParams, cursorSql, finishPage, parseJson } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
@@ -33,7 +34,7 @@ const isParticipant = (o, ctx) => {
     if (ctx.user.role === 'PROVIDER') {
         if (o.provider_id === ctx.user.providerId)
             return true;
-        return !!ctx.app.db.get('SELECT 1 FROM order_assignments WHERE order_id = ? AND provider_id = ?', o.id, ctx.user.providerId);
+        return !!ctx.app.db.get("SELECT 1 FROM order_assignments WHERE order_id = ? AND provider_id = ? AND status IN ('OFFERED','ACCEPTED')", o.id, ctx.user.providerId);
     }
     return false;
 };
@@ -96,6 +97,12 @@ export function createOrders(app) {
             if (!res.changes)
                 throw E.conflict('تم تعديل الطلب من عملية أخرى، أعد المحاولة', 'VERSION_CONFLICT');
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,metadata,created_at) VALUES (?,?,?,?,?,?,?,?)', o.id, o.status, to, ctx.user?.id ?? null, actorRole, reason ?? null, metadata ? JSON.stringify(metadata) : null, now);
+            // A public share is bound to the current execution context. Once an order
+            // leaves an executable state, revoke the token so it cannot reactivate if
+            // the order is later reassigned or restored by an administrative action.
+            if (!['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(to)) {
+                db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', now, o.id);
+            }
             executionEvent(app, o.id, 'STATUS', `تغيرت حالة الطلب إلى ${to}`, reason, actorRole, ctx.user?.id, metadata || {});
             if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED')
                 db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?', to, now, o.id);
@@ -131,7 +138,7 @@ export function registerOrderRoutes(app, r) {
         const formData = validateFormData(fields, b.formData);
         if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now())
             throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
-        const idemKey = String(ctx.req.headers['idempotency-key'] || '') || null;
+        const idemKey = readIdempotencyKey(ctx.req.headers['idempotency-key']);
         return db.tx(() => {
             if (idemKey) {
                 const dup = db.get('SELECT * FROM orders WHERE customer_id = ? AND idempotency_key = ?', ctx.user.id, idemKey);
@@ -203,11 +210,28 @@ export function registerOrderRoutes(app, r) {
                 ctx.status = 200;
                 return { order: orders.serialize(same, ctx), idempotent: true, duplicatePrevented: true };
             }
+            // Validate all client-supplied references before writing the order. Silently
+            // dropping invalid attachment IDs made a successful order differ from what
+            // the customer submitted and could hide an upload/ownership problem.
+            const attachmentIds = b.attachmentFileIds || [];
+            if (new Set(attachmentIds).size !== attachmentIds.length) {
+                throw E.unprocessable('لا يمكن إرفاق الملف نفسه أكثر من مرة', 'DUPLICATE_ATTACHMENT');
+            }
+            for (const fid of attachmentIds) {
+                if (!db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user.id)) {
+                    throw E.unprocessable('يوجد ملف مرفق غير صالح أو لا تملك صلاحية استخدامه', 'INVALID_ATTACHMENT');
+                }
+            }
+            if (b.recipientUserId) {
+                const recipient = db.get('SELECT id,status FROM users WHERE id=?', b.recipientUserId);
+                if (!recipient || recipient.status !== 'ACTIVE')
+                    throw E.unprocessable('حساب المستفيد غير موجود أو غير نشط', 'INVALID_RECIPIENT');
+            }
             const id = uuid();
             const now = new Date(app.clock.now());
             const nowIso = iso(app.clock.now());
             const code = genCode(db, now);
-            const attachments = (b.attachmentFileIds || []).filter((fid) => db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user.id));
+            const attachments = attachmentIds;
             db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,
                 pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id, b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get('platform.currency'), b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName || null, b.recipientPhone || null, b.recipientUserId || null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
@@ -250,6 +274,13 @@ export function registerOrderRoutes(app, r) {
     r.post('/orders/:id/cancel', auth, (ctx) => {
         const b = parse(s.obj({ reason: s.str({ max: 300, optional: true }) }), ctx.body);
         return db.tx(() => {
+            // Preserve an explicit forbidden response for cancellation attempts against another provider's order,
+            // while detail/task/timeline reads require a current offer or assignment.
+            if (ctx.user.role === 'PROVIDER') {
+                const current = db.get('SELECT * FROM orders WHERE id = ?', ctx.params['id']);
+                if (current && current.provider_id !== ctx.user.providerId)
+                    throw E.forbidden();
+            }
             const o = orders.getOwned(ctx.params['id'], ctx);
             if (!CANCELLABLE_ORDER.includes(o.status))
                 throw E.unprocessable('لا يمكن إلغاء الطلب في هذه الحالة', 'NOT_CANCELLABLE');
@@ -270,6 +301,7 @@ export function registerOrderRoutes(app, r) {
             const now = iso(app.clock.now());
             db.run(`UPDATE orders SET status='CANCELLED', cancelled_by_role=?, cancel_reason=?, cancellation_fee=?, cancelled_at=?, updated_at=?, version=version+1 WHERE id=? AND version=?`, actorRole, b.reason || null, fee, now, now, o.id, o.version);
             db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', o.id, o.status, 'CANCELLED', ctx.user.id, actorRole, b.reason || null, now);
+            db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', now, o.id);
             db.run(`UPDATE order_assignments SET status='WITHDRAWN', responded_at=? WHERE order_id=? AND status='OFFERED'`, now, o.id);
             db.run(`UPDATE quotes SET status='WITHDRAWN', updated_at=? WHERE order_id=? AND status='SUBMITTED'`, now, o.id);
             if (o.provider_id)

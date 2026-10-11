@@ -178,9 +178,9 @@ export class HybridIntentParser {
             response_format: { type: 'json_object' },
             messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }],
         };
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('AI intent timeout')), this.config.aiIntentTimeoutMs));
         const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.aiIntentKey}` };
-        const res = await Promise.race([fetch(this.config.aiIntentUrl, { method: 'POST', headers, body: JSON.stringify(body) }), timeout]);
+        // Abort the underlying request on timeout instead of racing it against an uncancelled timer.
+        const res = await fetch(this.config.aiIntentUrl, { method: 'POST', headers, body: JSON.stringify(body), signal: globalThis.AbortSignal.timeout(this.config.aiIntentTimeoutMs) });
         if (!res.ok)
             throw new Error(`AI intent HTTP ${res.status}`);
         const j = await res.json();

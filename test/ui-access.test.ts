@@ -9,20 +9,21 @@ const provider = fs.readFileSync(path.join(root, 'provider.html'), 'utf8');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 test('customer shell exposes the provider portal', () => {
-  assert.ok(app.includes('href="/provider.html"'));
-  assert.ok(app.includes('واجهة مقدم الخدمة'));
+  assert.ok(app.includes('data-role="PROVIDER"'));
+  assert.ok(app.includes('مقدم خدمة'));
+  assert.ok(provider.includes('data-page="provider"'));
 });
 
 test('provider auth exposes provider registration and customer switch', () => {
-  assert.ok(app.includes("next==='provider'"));
+  assert.ok(app.includes('data-role="PROVIDER"'));
   assert.ok(app.includes('إنشاء حساب مقدم خدمة'));
-  assert.ok(app.includes('منصة مقدم الخدمة'));
+  assert.ok(app.includes('مقدم خدمة'));
 });
 
 test('provider page and frontend assets use the current version', () => {
   assert.ok(provider.includes('data-page="provider"'));
-  assert.ok(provider.includes('app.js?v=80.0')); 
-  assert.ok(index.includes('app.js?v=80.0')); 
+  assert.ok(provider.includes('app.js?v=84.10')); 
+  assert.ok(index.includes('app.js?v=84.10')); 
 });
 
 
@@ -32,10 +33,9 @@ test('provider order action is not nested inside the clickable order detail butt
 });
 
 test('provider portal does not redirect an existing customer back to the customer home', () => {
-  assert.ok(app.includes("if(state.user!.role!=='PROVIDER')"));
-  assert.ok(app.includes("authBox('provider');"));
-  assert.ok(app.includes('هذا الحساب حساب عميل'));
-  assert.ok(!app.includes("if(state.user!.role!=='PROVIDER'){location.href='/';return}"));
+  assert.ok(app.includes("if(state.user!.role!=='PROVIDER'){redirectToRole(state.user!.role);return}"));
+  assert.ok(app.includes("const expected=roleHome(state.user!.role)"));
+  assert.ok(app.includes("location.replace(expected)"));
 });
 
 test('provider route alias serves the provider page', () => {

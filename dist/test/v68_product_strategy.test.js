@@ -57,8 +57,8 @@ test('V68: الاتصال داخل الطلب لا يكشف الرقم إلا ل
         const providerId = t.app.db.get('SELECT id FROM service_providers WHERE user_id=?', p.body.user.id).id;
         t.app.db.run(`UPDATE orders SET provider_id=?,status='ACCEPTED' WHERE id=?`, providerId, oid);
         const cp = await t.api('GET', `/api/v1/orders/${oid}/contact`, { token: p.body.accessToken });
-        assert.equal(cp.status, 200, cp.text);
-        assert.equal(cp.body.phone, c.body.user.phone);
+        assert.equal(cp.status, 403, cp.text);
+        assert.equal(cp.body.error.code, 'CONTACT_PHONE_PRIVATE');
     }
     finally {
         await t.close();
@@ -92,8 +92,8 @@ test('V68: ملفات الواجهة تشير إلى إصدار الكاش ال�
     const index = fs.readFileSync('public/index.html', 'utf8');
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const sw = fs.readFileSync('public/sw.js', 'utf8');
-    assert.ok(index.includes('app.js?v=80.0'));
-    assert.ok(sw.includes('khadamat-shell-v80'));
+    assert.ok(index.includes('app.js?v=84.10'));
+    assert.ok(sw.includes('khadamat-shell-v84-10'));
     assert.ok(app.includes('أقرب معلم'));
     assert.ok(app.includes('customerMainCategories'));
 });

@@ -30,8 +30,15 @@ export function registerFileRoutes(app: App, r: Router): void {
   const { db } = app;
 
   r.post('/files', auth, limit('upload', { max: 40, windowMs: 3600_000, key: (c: Ctx) => c.user?.id || c.ip }), (ctx: Ctx) => {
-    const b = parse<{ purpose: typeof PURPOSES[number]; name?: string; dataBase64: string }>(s.obj({ purpose: s.oneOf(PURPOSES), name: s.str({ max: 120, optional: true }), dataBase64: s.str({ min: 8, trim: false }) }), ctx.body);
-    const buf = Buffer.from(b.dataBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    const b = parse<{ purpose: typeof PURPOSES[number]; name?: string; dataBase64: string }>(s.obj({ purpose: s.oneOf(PURPOSES), name: s.str({ max: 120, optional: true }), dataBase64: s.str({ min: 8, max: 7_000_000, trim: false }) }), ctx.body);
+    const encoded = b.dataBase64.replace(/^data:[^;]+;base64,/, '');
+    // Buffer.from(base64) is deliberately permissive and may ignore invalid
+    // characters. Validate canonical Base64 before allocating/accepting bytes.
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) {
+      throw E.unprocessable('ترميز الملف غير صالح', 'INVALID_BASE64');
+    }
+    const buf = Buffer.from(encoded, 'base64');
+    if (buf.toString('base64') !== encoded) throw E.unprocessable('ترميز الملف غير صالح', 'INVALID_BASE64');
     if (!buf.length) throw E.unprocessable('الملف فارغ', 'EMPTY_FILE');
     if (buf.length > MAX_BYTES) throw E.unprocessable('حجم الملف يتجاوز 5MB', 'FILE_TOO_LARGE');
     const mime = sniff(buf);
@@ -53,8 +60,18 @@ export function registerFileRoutes(app: App, r: Router): void {
       auth(ctx); // الملفات الخاصة تتطلب تسجيل الدخول
       const u = ctx.user!;
       let ok = u.role === 'ADMIN' || f.owner_id === u.id;
-      if (!ok && u.role === 'PROVIDER' && f.purpose === 'order_attachment') {
-        ok = !!db.get(`SELECT 1 FROM orders o, json_each(o.attachments) je WHERE je.value = ? AND (o.provider_id = ? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id = o.id AND a.provider_id = ? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId) || !!db.get(`SELECT 1 FROM order_messages m JOIN orders o ON o.id=m.order_id, json_each(m.attachments) je WHERE je.value=? AND (o.provider_id=? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id=o.id AND a.provider_id=? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId);
+      if (!ok && f.purpose === 'order_attachment' && u.role === 'PROVIDER' && u.providerId) {
+        // A provider may view files attached to an order only while that provider
+        // owns the order or has an active offer/acceptance for it.
+        ok = !!db.get(`SELECT 1 FROM orders o, json_each(o.attachments) je WHERE je.value = ? AND (o.provider_id = ? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id = o.id AND a.provider_id = ? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId)
+          || !!db.get(`SELECT 1 FROM order_messages m JOIN orders o ON o.id=m.order_id, json_each(m.attachments) je WHERE je.value=? AND (o.provider_id=? OR EXISTS (SELECT 1 FROM order_assignments a WHERE a.order_id=o.id AND a.provider_id=? AND a.status IN ('OFFERED','ACCEPTED')))`, f.id, u.providerId, u.providerId);
+      }
+      if (!ok && f.purpose === 'order_attachment' && u.role === 'CUSTOMER') {
+        // Symmetric access for the customer who owns the order: without this,
+        // customer-owned uploads worked but provider-sent chat attachments were
+        // inaccessible to the customer receiving them.
+        ok = !!db.get(`SELECT 1 FROM orders o, json_each(o.attachments) je WHERE je.value=? AND o.customer_id=?`, f.id, u.id)
+          || !!db.get(`SELECT 1 FROM order_messages m JOIN orders o ON o.id=m.order_id, json_each(m.attachments) je WHERE je.value=? AND o.customer_id=?`, f.id, u.id);
       }
       if (!ok) throw E.forbidden();
     }

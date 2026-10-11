@@ -1,5 +1,6 @@
 import { s, parse, type Schema } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, tr, pageParams, cursorSql, finishPage, parseJson } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
@@ -54,7 +55,7 @@ const isParticipant = (o: OrderRow, ctx: Ctx): boolean => {
   if (ctx.user.role === 'CUSTOMER') return o.customer_id === ctx.user.id;
   if (ctx.user.role === 'PROVIDER') {
     if (o.provider_id === ctx.user.providerId) return true;
-    return !!ctx.app.db.get('SELECT 1 FROM order_assignments WHERE order_id = ? AND provider_id = ?', o.id, ctx.user.providerId);
+    return !!ctx.app.db.get("SELECT 1 FROM order_assignments WHERE order_id = ? AND provider_id = ? AND status IN ('OFFERED','ACCEPTED')", o.id, ctx.user.providerId);
   }
   return false;
 };
@@ -110,6 +111,12 @@ export function createOrders(app: App): Orders {
       if (!res.changes) throw E.conflict('تم تعديل الطلب من عملية أخرى، أعد المحاولة', 'VERSION_CONFLICT');
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,metadata,created_at) VALUES (?,?,?,?,?,?,?,?)',
         o.id, o.status, to, ctx.user?.id ?? null, actorRole, reason ?? null, metadata ? JSON.stringify(metadata) : null, now);
+      // A public share is bound to the current execution context. Once an order
+      // leaves an executable state, revoke the token so it cannot reactivate if
+      // the order is later reassigned or restored by an administrative action.
+      if (!['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(to)) {
+        db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', now, o.id);
+      }
       executionEvent(app,o.id,'STATUS',`تغيرت حالة الطلب إلى ${to}`,reason,actorRole,ctx.user?.id,metadata||{});
       if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED') db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?',to,now,o.id);
       if (to === 'COMPLETED' && o.provider_id) {
@@ -144,7 +151,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
     const fields = parseJson<FormField[]>(svc.form_schema, []) ?? [];
     const formData = validateFormData(fields, b.formData);
     if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now()) throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
-    const idemKey = String(ctx.req.headers['idempotency-key'] || '') || null;
+    const idemKey = readIdempotencyKey(ctx.req.headers['idempotency-key']);
 
     return db.tx(() => {
       if (idemKey) {
@@ -204,9 +211,26 @@ export function registerOrderRoutes(app: App, r: Router): void {
         return { order: orders.serialize(same, ctx), idempotent: true, duplicatePrevented: true };
       }
 
+      // Validate all client-supplied references before writing the order. Silently
+      // dropping invalid attachment IDs made a successful order differ from what
+      // the customer submitted and could hide an upload/ownership problem.
+      const attachmentIds = b.attachmentFileIds || [];
+      if (new Set(attachmentIds).size !== attachmentIds.length) {
+        throw E.unprocessable('لا يمكن إرفاق الملف نفسه أكثر من مرة', 'DUPLICATE_ATTACHMENT');
+      }
+      for (const fid of attachmentIds) {
+        if (!db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user!.id)) {
+          throw E.unprocessable('يوجد ملف مرفق غير صالح أو لا تملك صلاحية استخدامه', 'INVALID_ATTACHMENT');
+        }
+      }
+      if (b.recipientUserId) {
+        const recipient = db.get<{ id: string; status: string }>('SELECT id,status FROM users WHERE id=?', b.recipientUserId);
+        if (!recipient || recipient.status !== 'ACTIVE') throw E.unprocessable('حساب المستفيد غير موجود أو غير نشط', 'INVALID_RECIPIENT');
+      }
+
       const id = uuid(); const now = new Date(app.clock.now()); const nowIso = iso(app.clock.now());
       const code = genCode(db, now);
-      const attachments = (b.attachmentFileIds || []).filter((fid) => db.get(`SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'order_attachment'`, fid, ctx.user!.id));
+      const attachments = attachmentIds;
       db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,
                 pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -249,6 +273,12 @@ export function registerOrderRoutes(app: App, r: Router): void {
   r.post('/orders/:id/cancel', auth, (ctx: Ctx) => {
     const b = parse<{ reason?: string }>(s.obj({ reason: s.str({ max: 300, optional: true }) }), ctx.body);
     return db.tx(() => {
+      // Preserve an explicit forbidden response for cancellation attempts against another provider's order,
+      // while detail/task/timeline reads require a current offer or assignment.
+      if (ctx.user!.role === 'PROVIDER') {
+        const current = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', ctx.params['id']!);
+        if (current && current.provider_id !== ctx.user!.providerId) throw E.forbidden();
+      }
       const o = orders.getOwned(ctx.params['id']!, ctx);
       if (!CANCELLABLE_ORDER.includes(o.status)) throw E.unprocessable('لا يمكن إلغاء الطلب في هذه الحالة', 'NOT_CANCELLABLE');
       const actorRole: ActorRole = ctx.user!.role as ActorRole;
@@ -268,6 +298,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
       db.run(`UPDATE orders SET status='CANCELLED', cancelled_by_role=?, cancel_reason=?, cancellation_fee=?, cancelled_at=?, updated_at=?, version=version+1 WHERE id=? AND version=?`,
         actorRole, b.reason || null, fee, now, now, o.id, o.version);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', o.id, o.status, 'CANCELLED', ctx.user!.id, actorRole, b.reason || null, now);
+      db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', now, o.id);
       db.run(`UPDATE order_assignments SET status='WITHDRAWN', responded_at=? WHERE order_id=? AND status='OFFERED'`, now, o.id);
       db.run(`UPDATE quotes SET status='WITHDRAWN', updated_at=? WHERE order_id=? AND status='SUBMITTED'`, now, o.id);
       if (o.provider_id) app.payment.onCancelled(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!);

@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, tr } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
@@ -26,7 +27,7 @@ export function registerCustomerExperienceRoutes(app: App, r: Router): void {
 
   r.get('/me/beneficiaries', auth, roles('CUSTOMER'), (ctx: Ctx) => ({ beneficiaries: db.all<any>('SELECT * FROM customer_beneficiaries WHERE customer_id=? ORDER BY updated_at DESC',ctx.user!.id).map(b=>serializeBeneficiary(app,b,ctx.locale)) }));
   r.post('/me/beneficiaries', auth, roles('CUSTOMER'), (ctx: Ctx) => {
-    const b=parse<any>(beneficiarySchema,ctx.body); const idem=String(ctx.req.headers['idempotency-key']||'').trim().slice(0,128);
+    const b=parse<any>(beneficiarySchema,ctx.body); const idem=readIdempotencyKey(ctx.req.headers['idempotency-key']);
     if(idem){const old=db.get<any>('SELECT * FROM customer_beneficiaries WHERE customer_id=? AND idempotency_key=?',ctx.user!.id,idem);if(old){ctx.status=200;return {beneficiary:serializeBeneficiary(app,old,ctx.locale),idempotent:true};}}
     const id=uuid(),now=iso(app.clock.now()); let locId=null;
     if(b.location) locId=app.locations.create(b.location).id;

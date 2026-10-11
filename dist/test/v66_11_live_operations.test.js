@@ -111,6 +111,13 @@ test('V66.13: إكمال مشوار يحسب المسافة الفعلية من 
         const trip = t.app.db.get('SELECT distance_km distanceKm,fare FROM trip_orders WHERE order_id=?', id);
         assert.ok(trip.distanceKm > 0);
         assert.equal(done.body.order.agreedPrice, trip.fare);
+        const completed = t.app.db.get('SELECT agreed_price agreedPrice,commission_amount commissionAmount,provider_payout_amount providerPayoutAmount FROM orders WHERE id=?', id);
+        assert.equal(completed.agreedPrice, trip.fare);
+        assert.equal(completed.commissionAmount, Math.round(trip.fare * Number(t.app.settings.get('platform.commission_percent'))) / 100);
+        assert.equal(completed.providerPayoutAmount, trip.fare - completed.commissionAmount);
+        const payment = t.app.db.get('SELECT amount,status FROM payments WHERE order_id=? ORDER BY created_at DESC LIMIT 1', id);
+        assert.equal(payment.amount, trip.fare);
+        assert.equal(payment.status, 'PAID');
     }
     finally {
         await t.close();

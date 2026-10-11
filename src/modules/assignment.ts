@@ -25,8 +25,15 @@ export function createAssignmentService(app: App): AssignmentService {
   const svc: AssignmentService = {
     assignWave(orderId) {
       return db.tx(() => {
-        const o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', orderId)!;
-        if (!['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id) return { offered: 0 };
+        const o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', orderId);
+        if (!o || !['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id) return { offered: 0 };
+        // Expire stale offers before deciding whether another wave is allowed.
+        // Without this guard, two nearly simultaneous rejections could each launch a new wave,
+        // creating duplicate active offers and unnecessary notifications for the same order.
+        const checkNowIso = iso(app.clock.now());
+        db.run("UPDATE order_assignments SET status='EXPIRED',responded_at=?,decision_reason='انتهت مهلة الاستجابة' WHERE order_id=? AND status='OFFERED' AND expires_at<=?", checkNowIso, orderId, checkNowIso);
+        const activeOffer = db.get<{ id: string }>("SELECT id FROM order_assignments WHERE order_id=? AND status='OFFERED' AND expires_at>? LIMIT 1", orderId, checkNowIso);
+        if (activeOffer) return { offered: 0 };
         const excludeProviderIds = db.all<{ provider_id: string }>("SELECT DISTINCT provider_id FROM order_assignments WHERE order_id = ? AND status IN ('REJECTED','EXPIRED','ACCEPTED')", orderId).map((x) => x.provider_id);
         // نرسل العرض إلى الأقرب فقط؛ عند الرفض/انتهاء المهلة ينتقل إلى التالي الأقرب.
         const batch = o.pricing_type === 'QUOTE' ? app.settings.get<number>('assignment.batch_size') : 1;
@@ -56,26 +63,42 @@ export function createAssignmentService(app: App): AssignmentService {
     },
 
     offerOpenOrdersToProvider(providerId) {
-      // الطلبات المفتوحة لا تعتمد على وقت فتح مقدم الخدمة ولا على مهلة عمر للطلب.
-      // إذا كان الطلب ما زال SEARCHING/ASSIGNED ولم يُسند، فيجب أن يدخل المطابقة
-      // لمقدم خدمة مناسب حتى لو أُنشئ قبل دخوله استقبال الطلبات بوقت.
-      const rows = db.all<OrderRow>(`SELECT * FROM orders WHERE status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL ORDER BY created_at ASC LIMIT 500`);
+      // اعمل على كل طلب داخل معاملة قصيرة، وأعد قراءته قبل إنشاء العرض؛ فقد يكون
+      // أُغلق أو أُسند إلى مقدم آخر منذ جلب قائمة الطلبات المفتوحة.
+      const rows = db.all<{ id: string }>(`SELECT id FROM orders WHERE status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL ORDER BY created_at ASC LIMIT 500`);
       let offered = 0;
-      for (const o of rows) {
-        const excluded = db.all<{provider_id:string}>("SELECT provider_id FROM order_assignments WHERE order_id=? AND provider_id=? AND status IN ('REJECTED','EXPIRED','ACCEPTED')", o.id, providerId);
-        if (excluded.length) continue;
-        const candidates = app.matcher.findCandidates(o, { excludeProviderIds: [], limit: 50 });
-        const candidate = candidates.find((c) => c.providerId === providerId);
-        if (!candidate) continue;
-        const nowIso = iso(app.clock.now());
-        const expiresAt = iso(app.clock.now() + app.settings.get<number>('assignment.offer_ttl_sec') * 1000);
-        const wave = o.wave + 1;
-        const existing = db.get<{id:string}>('SELECT id FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, providerId);
-        if (existing) db.run("UPDATE order_assignments SET status='OFFERED',wave=?,score=?,distance_km=?,offered_at=?,expires_at=?,responded_at=NULL,decision_reason=NULL WHERE id=?", wave, candidate.score, candidate.distanceKm, nowIso, expiresAt, existing.id);
-        else db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)', uuid(), o.id, providerId, 'OFFERED', wave, candidate.score, candidate.distanceKm, nowIso, expiresAt);
-        if (o.status === 'SEARCHING') db.run("UPDATE orders SET status='ASSIGNED',wave=?,search_exhausted_at=NULL,updated_at=?,version=version+1 WHERE id=? AND version=?", wave, nowIso, o.id, o.version);
-        app.notifications.notify(db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',providerId)!.user_id, 'NEW_OFFER', { service: tr(catalog.all().byService.get(o.service_id)!.name_i18n, 'ar') }, { orderId:o.id });
-        offered++;
+      for (const row of rows) {
+        const didOffer = db.tx(() => {
+          const o = db.get<OrderRow>('SELECT * FROM orders WHERE id=?', row.id);
+          if (!o || !['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id) return false;
+          const prior = db.get<{ status: string; expires_at: string | null }>(
+            'SELECT status,expires_at FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, providerId);
+          if (prior && ['REJECTED', 'EXPIRED', 'ACCEPTED'].includes(prior.status)) return false;
+          const now = app.clock.now();
+          const nowIso = iso(now);
+          db.run("UPDATE order_assignments SET status='EXPIRED',responded_at=?,decision_reason='انتهت مهلة الاستجابة' WHERE order_id=? AND status='OFFERED' AND expires_at<=?", nowIso, o.id, nowIso);
+          if (prior?.status === 'OFFERED') return false;
+          const candidates = app.matcher.findCandidates(o, { excludeProviderIds: [], limit: 50 });
+          const candidate = candidates.find((c) => c.providerId === providerId);
+          if (!candidate) return false;
+          const activeOffers = db.all<{ wave: number }>("SELECT wave FROM order_assignments WHERE order_id=? AND status='OFFERED' AND expires_at>? ORDER BY wave", o.id, nowIso);
+          // إذا كانت هناك موجة جارية، أضف العرض إليها؛ وإلا ابدأ موجة جديدة.
+          const wave = activeOffers.length ? activeOffers[0].wave : o.wave + 1;
+          const expiresAt = iso(now + app.settings.get<number>('assignment.offer_ttl_sec') * 1000);
+          const existing = db.get<{ id: string }>('SELECT id FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, providerId);
+          if (existing) db.run("UPDATE order_assignments SET status='OFFERED',wave=?,score=?,distance_km=?,offered_at=?,expires_at=?,responded_at=NULL,decision_reason=NULL WHERE id=?", wave, candidate.score, candidate.distanceKm, nowIso, expiresAt, existing.id);
+          else db.run('INSERT INTO order_assignments(id,order_id,provider_id,status,wave,score,distance_km,offered_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)', uuid(), o.id, providerId, 'OFFERED', wave, candidate.score, candidate.distanceKm, nowIso, expiresAt);
+          if (!activeOffers.length) {
+            const changed = db.run("UPDATE orders SET status='ASSIGNED',wave=?,search_exhausted_at=NULL,updated_at=?,version=version+1 WHERE id=? AND version=? AND provider_id IS NULL AND status IN ('SEARCHING','ASSIGNED')", wave, nowIso, o.id, o.version);
+            if (Number(changed.changes) !== 1) throw E.conflict('تغير الطلب أثناء إنشاء العرض','ORDER_STATE_CHANGED');
+            if (o.status === 'SEARCHING') db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', o.id, 'SEARCHING', 'ASSIGNED', null, 'SYSTEM', `wave ${wave}`, nowIso);
+          }
+          const provider = db.get<{ user_id: string }>('SELECT user_id FROM service_providers WHERE id=?', providerId);
+          if (provider) app.notifications.notify(provider.user_id, 'NEW_OFFER', { service: tr(catalog.all().byService.get(o.service_id)!.name_i18n, 'ar') }, { orderId: o.id });
+          notifiedExhausted.delete(o.id);
+          return true;
+        });
+        if (didOffer) offered++;
       }
       return { offered };
     },
@@ -85,8 +108,12 @@ export function createAssignmentService(app: App): AssignmentService {
         const o = db.get<OrderRow>('SELECT * FROM orders WHERE id=?', orderId);
         if (!o || o.provider_id !== providerId || !['ACCEPTED'].includes(o.status)) return { offered: 0 };
         const nowIso = iso(app.clock.now());
+        // The first acceptance creates a pending payment record. Close it before re-offering
+        // the order so a later provider acceptance cannot leave multiple pending cash records.
+        app.payment.onReassigned(o);
         db.run(`UPDATE order_assignments SET status='WITHDRAWN', responded_at=?, decision_reason='انتقل العرض لمقدم خدمة آخر' WHERE order_id=? AND status='OFFERED'`, nowIso, orderId);
         db.run(`UPDATE order_assignments SET status='REJECTED', responded_at=?, decision_reason='رفض مقدم الخدمة' WHERE order_id=? AND provider_id=? AND status='ACCEPTED'`, nowIso, orderId, providerId);
+        db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', nowIso, orderId);
         db.run(`UPDATE orders SET status='SEARCHING', provider_id=NULL, accepted_at=NULL, agreed_price=NULL, search_exhausted_at=NULL, wave=0, updated_at=?, version=version+1 WHERE id=? AND provider_id=? AND status='ACCEPTED'`, nowIso, orderId, providerId);
         db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', orderId, 'ACCEPTED', 'SEARCHING', null, 'SYSTEM', reason, nowIso);
         app.notifications.notify(o.customer_id, 'PROVIDER_REASSIGNED', { code: o.code });
@@ -136,11 +163,17 @@ export function createAssignmentService(app: App): AssignmentService {
 
     rejectOffer(assignmentId, ctx) {
       const providerId = ctx.user!.providerId!;
-      const now = iso(app.clock.now());
-      const res = db.run(`UPDATE order_assignments SET status='REJECTED', responded_at=?, decision_reason='رفض مقدم الخدمة' WHERE id=? AND provider_id=? AND status='OFFERED'`, now, assignmentId, providerId);
-      if (!res.changes) throw E.notFound('العرض غير موجود');
-      const assignment = db.get<{ order_id: string }>('SELECT order_id FROM order_assignments WHERE id = ?', assignmentId);
-      if (assignment) { db.run("UPDATE intent_audit SET assignment_result='REJECTED',updated_at=? WHERE order_id=? AND (assignment_result IS NULL OR assignment_result<>'ACCEPTED')",now,assignment.order_id); svc.assignWave(assignment.order_id); }
+      return db.tx(() => {
+        const now = iso(app.clock.now());
+        const res = db.run(`UPDATE order_assignments SET status='REJECTED', responded_at=?, decision_reason='رفض مقدم الخدمة' WHERE id=? AND provider_id=? AND status='OFFERED'`, now, assignmentId, providerId);
+        if (!res.changes) throw E.notFound('العرض غير موجود');
+        const assignment = db.get<{ order_id: string }>('SELECT order_id FROM order_assignments WHERE id = ?', assignmentId);
+        if (assignment) {
+          db.run("UPDATE intent_audit SET assignment_result='REJECTED',updated_at=? WHERE order_id=? AND (assignment_result IS NULL OR assignment_result<>'ACCEPTED')",now,assignment.order_id);
+          // Nested transaction joins this transaction, keeping rejection and next-wave decision atomic.
+          svc.assignWave(assignment.order_id);
+        }
+      });
     },
 
     listOffers(providerId) {
@@ -171,9 +204,16 @@ export function createAssignmentService(app: App): AssignmentService {
           if (r.offered > 0) { waved++; continue; }
         }
         if (!o.search_exhausted_at) {
+          // نسجل نفاد المرشحين كحالة بحث فقط، وليس انتهاء صلاحية للطلب.
+          // يظل الطلب مفتوحًا، ونبلغ العميل والإدارة ثم نعيد المحاولة دوريًا.
+          db.run('UPDATE orders SET search_exhausted_at=?, updated_at=?, version=version+1 WHERE id=? AND search_exhausted_at IS NULL', nowIso, nowIso, o.id);
+          exhausted++;
           const full = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!;
-          // عدم وجود مقدم خدمة الآن لا يعني انتهاء الطلب. يبقى الطلب مفتوحًا،
-          // وسيُعاد عرضه تلقائيًا عندما يدخل مقدم خدمة مناسب وضع استقبال الطلبات.
+          if (!notifiedExhausted.has(o.id)) {
+            app.notifications.notify(full.customer_id, 'NO_PROVIDER_FOUND', { code: full.code }, { orderId: full.id });
+            app.notifications.notifyAdmins('NO_PROVIDER_FOUND_ADMIN', { code: full.code }, { orderId: full.id });
+            notifiedExhausted.add(o.id);
+          }
           continue;
         }
         if (Date.parse(o.search_exhausted_at) + retryMs <= now) {
@@ -217,16 +257,20 @@ export function registerAssignmentRoutes(app: App, r: Router): void {
       const o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ? AND provider_id = ?', ctx.params['id'], ctx.user!.providerId);
       if (!o) throw E.notFound('الطلب غير موجود');
       if (PROVIDER_STEPS[o.status] !== b.to || !canTransition(o.status, b.to, 'PROVIDER')) throw E.unprocessable(`لا يمكن الانتقال من ${o.status} إلى ${b.to}`, 'INVALID_TRANSITION');
-      const updated = orders.applyTransition(o, b.to, 'PROVIDER', ctx);
+      let currentOrder = o;
       if (b.to === 'COMPLETED') {
+        const proof = db.get<{delivery_proof_type:string}>('SELECT delivery_proof_type FROM services WHERE id=?', o.service_id);
+        if (proof?.delivery_proof_type && proof.delivery_proof_type !== 'NONE' && !db.get('SELECT 1 FROM orders WHERE id=? AND delivery_proof_verified_at IS NOT NULL', o.id)) throw E.unprocessable('يجب إكمال إثبات التسليم قبل إنهاء الطلب', 'DELIVERY_PROOF_REQUIRED');
+        // احسب أجرة المشوار قبل انتقال الطلب إلى COMPLETED حتى تُحسب العمولة والتسوية والدفع على الأجرة النهائية.
         const tripRow=db.get<any>(`SELECT t.* FROM trip_orders t JOIN orders oo ON oo.id=t.order_id JOIN services s ON s.id=oo.service_id WHERE t.order_id=? AND s.slug='motorcycle-trips'`,o.id);
         if(tripRow){
           const pts=db.all<any>('SELECT lat,lng FROM trip_location_history WHERE order_id=? ORDER BY id',o.id);
           let actualKm=0; for(let i=1;i<pts.length;i++){ const R=6371; const dLat=(Number(pts[i].lat)-Number(pts[i-1].lat))*Math.PI/180; const dLng=(Number(pts[i].lng)-Number(pts[i-1].lng))*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(Number(pts[i-1].lat)*Math.PI/180)*Math.cos(Number(pts[i].lat)*Math.PI/180)*Math.sin(dLng/2)**2; actualKm += 2*R*Math.asin(Math.sqrt(a)); }
-          if(actualKm>0.05){ actualKm=Math.round(actualKm*10)/10; const base=Math.max(Number(tripRow.minimum_fare),Number(tripRow.base_fare)+actualKm*Number(tripRow.per_km_fare)); const finalFare=Math.round((base+Number(tripRow.waiting_total_minutes||0)*Number(tripRow.waiting_per_minute_fare||0))/50)*50; db.run('UPDATE trip_orders SET distance_km=?,fare=?,updated_at=? WHERE order_id=?',actualKm,finalFare,iso(app.clock.now()),o.id); db.run('UPDATE orders SET agreed_price=?,price_snapshot=?,updated_at=?,version=version+1 WHERE id=?',finalFare,finalFare,iso(app.clock.now()),o.id); }
+          if(actualKm>0.05){ actualKm=Math.round(actualKm*10)/10; const base=Math.max(Number(tripRow.minimum_fare),Number(tripRow.base_fare)+actualKm*Number(tripRow.per_km_fare)); const finalFare=Math.round((base+Number(tripRow.waiting_total_minutes||0)*Number(tripRow.waiting_per_minute_fare||0))/50)*50; db.run('UPDATE trip_orders SET distance_km=?,fare=?,updated_at=? WHERE order_id=?',actualKm,finalFare,iso(app.clock.now()),o.id); db.run('UPDATE orders SET agreed_price=?,price_snapshot=?,updated_at=?,version=version+1 WHERE id=? AND version=?',finalFare,finalFare,iso(app.clock.now()),o.id,o.version); currentOrder=db.get<OrderRow>('SELECT * FROM orders WHERE id=?',o.id)!; }
         }
-        const proof = db.get<{delivery_proof_type:string}>('SELECT delivery_proof_type FROM services WHERE id=?', o.service_id);
-        if (proof?.delivery_proof_type && proof.delivery_proof_type !== 'NONE' && !db.get('SELECT 1 FROM orders WHERE id=? AND delivery_proof_verified_at IS NOT NULL', o.id)) throw E.unprocessable('يجب إكمال إثبات التسليم قبل إنهاء الطلب', 'DELIVERY_PROOF_REQUIRED');
+      }
+      const updated = orders.applyTransition(currentOrder, b.to, 'PROVIDER', ctx);
+      if (b.to === 'COMPLETED') {
         db.run('UPDATE service_providers SET completed_orders_count = completed_orders_count + 1, updated_at = ? WHERE id = ?', iso(app.clock.now()), o.provider_id); app.payment.onCompleted(updated); }
       const map: Record<string, 'PROVIDER_ON_THE_WAY' | 'SERVICE_STARTED' | 'ORDER_COMPLETED'> = { ON_THE_WAY: 'PROVIDER_ON_THE_WAY', IN_PROGRESS: 'SERVICE_STARTED', COMPLETED: 'ORDER_COMPLETED' };
       app.notifications.notify(o.customer_id, map[b.to]!, { code: o.code }, { orderId: o.id });

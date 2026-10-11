@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
@@ -40,7 +41,7 @@ export function registerChatRoutes(app, r) {
         if (['CANCELLED'].includes(o.status))
             throw E.unprocessable('لا يمكن مراسلة الطلب بعد إلغائه', 'ORDER_CLOSED');
         const b = parse(bodySchema, ctx.body);
-        const idem = String(ctx.req.headers['idempotency-key'] || '').trim();
+        const idem = readIdempotencyKey(ctx.req.headers['idempotency-key']);
         return app.db.tx(() => {
             if (idem) {
                 const old = app.db.get('SELECT * FROM order_messages WHERE order_id=? AND sender_id=? AND idempotency_key=?', o.id, ctx.user.id, idem);

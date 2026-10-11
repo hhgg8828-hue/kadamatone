@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles, adminLevel } from './auth.middleware.js';
@@ -76,7 +77,7 @@ export function registerComplaintRoutes(app: App, r: Router): void {
       const c = db.get<ComplaintRow>('SELECT * FROM complaints WHERE id = ?', ctx.params['id']);
       if (!c || !canView(c, ctx)) throw E.notFound('الشكوى غير موجودة');
       if (['RESOLVED', 'REJECTED', 'CLOSED'].includes(c.status)) throw E.unprocessable('هذه الشكوى مغلقة', 'COMPLAINT_CLOSED');
-      const idem = String(ctx.req.headers['idempotency-key'] || '').trim();
+      const idem = readIdempotencyKey(ctx.req.headers['idempotency-key']);
       if (idem) {
         const old = db.get<any>('SELECT * FROM complaint_messages WHERE complaint_id=? AND author_id=? AND idempotency_key=?', c.id, ctx.user!.id, idem);
         if (old) { ctx.status = 200; return { complaint: complaintOut(c), message: { id: old.id, authorId: old.author_id, authorRole: old.author_role, body: old.body, createdAt: old.created_at }, idempotent: true }; }

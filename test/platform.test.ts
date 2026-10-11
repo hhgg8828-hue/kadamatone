@@ -27,8 +27,10 @@ describe('Database & Seed', () => {
   test('الأقسام الأساسية بأسمائها الصحيحة وبالترتيب', async () => {
     const r = await api('GET', '/api/v1/categories');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.body.categories.map((c: Row) => c.name), ['النقل', 'التوصيل', 'خدمات المنزل', 'خدمات السيارات', 'الصيانة', 'المعاملات', 'العمالة عند الطلب']);
-    assert.deepEqual(r.body.categories.map((c: Row) => c.icon), ['🚗', '📦', '🏠', '🚘', '🔧', '🏛️', '👷']);
+    assert.deepEqual(r.body.categories.slice(0, 5).map((c: Row) => c.name), ['النقل', 'التوصيل', 'خدمات المنزل', 'خدمات السيارات', 'الصيانة']);
+    const names = r.body.categories.map((c: Row) => c.name);
+    for (const name of ['المعاملات', 'العمالة عند الطلب', 'الخدمات الأساسية', 'الأسرة والحياة اليومية']) assert.ok(names.includes(name), `القسم ${name} مفقود`);
+    assert.deepEqual(r.body.categories.slice(0, 5).map((c: Row) => c.icon), ['🚗', '📦', '🏠', '🚘', '🔧']);
   });
   test('خدمات المنزل تحتوي الخدمات المطلوبة', async () => {
     const r = await api('GET', '/api/v1/categories/home-services/services');
@@ -242,7 +244,9 @@ describe('HTTP hardening', () => {
 });
 
 
-test('customer portal link points directly to provider page', () => {
+test('customer portal exposes the provider role and the dedicated provider page', () => {
   const html = readFileSync(resolve('public/app.ts'), 'utf8');
-  assert.match(html, /href=\"\/provider\.html\" data-provider-link/);
+  const providerPage = readFileSync(resolve('public/provider.html'), 'utf8');
+  assert.match(html, /data-role=\"PROVIDER\"/);
+  assert.match(providerPage, /data-page=\"provider\"/);
 });

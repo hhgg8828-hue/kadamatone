@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, pageParams, cursorSql, finishPage } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
@@ -37,7 +38,7 @@ export function registerChatRoutes(app:App,r:Router){
   });
   r.post('/orders/:id/messages',auth,roles('CUSTOMER','PROVIDER'),(ctx:Ctx)=>{
     const o=canAccess(app,ctx.params.id!,ctx); if(['CANCELLED'].includes(o.status)) throw E.unprocessable('لا يمكن مراسلة الطلب بعد إلغائه','ORDER_CLOSED');
-    const b=parse<any>(bodySchema,ctx.body); const idem=String(ctx.req.headers['idempotency-key']||'').trim();
+    const b=parse<any>(bodySchema,ctx.body); const idem=readIdempotencyKey(ctx.req.headers['idempotency-key']);
     return app.db.tx(()=>{
       if(idem){const old=app.db.get<MsgRow>('SELECT * FROM order_messages WHERE order_id=? AND sender_id=? AND idempotency_key=?',o.id,ctx.user!.id,idem);if(old){ctx.status=200;return {message:out(app,old),idempotent:true};}}
       const attachmentFileIds=(b.attachmentFileIds||[]).filter((id:string)=>!!app.db.get(`SELECT id FROM files WHERE id=? AND owner_id=? AND purpose='order_attachment'`,id,ctx.user!.id));

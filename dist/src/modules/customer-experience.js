@@ -1,5 +1,6 @@
 import { s, parse } from '../core/validate.js';
 import { E } from '../core/errors.js';
+import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
 import { iso, tr } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
@@ -22,7 +23,7 @@ export function registerCustomerExperienceRoutes(app, r) {
     r.get('/me/beneficiaries', auth, roles('CUSTOMER'), (ctx) => ({ beneficiaries: db.all('SELECT * FROM customer_beneficiaries WHERE customer_id=? ORDER BY updated_at DESC', ctx.user.id).map(b => serializeBeneficiary(app, b, ctx.locale)) }));
     r.post('/me/beneficiaries', auth, roles('CUSTOMER'), (ctx) => {
         const b = parse(beneficiarySchema, ctx.body);
-        const idem = String(ctx.req.headers['idempotency-key'] || '').trim().slice(0, 128);
+        const idem = readIdempotencyKey(ctx.req.headers['idempotency-key']);
         if (idem) {
             const old = db.get('SELECT * FROM customer_beneficiaries WHERE customer_id=? AND idempotency_key=?', ctx.user.id, idem);
             if (old) {

@@ -47,13 +47,10 @@ async function drivingDistance(app: App, origin: { lat: number; lng: number }, d
   if (baseUrl === 'mock://straight-line') {
     return { distanceKm: Math.round(haversineKm(origin.lat, origin.lng, destination.lat, destination.lng) * 10) / 10, durationMin: null, method: 'STRAIGHT_LINE_TEST' };
   }
-  const timer = setTimeout(() => {}, app.config.routingTimeoutMs);
+  const url = `${baseUrl}/route/v1/driving/${encodeURIComponent(origin.lng)},${encodeURIComponent(origin.lat)};${encodeURIComponent(destination.lng)},${encodeURIComponent(destination.lat)}?overview=false&steps=false`;
   try {
-    const url = `${baseUrl}/route/v1/driving/${encodeURIComponent(origin.lng)},${encodeURIComponent(origin.lat)};${encodeURIComponent(destination.lng)},${encodeURIComponent(destination.lat)}?overview=false&steps=false`;
-    const response = await Promise.race([
-      fetch(url, { headers: { accept: 'application/json' } }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('ROUTING_TIMEOUT')), app.config.routingTimeoutMs)),
-    ]);
+    // Abort the actual network request; a bare Promise.race timeout leaves timers/sockets alive.
+    const response = await fetch(url, { headers: { accept: 'application/json' }, signal: (globalThis as any).AbortSignal.timeout(app.config.routingTimeoutMs) });
     if (!response.ok) throw E.serviceUnavailable('تعذر الوصول إلى خدمة حساب مسافة القيادة حاليًا', 'ROUTING_UNAVAILABLE');
     const data = await response.json() as any;
     const route = data?.routes?.[0];
@@ -65,13 +62,10 @@ async function drivingDistance(app: App, origin: { lat: number; lng: number }, d
     return { distanceKm, durationMin, method: 'ROAD_ROUTING' };
   } catch (err) {
     if ((err as any)?.code) throw err;
-    if ((err as any)?.message === 'ROUTING_TIMEOUT') throw E.serviceUnavailable('انتهت مهلة حساب مسافة القيادة، حاول مرة أخرى', 'ROUTING_TIMEOUT');
+    if ((err as any)?.name === 'TimeoutError' || (err as any)?.name === 'AbortError') throw E.serviceUnavailable('انتهت مهلة حساب مسافة القيادة، حاول مرة أخرى', 'ROUTING_TIMEOUT');
     throw E.serviceUnavailable('تعذر حساب مسافة القيادة حاليًا، حاول مرة أخرى', 'ROUTING_UNAVAILABLE');
-  } finally {
-    clearTimeout(timer);
   }
 }
-
 
 async function drivingRoute(app: App, points: Array<{lat:number;lng:number}>): Promise<RouteDistance> {
   if (points.length < 2) throw E.unprocessable('حدد نقطتين على الأقل للمسار', 'ROUTE_POINTS_REQUIRED');
@@ -82,7 +76,7 @@ async function drivingRoute(app: App, points: Array<{lat:number;lng:number}>): P
   }
   try {
     const coords=points.map(p=>`${encodeURIComponent(p.lng)},${encodeURIComponent(p.lat)}`).join(';');
-    const response=await Promise.race([fetch(`${baseUrl}/route/v1/driving/${coords}?overview=false&steps=false`,{headers:{accept:'application/json'}}),new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('ROUTING_TIMEOUT')),app.config.routingTimeoutMs))]);
+    const response=await fetch(`${baseUrl}/route/v1/driving/${coords}?overview=false&steps=false`,{headers:{accept:'application/json'},signal:(globalThis as any).AbortSignal.timeout(app.config.routingTimeoutMs)});
     if(!response.ok) throw E.serviceUnavailable('تعذر الوصول إلى خدمة حساب مسافة القيادة حاليًا','ROUTING_UNAVAILABLE');
     const data=await response.json() as any; const route=data?.routes?.[0];
     if(data?.code!=='Ok'||!route||!Number.isFinite(route.distance)||route.distance<=0) throw E.unprocessable('تعذر العثور على طريق قيادة بين النقاط','ROUTE_NOT_FOUND');
@@ -168,28 +162,79 @@ export function registerTripRoutes(app: App, r: Router): void {
 
   r.post('/trips/:id/destination', auth, roles('CUSTOMER','PROVIDER'), async (ctx: Ctx) => {
     const b=parse<any>(s.obj({destination:tripLocation}),ctx.body);
-    const o=app.db.get<OrderRow>('SELECT * FROM orders WHERE id=?',ctx.params.id!);
-    if(!o) throw E.notFound('المشوار غير موجود');
-    if(ctx.user!.role==='CUSTOMER' && o.customer_id!==ctx.user!.id) throw E.forbidden();
-    if(ctx.user!.role==='PROVIDER' && o.provider_id!==ctx.user!.providerId) throw E.forbidden();
-    if(['COMPLETED','CANCELLED'].includes(o.status)) throw E.unprocessable('لا يمكن تغيير وجهة مشوار منتهٍ','TRIP_CLOSED');
-    const t=app.db.get<any>('SELECT * FROM trip_orders WHERE order_id=?',o.id); if(!t) throw E.notFound('بيانات المشوار غير موجودة');
-    const d=makeLocation(app,ctx.user!.id,b.destination);
-    const origin=app.db.get<any>('SELECT * FROM locations WHERE id=?',o.location_id)!;
-    const route=await drivingRoute(app,[origin,{lat:d.lat,lng:d.lng}]); const pricing=price(app,route.distanceKm); const now=iso(app.clock.now());
-    app.db.run('UPDATE trip_orders SET destination_location_id=?,destination_pending=0,distance_km=?,fare=?,updated_at=? WHERE order_id=?',d.id,route.distanceKm,pricing.fare,now,o.id);
-    app.db.run('UPDATE orders SET price_snapshot=?,updated_at=?,version=version+1 WHERE id=?',pricing.fare,now,o.id);
-    app.sse.send(o.customer_id,'sync',{scope:'orders',orderId:o.id});
-    return {ok:true,distanceKm:route.distanceKm,fare:pricing.fare,currency:pricing.currency,trip:serializeTrip(app,o.id,ctx.locale)};
+    const initial=app.db.get<OrderRow>('SELECT * FROM orders WHERE id=?',ctx.params.id!);
+    if(!initial) throw E.notFound('المشوار غير موجود');
+    if(ctx.user!.role==='CUSTOMER' && initial.customer_id!==ctx.user!.id) throw E.forbidden();
+    if(ctx.user!.role==='PROVIDER' && initial.provider_id!==ctx.user!.providerId) throw E.forbidden();
+    if(!['SEARCHING','ASSIGNED','ACCEPTED'].includes(initial.status)) throw E.unprocessable('لا يمكن تحديد الوجهة بعد بدء التنفيذ أو إغلاق المشوار','TRIP_DESTINATION_LOCKED');
+    const initialTrip=app.db.get<any>('SELECT * FROM trip_orders WHERE order_id=?',initial.id);
+    if(!initialTrip) throw E.notFound('بيانات المشوار غير موجودة');
+    if(!initialTrip.destination_pending) throw E.conflict('تم تحديد وجهة هذا المشوار بالفعل؛ لا يمكن تغييرها من هذا المسار','DESTINATION_ALREADY_SET');
+    const origin=app.db.get<any>('SELECT * FROM locations WHERE id=?',initial.location_id)!;
+    const stopRows=app.db.all<any>('SELECT l.lat,l.lng FROM trip_stops ts JOIN locations l ON l.id=ts.location_id WHERE ts.order_id=? ORDER BY ts.sequence_no',initial.id);
+    // Include configured stops in the fare calculation; omitting them undercharged multi-stop trips.
+    const route=await drivingRoute(app,[origin,...stopRows,{lat:b.destination.lat,lng:b.destination.lng}]);
+    const pricing=price(app,route.distanceKm); const now=iso(app.clock.now());
+    const result=app.db.tx(()=>{
+      const o=app.db.get<OrderRow>('SELECT * FROM orders WHERE id=?',initial.id);
+      const trip=app.db.get<any>('SELECT * FROM trip_orders WHERE order_id=?',initial.id);
+      if(!o||!trip) throw E.notFound('المشوار غير موجود');
+      if(o.version!==initial.version || !trip.destination_pending) throw E.conflict('تغيرت بيانات المشوار أثناء تحديد الوجهة؛ حدّث الصفحة وحاول مجددًا','TRIP_VERSION_CONFLICT');
+      if(!['SEARCHING','ASSIGNED','ACCEPTED'].includes(o.status)) throw E.unprocessable('لا يمكن تحديد الوجهة بعد بدء التنفيذ أو إغلاق المشوار','TRIP_DESTINATION_LOCKED');
+      const d=makeLocation(app,ctx.user!.id,b.destination);
+      const orderUpdate=app.db.run(`UPDATE orders SET price_snapshot=?,agreed_price=CASE WHEN status='ACCEPTED' THEN ? ELSE agreed_price END,updated_at=?,version=version+1 WHERE id=? AND version=? AND status IN ('SEARCHING','ASSIGNED','ACCEPTED')`,pricing.fare,pricing.fare,now,o.id,o.version);
+      if(!orderUpdate.changes) throw E.conflict('تغيرت بيانات المشوار؛ حدّث الصفحة وحاول مجددًا','TRIP_VERSION_CONFLICT');
+      app.db.run('UPDATE trip_orders SET destination_location_id=?,destination_pending=0,distance_km=?,fare=?,updated_at=? WHERE order_id=? AND destination_pending=1',d.id,route.distanceKm,pricing.fare,now,o.id);
+      // If the provider already accepted a destination-pending trip, keep the pending cash record aligned with the final fare.
+      if(o.status==='ACCEPTED') app.db.run("UPDATE payments SET amount=?,currency=?,updated_at=? WHERE order_id=? AND status='PENDING'",pricing.fare,pricing.currency,now,o.id);
+      return {customerId:o.customer_id};
+    });
+    app.sse.send(result.customerId,'sync',{scope:'orders',orderId:initial.id});
+    if(initial.provider_id){const providerUser=app.db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',initial.provider_id);if(providerUser)app.sse.send(providerUser.user_id,'sync',{scope:'orders',orderId:initial.id});}
+    return {ok:true,distanceKm:route.distanceKm,fare:pricing.fare,currency:pricing.currency,trip:serializeTrip(app,initial.id,ctx.locale)};
   });
 
   r.post('/trips/:id/wait', auth, roles('PROVIDER'), (ctx: Ctx) => {
-    const b=parse<any>(s.obj({action:s.oneOf(['START','STOP'])}),ctx.body); const o=app.db.get<any>('SELECT id,status FROM orders WHERE id=? AND provider_id=?',ctx.params.id!,ctx.user!.providerId); if(!o)throw E.notFound('المشوار غير موجود');
-    if(o.status!=='IN_PROGRESS')throw E.unprocessable('يمكن احتساب الانتظار أثناء تنفيذ المشوار فقط','INVALID_TRIP_STATE');
-    const active=app.db.get<any>('SELECT * FROM trip_wait_sessions WHERE order_id=? AND provider_id=? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',o.id,ctx.user!.providerId); const now=iso(app.clock.now());
-    if(b.action==='START'){if(active)throw E.conflict('يوجد وقت انتظار قيد التسجيل','WAIT_ALREADY_STARTED'); const id=uuid();app.db.run('INSERT INTO trip_wait_sessions(id,order_id,provider_id,started_at,created_at) VALUES(?,?,?,?,?)',id,o.id,ctx.user!.providerId,now,now);return {ok:true,startedAt:now};}
-    if(!active)throw E.unprocessable('لا يوجد وقت انتظار قيد التسجيل','WAIT_NOT_STARTED');
-    const minutes=Math.max(0,(Date.parse(now)-Date.parse(active.started_at))/60000); const rounded=Math.round(minutes*10)/10; const t=app.db.get<any>('SELECT * FROM trip_orders WHERE order_id=?',o.id)!; const total=Math.round((Number(t.waiting_total_minutes)+rounded)*10)/10; const extra=Math.round(total*Number(t.waiting_per_minute_fare||0)); const baseFare=Math.max(Number(t.minimum_fare),Number(t.base_fare)+Number(t.distance_km)*Number(t.per_km_fare)); const fare=Math.round((baseFare+extra)/50)*50; app.db.run('UPDATE trip_wait_sessions SET ended_at=?,minutes=? WHERE id=?',now,rounded,active.id); app.db.run('UPDATE trip_orders SET waiting_total_minutes=?,fare=?,updated_at=? WHERE order_id=?',total,fare,now,o.id); return {ok:true,minutes:rounded,totalMinutes:total,fare};
+    const b=parse<any>(s.obj({action:s.oneOf(['START','STOP'])}),ctx.body);
+    const orderId=ctx.params.id!; const providerId=ctx.user!.providerId;
+    if(!providerId) throw E.notFound('ملف مقدم الخدمة غير موجود');
+    const now=iso(app.clock.now());
+    return app.db.tx(()=>{
+      const o=app.db.get<any>('SELECT id,status,version,customer_id FROM orders WHERE id=? AND provider_id=?',orderId,providerId);
+      if(!o) throw E.notFound('المشوار غير موجود');
+      if(o.status!=='IN_PROGRESS') throw E.unprocessable('يمكن احتساب الانتظار أثناء تنفيذ المشوار فقط','INVALID_TRIP_STATE');
+      const active=app.db.get<any>("SELECT * FROM trip_wait_sessions WHERE order_id=? AND provider_id=? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1",o.id,providerId);
+      if(b.action==='START'){
+        if(active) throw E.conflict('يوجد وقت انتظار قيد التسجيل','WAIT_ALREADY_STARTED');
+        const id=uuid();
+        app.db.run('INSERT INTO trip_wait_sessions(id,order_id,provider_id,started_at,created_at) VALUES(?,?,?,?,?)',id,o.id,providerId,now,now);
+        app.db.afterCommit(()=>app.sse.send(o.customer_id,'sync',{scope:'orders',orderId:o.id,tripWait:'STARTED'}));
+        return {ok:true,startedAt:now};
+      }
+      if(!active) throw E.unprocessable('لا يوجد وقت انتظار قيد التسجيل','WAIT_NOT_STARTED');
+      const minutes=Math.max(0,(Date.parse(now)-Date.parse(active.started_at))/60000);
+      const rounded=Math.round(minutes*10)/10;
+      const trip=app.db.get<any>('SELECT * FROM trip_orders WHERE order_id=?',o.id);
+      if(!trip) throw E.notFound('بيانات المشوار غير موجودة');
+      const total=Math.round((Number(trip.waiting_total_minutes)+rounded)*10)/10;
+      const extra=total*Number(trip.waiting_per_minute_fare||0);
+      const baseFare=Math.max(Number(trip.minimum_fare),Number(trip.base_fare)+Number(trip.distance_km)*Number(trip.per_km_fare));
+      const fare=Math.round((baseFare+extra)/50)*50;
+      const ended=app.db.run('UPDATE trip_wait_sessions SET ended_at=?,minutes=? WHERE id=? AND ended_at IS NULL',now,rounded,active.id);
+      if(Number(ended.changes)!==1) throw E.conflict('تم إنهاء جلسة الانتظار من عملية أخرى؛ حدّث المشوار','WAIT_SESSION_CHANGED');
+      const changed=app.db.run('UPDATE trip_orders SET waiting_total_minutes=?,fare=?,updated_at=? WHERE order_id=? AND waiting_total_minutes=?',total,fare,now,o.id,trip.waiting_total_minutes);
+      if(Number(changed.changes)!==1) throw E.conflict('تغيرت بيانات أجرة المشوار؛ أعد المحاولة','TRIP_FARE_CHANGED');
+      const orderChanged=app.db.run("UPDATE orders SET agreed_price=?,price_snapshot=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND status='IN_PROGRESS'",fare,fare,now,o.id,o.version);
+      if(Number(orderChanged.changes)!==1) throw E.conflict('تغيرت حالة المشوار أثناء تحديث الأجرة','TRIP_FARE_CHANGED');
+      // Keep the outstanding cash amount consistent with the fare that the customer will be asked to pay.
+      app.db.run("UPDATE payments SET amount=?,currency=?,updated_at=? WHERE order_id=? AND status='PENDING'",fare,trip.currency,now,o.id);
+      app.db.afterCommit(()=>{
+        app.sse.send(o.customer_id,'sync',{scope:'orders',orderId:o.id,tripWait:'STOPPED',fare});
+        const providerUser=app.db.get<{user_id:string}>('SELECT user_id FROM service_providers WHERE id=?',providerId);
+        if(providerUser) app.sse.send(providerUser.user_id,'sync',{scope:'orders',orderId:o.id,tripWait:'STOPPED',fare});
+      });
+      return {ok:true,minutes:rounded,totalMinutes:total,fare,currency:trip.currency};
+    });
   });
 }
 
