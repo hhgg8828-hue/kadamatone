@@ -626,7 +626,7 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .quote-breakdown p:last-child{border-top:1px solid var(--line);padding-top:7px;color:var(--primary)}
 
 
-/* V85.2 — make every admin module visible on mobile; provider quick navigation */
+/* Release 2.2 — make every admin module visible on mobile; provider quick navigation */
 .admin-tabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;flex-wrap:wrap!important;overflow:visible!important;overscroll-behavior:initial!important;position:static!important;align-items:stretch;gap:8px;padding:10px;margin-bottom:18px}
 .admin-tabs .btn{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35;min-height:42px;padding:9px 8px}
 .provider-quick-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:10px;background:#fff;border:1px solid #dce9df;border-radius:16px;box-shadow:var(--shadow-sm)}

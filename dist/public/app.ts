@@ -122,8 +122,8 @@ const OFFLINE_QUEUE='khadamat_order_queue_v1';
 function queueOrder(body:any,key:string,image?:{name:string,dataBase64:string}){const q=JSON.parse(localStorage.getItem(OFFLINE_QUEUE)||'[]');q.push({body,key,image:image||null,createdAt:Date.now()});localStorage.setItem(OFFLINE_QUEUE,JSON.stringify(q.slice(-10)));}
 async function flushOrderQueue(){if(!navigator.onLine||!state.token)return;const q=JSON.parse(localStorage.getItem(OFFLINE_QUEUE)||'[]');if(!q.length)return;const left:any[]=[];for(const item of q){try{let body={...item.body};if(item.image&&!body.attachmentFileIds?.length){const up=await api('/files',{method:'POST',body:JSON.stringify({purpose:'order_attachment',name:item.image.name,dataBase64:item.image.dataBase64})});body.attachmentFileIds=[up.file.id];}await api('/orders',{method:'POST',headers:{'Idempotency-Key':item.key},body:JSON.stringify(body)})}catch{left.push(item)}}localStorage.setItem(OFFLINE_QUEUE,JSON.stringify(left));if(q.length!==left.length)toast('تمت المزامنة','تم إرسال الطلبات المحفوظة بعد عودة الإنترنت.')}
 window.addEventListener('online',()=>{flushOrderQueue().catch(()=>{});flushMessageOutbox().catch(()=>{})});
-async function api(path:string,opts:RequestInit={},retry=true){const started=performance.now();const h=new Headers(opts.headers||{});h.set('Content-Type','application/json');if(state.token)h.set('Authorization',`Bearer ${state.token}`);let r:Response;try{r=await fetch('/api/v1'+path,{...opts,headers:h});}catch(e){recordApiTiming(path,performance.now()-started,0);throw e}const j=await r.json().catch(()=>({}));recordApiTiming(path,performance.now()-started,r.status);if(r.status===401&&retry&&path!=='/auth/refresh'&&sessionStorage.getItem(SESSION_KEY)){try{const refreshed=await fetch('/api/v1/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'khadamat'},body:'{}'});const rj=await refreshed.json().catch(()=>({}));if(refreshed.ok&&rj.accessToken){saveSession(rj);return api(path,opts,false)}}catch{}sessionStorage.removeItem(SESSION_KEY);state.token=null;state.user=null;throw new Error('انتهت الجلسة، يرجى تسجيل الدخول من جديد')}if(!r.ok){const err:any=new Error(j?.error?.message||'حدث خطأ');err.code=j?.error?.code;err.details=j?.error?.details||[];throw err}return j;}
-function saveSession(j:AnyObj){state.token=j.accessToken;state.user=j.user;sessionStorage.setItem(SESSION_KEY,JSON.stringify({accessToken:j.accessToken,user:j.user}));}
+async function api(path:string,opts:RequestInit={},retry=true){const started=performance.now();const h=new Headers(opts.headers||{});h.set('Content-Type','application/json');if(state.token)h.set('Authorization',`Bearer ${state.token}`);let r:Response;try{r=await fetch('/api/v1'+path,{...opts,headers:h});}catch(e){recordApiTiming(path,performance.now()-started,0);throw e}const j=await r.json().catch(()=>({}));recordApiTiming(path,performance.now()-started,r.status);if(r.status===401&&retry&&path!=='/auth/refresh'&&localStorage.getItem(SESSION_KEY)){try{const refreshed=await fetch('/api/v1/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'khadamat'},body:'{}'});const rj=await refreshed.json().catch(()=>({}));if(refreshed.ok&&rj.accessToken){saveSession(rj);return api(path,opts,false)}}catch{}localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_KEY);state.token=null;state.user=null;throw new Error('انتهت الجلسة، يرجى تسجيل الدخول من جديد')}if(!r.ok){const err:any=new Error(j?.error?.message||'حدث خطأ');err.code=j?.error?.code;err.details=j?.error?.details||[];throw err}return j;}
+function saveSession(j:AnyObj){state.token=j.accessToken;state.user=j.user;localStorage.setItem(SESSION_KEY,JSON.stringify({accessToken:j.accessToken,user:j.user}));sessionStorage.removeItem(SESSION_KEY);}
 async function openPrivateFile(path:string){
   const win=window.open('about:blank','_blank');
   if(!win){alert('اسمح بفتح النوافذ المنبثقة لعرض الملف.');return}
@@ -146,8 +146,8 @@ async function openPrivateFile(path:string){
     win.document.body.innerHTML=`<div style="font-family:Arial;padding:24px"><h3>تعذر فتح الملف</h3><p>${esc((e as Error).message)}</p></div>`;
   }
 }
-function restoreSession(){try{const raw=sessionStorage.getItem(SESSION_KEY);if(!raw)return false;const j=JSON.parse(raw);if(!j?.accessToken||!j?.user){sessionStorage.removeItem(SESSION_KEY);return false}state.token=j.accessToken;state.user=j.user;return true}catch{sessionStorage.removeItem(SESSION_KEY);return false}}
-async function logout(){stopRealtime();try{if(state.token)await api('/auth/logout',{method:'POST',body:'{}'});}catch{}state.token=null;state.user=null;sessionStorage.removeItem(SESSION_KEY);location.replace('/')}
+function restoreSession(){try{let raw=localStorage.getItem(SESSION_KEY);if(!raw){raw=sessionStorage.getItem(SESSION_KEY);if(raw){localStorage.setItem(SESSION_KEY,raw);sessionStorage.removeItem(SESSION_KEY)}}if(!raw)return false;const j=JSON.parse(raw);if(!j?.accessToken||!j?.user){localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_KEY);return false}state.token=j.accessToken;state.user=j.user;return true}catch{localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_KEY);return false}}
+async function logout(){stopRealtime();try{if(state.token)await api('/auth/logout',{method:'POST',body:'{}'});}catch{}state.token=null;state.user=null;localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_KEY);location.replace('/')}
 const STATUS_AR:any={PENDING:'قيد المراجعة',SEARCHING:'جارٍ البحث عن مقدم خدمة',ASSIGNED:'تم ترشيح مقدم خدمة',ACCEPTED:'تم قبول الطلب',ON_THE_WAY:'مقدم الخدمة في الطريق',IN_PROGRESS:'الخدمة قيد التنفيذ',COMPLETED:'مكتمل',CANCELLED:'ملغي',DISPUTED:'متنازع عليه'};
 const statusAr=(s:any)=>STATUS_AR[String(s)]||String(s||'غير محدد');
 const VERIFY_AR:any={PENDING:'قيد التحقق',VERIFIED:'موثق',REJECTED:'مرفوض',SUSPENDED:'موقوف'};
@@ -243,24 +243,43 @@ async function openAccount(){
           }
           await api('/provider/profile',{method:'PATCH',body:JSON.stringify({displayName:String(f.get('displayName')||''),bio:String(f.get('bio')||'')})});
           const profileUpdate:any={fullName:String(f.get('fullName')||u.fullName||''),secondaryPhone:String(f.get('secondaryPhone')||'')}; if(avatarFileId)profileUpdate.avatarFileId=avatarFileId;
-          const me=await api('/me/profile',{method:'PATCH',body:JSON.stringify(profileUpdate)}); state.user=me.user; sessionStorage.setItem(SESSION_KEY,JSON.stringify({accessToken:state.token,user:state.user}));
+          const me=await api('/me/profile',{method:'PATCH',body:JSON.stringify(profileUpdate)}); state.user=me.user; localStorage.setItem(SESSION_KEY,JSON.stringify({accessToken:state.token,user:state.user}));
         } else {
-          const me=await api('/me/profile',{method:'PATCH',body:JSON.stringify({fullName:String(f.get('fullName')||u.fullName||''),secondaryPhone:String(f.get('secondaryPhone')||'')})});state.user=me.user;sessionStorage.setItem(SESSION_KEY,JSON.stringify({accessToken:state.token,user:state.user}));
+          const me=await api('/me/profile',{method:'PATCH',body:JSON.stringify({fullName:String(f.get('fullName')||u.fullName||''),secondaryPhone:String(f.get('secondaryPhone')||'')})});state.user=me.user;localStorage.setItem(SESSION_KEY,JSON.stringify({accessToken:state.token,user:state.user}));
         }
         msg.textContent='تم حفظ التغييرات بنجاح'; msg.className='success';
       }catch(x){msg.textContent=(x as Error).message;msg.className='error'}
     });
-    document.getElementById('deleteAccountBtn')?.addEventListener('click',async()=>{if(!confirm('هل أنت متأكد من حذف حسابك؟ ستُخفى بيانات التواصل ولن تتمكن من استخدام الحساب بعد ذلك.'))return;if(!confirm('تأكيد أخير: هل تريد حذف الحساب الآن؟'))return;const btn=document.getElementById('deleteAccountBtn') as HTMLButtonElement;btn.disabled=true;btn.textContent='جارٍ حذف الحساب...';try{await api('/me/account',{method:'DELETE',body:JSON.stringify({confirmation:'DELETE'})});stopRealtime();stopPollers();state.token=null;state.user=null;sessionStorage.removeItem(SESSION_KEY);localStorage.removeItem('khadamat.selectedAreaId');alert('تم حذف الحساب وإخفاء بيانات التواصل الشخصية.');location.replace('/')}catch(err){btn.disabled=false;btn.textContent='حذف حسابي نهائيًا';alert((err as Error).message)}});
+    document.getElementById('deleteAccountBtn')?.addEventListener('click',async()=>{if(!confirm('هل أنت متأكد من حذف حسابك؟ ستُخفى بيانات التواصل ولن تتمكن من استخدام الحساب بعد ذلك.'))return;if(!confirm('تأكيد أخير: هل تريد حذف الحساب الآن؟'))return;const btn=document.getElementById('deleteAccountBtn') as HTMLButtonElement;btn.disabled=true;btn.textContent='جارٍ حذف الحساب...';try{await api('/me/account',{method:'DELETE',body:JSON.stringify({confirmation:'DELETE'})});stopRealtime();stopPollers();state.token=null;state.user=null;localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(SESSION_KEY);localStorage.removeItem('khadamat.selectedAreaId');alert('تم حذف الحساب وإخفاء بيانات التواصل الشخصية.');location.replace('/')}catch(err){btn.disabled=false;btn.textContent='حذف حسابي نهائيًا';alert((err as Error).message)}});
   }catch(e){alert((e as Error).message)}
 }
 
 function authBox(forcedRole:'CUSTOMER'|'PROVIDER'|'ADMIN'|null=null){
+  let locationGatePassed=false;
   let selected:'CUSTOMER'|'PROVIDER'|'ADMIN'|null=forcedRole;
   let mode:'login'|'register'='login';
   let customerOtpPhone='';
   let customerOtpSent=false;
   const authenticate=async(j:any)=>{saveSession(j);startRealtime().catch(()=>{});startNotificationPolling();if('Notification' in window&&Notification.permission==='granted')registerWebPushSubscription().catch(()=>{});const target=roleHome(j.user.role);const next=`${target}${target.includes('?')?'&':'?'}auth=success`;window.location.replace(next)};
   const draw=()=>{
+    if(!locationGatePassed){
+      const saved=(()=>{try{return JSON.parse(localStorage.getItem('khadamat.currentLocation.v1')||'null')}catch{return null}})();
+      shell(`<div class="hero"><h1>📍 قبل أن تبدأ في خدمات</h1><p class="muted">اسمح للتطبيق بتحديد موقعك لتسهيل اختيار موقع الطلب والوصول إلى الخدمة المناسبة. لن نطلب الموقع الدقيق إلا بعد موافقتك.</p></div><div class="card" style="max-width:620px;margin:0 auto;text-align:center"><div style="font-size:48px;margin-bottom:10px">📍</div><h2>تحديد موقعك</h2><p class="muted">اضغط على الزر أدناه، ثم اختر «السماح» في رسالة الهاتف أو المتصفح. يمكنك المتابعة يدويًا إذا لم ترغب في مشاركة موقعك.</p><button class="btn" id="preLoginLocate" type="button">السماح وتحديد موقعي الآن</button><p id="preLoginLocationStatus" class="muted" role="status">${saved&&Number.isFinite(Number(saved.lat))&&Number.isFinite(Number(saved.lng))?'يوجد موقع سابق محفوظ على هذا الجهاز؛ يمكنك تحديثه أو المتابعة.':'لم يتم تحديد الموقع بعد.'}</p><div class="row" style="justify-content:center;gap:10px;margin-top:12px"><button class="btn secondary" id="preLoginContinue" type="button">${saved&&Number.isFinite(Number(saved.lat))&&Number.isFinite(Number(saved.lng))?'المتابعة بالموقع المحفوظ':'المتابعة بدون تحديد الموقع'}</button></div></div>`);
+      document.getElementById('preLoginLocate')?.addEventListener('click',()=>{
+        const status=document.getElementById('preLoginLocationStatus');
+        if(!navigator.geolocation){if(status)status.textContent='هذا الجهاز لا يدعم تحديد الموقع؛ يمكنك المتابعة يدويًا.';return}
+        const btn=document.getElementById('preLoginLocate') as HTMLButtonElement|null;if(btn){btn.disabled=true;btn.textContent='جارٍ تحديد الموقع...'}if(status)status.textContent='يرجى السماح بالوصول إلى الموقع في رسالة المتصفح أو الهاتف.';
+        navigator.geolocation.getCurrentPosition(pos=>{
+          const loc={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,source:'gps',capturedAt:new Date().toISOString()};
+          localStorage.setItem('khadamat.currentLocation.v1',JSON.stringify(loc));locationGatePassed=true;draw();
+        },err=>{
+          if(btn){btn.disabled=false;btn.textContent='إعادة المحاولة لتحديد موقعي'}
+          if(status)status.textContent=err.code===1?'لم يتم السماح بالموقع. يمكنك السماح من إعدادات الهاتف أو المتابعة يدويًا.':'تعذر تحديد الموقع الآن. فعّل خدمة الموقع وحاول مرة أخرى أو تابع يدويًا.';
+        },{enableHighAccuracy:true,timeout:20000,maximumAge:30000});
+      });
+      document.getElementById('preLoginContinue')?.addEventListener('click',()=>{locationGatePassed=true;draw()});
+      return;
+    }
     const selectedLabel=selected==='CUSTOMER'?'حساب عميل':selected==='PROVIDER'?'حساب مقدم خدمة':selected==='ADMIN'?'حساب إدارة':'';
     const isAdmin=selected==='ADMIN'; const isProvider=selected==='PROVIDER';
     shell(`<div class="hero"><h1>مرحبًا بك في خدمات</h1><p class="muted">${selected==='CUSTOMER'?'تسجيل العميل سريع: رقم الهاتف ← رمز واتساب ← دخول. لا نطلب منك استبيانًا طويلًا.':forcedRole?'هذه واجهة مستقلة للحساب المحدد. بعد تسجيل الدخول ستبقى داخل واجهتك فقط.':'اختر نوع الحساب أولًا. بعد تسجيل الدخول ستظهر لك واجهة حسابك فقط.'}</p></div>
