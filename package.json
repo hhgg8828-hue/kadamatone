@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "0.6.54",
-  "description": "خدمات (Khadamat) — V84.10 trip share lifecycle privacy",
+  "version": "0.6.58",
+  "description": "خدمات (Khadamat) — V85.2 visible admin navigation and provider quick links",
   "private": true,
   "type": "module",
   "engines": {

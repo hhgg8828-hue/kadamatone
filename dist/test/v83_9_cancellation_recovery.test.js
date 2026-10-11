@@ -68,8 +68,8 @@ test('V83.9: لا تُلغى الخدمة مرتين بطلبين متزامني
 });
 test('V83.9: جميع واجهات PWA تستخدم ملفات الأصول وذاكرة التخزين المؤقت الحالية', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=84.10'), file);
+        assert.ok(fs.readFileSync(file, 'utf8').includes('v=85.2'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v84-10'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v85-2'));
 });
 //# sourceMappingURL=v83_9_cancellation_recovery.test.js.map

@@ -12,7 +12,7 @@ import type { OrderRow, QuoteRow } from '../types/domain.js';
  * مرتبط فعليًا بقاعدة البيانات: لا بيانات وهمية.
  */
 const quoteOut = (q: QuoteRow, providerName?: string) => ({
-  id: q.id, orderId: q.order_id, providerId: q.provider_id, providerName, amount: q.amount, message: q.message,
+  id: q.id, orderId: q.order_id, providerId: q.provider_id, providerName, amount: q.amount, deliveryFee: Number(q.delivery_fee || 0), totalAmount: Number(q.amount) + Number(q.delivery_fee || 0), message: q.message,
   validUntil: q.valid_until, status: q.status, createdAt: q.created_at,
 });
 
@@ -21,8 +21,10 @@ export function registerQuoteRoutes(app: App, r: Router): void {
 
   // مزود يقدّم عرض سعر لطلب QUOTE مُسنَد له إسناد OFFERED (لا يمكن التقديم بلا عرض إسناد نشط)
   r.post('/provider/orders/:id/quote', auth, roles('PROVIDER'), (ctx: Ctx) => {
-    const b = parse<{ amount: number; message?: string; validHours?: number }>(
-      s.obj({ amount: s.num({ min: 0, max: 100_000_000 }), message: s.str({ max: 500, optional: true }), validHours: s.int({ min: 1, max: 720, optional: true }) }), ctx.body);
+    const b = parse<{ amount: number; deliveryFee?: number; message?: string; validHours?: number }>(
+      s.obj({ amount: s.num({ min: 0, max: 100_000_000 }), deliveryFee: s.num({ min: 0, max: 100_000_000, optional: true }), message: s.str({ max: 500, optional: true }), validHours: s.int({ min: 1, max: 720, optional: true }) }), ctx.body);
+    const deliveryFee = b.deliveryFee ?? 0;
+    if (b.amount + deliveryFee > 100_000_000) throw E.unprocessable('الإجمالي يتجاوز الحد المسموح', 'QUOTE_TOTAL_TOO_HIGH');
     const providerId = ctx.user!.providerId!;
     return db.tx(() => {
       const o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', ctx.params['id']);
@@ -39,13 +41,13 @@ export function registerQuoteRoutes(app: App, r: Router): void {
         if (existing.status === 'SUBMITTED') throw E.conflict('تم تقديم عرض سعر لهذا الطلب بالفعل', 'QUOTE_ALREADY_SUBMITTED');
         throw E.conflict('تم التعامل مع عرض السعر لهذا الطلب ولا يمكن تقديم عرض آخر', 'QUOTE_LOCKED');
       } else {
-        db.run('INSERT INTO quotes(id,order_id,provider_id,amount,message,valid_until,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
-          uuid(), o.id, providerId, b.amount, b.message || null, validUntil, 'SUBMITTED', now, now);
+        db.run('INSERT INTO quotes(id,order_id,provider_id,amount,delivery_fee,message,valid_until,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+          uuid(), o.id, providerId, b.amount, deliveryFee, b.message || null, validUntil, 'SUBMITTED', now, now);
       }
       const p = app.providers.summary(providerId);
       ctx.status = existing ? 200 : 201;
       const q = db.get<QuoteRow>('SELECT * FROM quotes WHERE order_id = ? AND provider_id = ?', o.id, providerId)!;
-      app.notifications.notify(o.customer_id, 'NEW_QUOTE', { provider: p.displayName, amount: String(b.amount), code: o.code }, { orderId: o.id, quoteId: q.id });
+      app.notifications.notify(o.customer_id, 'NEW_QUOTE', { provider: p.displayName, amount: String(b.amount + deliveryFee), code: o.code }, { orderId: o.id, quoteId: q.id });
       return { quote: quoteOut(q, p.displayName) };
     });
   });
@@ -91,8 +93,9 @@ export function registerQuoteRoutes(app: App, r: Router): void {
       if (q.status !== 'SUBMITTED') throw E.conflict('هذا العرض لم يعد متاحًا', 'QUOTE_NOT_AVAILABLE');
       if (q.valid_until && q.valid_until <= iso(app.clock.now())) { db.run(`UPDATE quotes SET status='EXPIRED' WHERE id=?`, q.id); throw E.conflict('انتهت صلاحية هذا العرض', 'QUOTE_EXPIRED'); }
       const now = iso(app.clock.now());
+      const totalAmount = Number(q.amount) + Number(q.delivery_fee || 0);
       const res = db.run(`UPDATE orders SET status='ACCEPTED', provider_id=?, agreed_price=?, accepted_at=?, updated_at=?, version=version+1
-                           WHERE id=? AND status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL`, q.provider_id, q.amount, now, now, o.id);
+                           WHERE id=? AND status IN ('SEARCHING','ASSIGNED') AND provider_id IS NULL`, q.provider_id, totalAmount, now, now, o.id);
       if (!res.changes) throw E.conflict('تعذّر قبول العرض، حاول تحديث الصفحة', 'ORDER_ALREADY_TAKEN');
       db.run(`UPDATE quotes SET status='ACCEPTED', updated_at=? WHERE id=?`, now, q.id);
       db.run(`UPDATE quotes SET status='REJECTED', updated_at=? WHERE order_id=? AND status='SUBMITTED' AND id != ?`, now, o.id, q.id);

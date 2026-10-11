@@ -6,6 +6,7 @@ import { auth } from './auth.middleware.js';
 /** قوالب الإشعارات. المفاتيح ثابتة، والنص يُترجم حسب لغة المستخدم. */
 export const TEMPLATES = {
     ORDER_RECEIVED: { ar: ['تم استلام طلبك', 'طلبك رقم {code} قيد البحث عن مقدم خدمة مناسب.'], en: ['Order received', 'Your order {code} is being matched with a provider.'] },
+    ORDER_CONFIRMATION_RESULT: { ar: ['تحديث تأكيد الطلب', 'تم تحديث متابعة طلبك {code}: {result}.'], en: ['Order confirmation update', 'The confirmation status for order {code} is now: {result}.'] },
     NEW_OFFER: { ar: ['لديك طلب جديد', 'طلب «{service}» جديد في {area}. اقبله قبل غيرك.'], en: ['You have a new request', 'New “{service}” request in {area}.'] },
     ORDER_ACCEPTED: { ar: ['تم قبول طلبك من مقدم الخدمة', 'قبل {provider} تنفيذ طلبك رقم {code}.'], en: ['Your order was accepted', '{provider} accepted order {code}.'] },
     PROVIDER_ON_THE_WAY: { ar: ['مقدم الخدمة في الطريق', 'مقدم الخدمة في طريقه إليك لتنفيذ الطلب {code}.'], en: ['Provider is on the way', 'Your provider is heading to you (order {code}).'] },
@@ -25,6 +26,9 @@ export const TEMPLATES = {
     PROVIDER_SUSPENDED: { ar: ['تم تعليق حسابك', 'السبب: {reason}'], en: ['Account suspended', 'Reason: {reason}'] },
     PROVIDER_REACTIVATED: { ar: ['تمت إعادة تفعيل حسابك', 'يمكنك متابعة استقبال الطلبات.'], en: ['Account reactivated', 'You can receive requests again.'] },
     NEW_RATING: { ar: ['تقييم جديد', 'حصلت على {score} من 5 للطلب {code}.'], en: ['New rating', 'You received {score}/5 for order {code}.'] },
+    RATING_FEEDBACK_RESPONSE: { ar: ['شكرًا لملاحظتك', '{message}'], en: ['Thank you for your feedback', '{message}'] },
+    RATING_FEEDBACK_ADMIN: { ar: ['ملاحظة تقييم جديدة', 'وصلت ملاحظة تحتاج إلى مراجعة للطلب {code}.'], en: ['New rating feedback', 'Feedback for order {code} needs review.'] },
+    RATING_FEEDBACK_PROVIDER: { ar: ['ملاحظة من العميل', 'وصلتك ملاحظة مرتبطة بتقييم الطلب {code}. راجعها لتحسين الخدمة.'], en: ['Customer feedback', 'Feedback was submitted for order {code}. Please review it to improve service.'] },
     COMPLAINT_OPENED: { ar: ['شكوى على طلب', 'فُتحت شكوى على الطلب {code}. يرجى الرد عليها.'], en: ['Complaint opened', 'A complaint was opened on order {code}. Please reply.'] },
     COMPLAINT_OPENED_ADMIN: { ar: ['شكوى جديدة', 'شكوى {complaint} على الطلب {code}.'], en: ['New complaint', 'Complaint {complaint} on order {code}.'] },
     COMPLAINT_REPLIED: { ar: ['رد جديد على الشكوى', 'هناك رد جديد على الشكوى {complaint}.'], en: ['New complaint reply', 'New reply on complaint {complaint}.'] },

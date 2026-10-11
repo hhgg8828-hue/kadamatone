@@ -70,9 +70,9 @@ async function issueCustomerOtp(app: App, phone: string): Promise<{ maskedPhone:
   return { maskedPhone: maskPhone(phone), ...(!app.config.whatsappOtpEnabled ? { devCode: code } : {}) };
 }
 
-export interface UserOut { id: string; fullName: string; phone: string; email: string | null; role: string; locale: string; status: string; avatarUrl: string | null; adminLevel: string | null }
+export interface UserOut { id: string; fullName: string; phone: string; secondaryPhone: string | null; email: string | null; role: string; locale: string; status: string; avatarUrl: string | null; adminLevel: string | null }
 export function serializeUser(u: UserRow): UserOut {
-  return { id: u.id, fullName: u.full_name, phone: u.phone, email: u.email || null, role: u.role, locale: u.locale, status: u.status,
+  return { id: u.id, fullName: u.full_name, phone: u.phone, secondaryPhone: u.secondary_phone || null, email: u.email || null, role: u.role, locale: u.locale, status: u.status,
     avatarUrl: u.avatar_file_id ? `/api/v1/files/${u.avatar_file_id}` : null, adminLevel: u.admin_level ?? null };
 }
 

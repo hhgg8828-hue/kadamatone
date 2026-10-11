@@ -585,3 +585,53 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
   .provider-command-strip b{font-size:20px}
 }
 @media(prefers-reduced-motion:reduce){.card,.btn,.quick-service,.service-option{transition:none!important}}
+
+/* V85.0 structured, accessible rating reasons */
+.rating-reason-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin:10px 0}
+.rating-reason{border:1px solid var(--border,#d9e2dc);border-radius:14px;background:var(--surface,#fff);color:var(--text,#18352a);padding:10px 12px;text-align:center;cursor:pointer;min-height:42px;transition:background .15s,border-color .15s,box-shadow .15s}
+.rating-reason.selected,.rating-reason[aria-pressed="true"]{background:#e1f3e8;border-color:#23845b;box-shadow:inset 0 0 0 1px #23845b;color:#145b3c}
+.rating-reason:focus-visible{outline:2px solid #23845b;outline-offset:2px}
+[data-service-sentiment].selected{background:#e1f3e8;border-color:#23845b;color:#145b3c}
+
+/* V85.0 city-aware home and image-led campaign cards */
+.customer-city-select{display:grid;gap:8px;margin:0 0 12px;padding:12px 14px}
+.customer-city-select label{font-weight:700}
+.customer-city-select select{width:100%;max-width:420px;min-height:42px;border:1px solid var(--border,#d9e2dc);border-radius:12px;padding:8px 12px;background:var(--surface,#fff);color:var(--text,#18352a)}
+.campaign-strip{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}
+.campaign-card{display:grid;grid-template-columns:minmax(100px,34%) 1fr;gap:12px;align-items:center;overflow:hidden;cursor:pointer;padding:10px}
+.campaign-card .campaign-image{width:100%;height:112px;object-fit:cover;border-radius:12px;grid-row:1 / span 2}
+.campaign-image-placeholder{display:grid;place-items:center;background:linear-gradient(135deg,#e3f4e9,#f6f8f6);font-size:30px}
+.campaign-card-copy p{margin:5px 0;font-size:.92rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.campaign-card>.btn{grid-column:2;justify-self:start}
+.campaign-detail-image{width:100%;max-height:260px;object-fit:cover;border-radius:14px;margin:8px 0}
+@media(min-width:720px){.campaign-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.campaign-card{grid-template-columns:120px 1fr}.campaign-card .campaign-image{height:124px}}
+.campaign-admin-preview{display:block;width:min(100%,560px);height:120px;object-fit:cover;border-radius:12px;margin-bottom:10px}
+.order-details-accordion{display:grid;gap:8px;margin:12px 0}
+.order-details-accordion details{border:1px solid var(--border,#d9e2dc);border-radius:12px;background:var(--surface,#fff);overflow:hidden}
+.order-details-accordion summary{cursor:pointer;font-weight:700;padding:12px 14px;list-style-position:inside}
+.order-detail-content{padding:0 14px 12px;overflow-wrap:anywhere}
+.order-detail-content p{margin:6px 0}
+.order-created-success{text-align:center;padding:20px}
+.order-created-success .row{justify-content:center;margin-top:16px}
+
+/* V85.1 — account privacy, location consent, and transparent quote totals */
+.account-delete-card{border-color:#f3c7c2;background:linear-gradient(135deg,#fffafa,#fff)}
+.account-delete-card h3{color:var(--danger);margin-top:0}
+.location-permission-intro .notice{margin:14px 0}
+.location-permission-intro .row{margin-top:14px}
+.order-price-preview{margin:14px 0;background:linear-gradient(135deg,#f7fcf8,#fffaf0);border-color:#d6e8dc}
+.order-price-preview h3{margin-top:0;color:var(--primary)}
+.order-item-summary p,.quote-breakdown p{margin:5px 0}
+.quote-breakdown{padding:10px 13px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2)}
+.quote-breakdown p:last-child{border-top:1px solid var(--line);padding-top:7px;color:var(--primary)}
+
+
+/* V85.2 — make every admin module visible on mobile; provider quick navigation */
+.admin-tabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;flex-wrap:wrap!important;overflow:visible!important;overscroll-behavior:initial!important;position:static!important;align-items:stretch;gap:8px;padding:10px;margin-bottom:18px}
+.admin-tabs .btn{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35;min-height:42px;padding:9px 8px}
+.provider-quick-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:10px;background:#fff;border:1px solid #dce9df;border-radius:16px;box-shadow:var(--shadow-sm)}
+.provider-quick-nav a{display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px 9px;border:1px solid #e1e9e3;border-radius:11px;background:linear-gradient(145deg,#f7fbf8,#fff);color:#245640;text-align:center;text-decoration:none;font-weight:800;font-size:13px;line-height:1.35}
+.provider-quick-nav a:hover{background:#edf7f0;border-color:#b9d4c2}
+#providerNotificationPanel,#offers,#myorders,#providerServicesSection,#verificationCard,#providerLocationCard,#providerVehicleCard,#providerCapabilitiesCard{scroll-margin-top:16px}
+@media(max-width:850px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:600px){.admin-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;position:static!important;gap:7px;padding:8px}.admin-tabs .btn{font-size:12px;padding:9px 6px}.provider-quick-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}.provider-quick-nav a{font-size:12px;min-height:40px;padding:7px 5px}}

@@ -26,7 +26,7 @@ export interface AuthUser {
 
 // ===== صفوف قاعدة البيانات الخام (SQLite الآن؛ نفس الأعمدة تصلح لـPostgreSQL لاحقًا) =====
 export interface UserRow {
-  id: string; role_id: number; full_name: string; phone: string; email: string | null; password_hash: string;
+  id: string; role_id: number; full_name: string; phone: string; secondary_phone?: string | null; email: string | null; password_hash: string;
   status: UserStatus; locale: Locale; avatar_file_id: string | null; token_version: number; last_login_at: string | null;
   created_at: string; updated_at: string; role: Role; admin_level: AdminLevel | null;
 }
@@ -66,7 +66,7 @@ export interface OrderAssignmentRow {
   offered_at: string; expires_at: string; responded_at: string | null;
 }
 export interface QuoteRow {
-  id: string; order_id: string; provider_id: string; amount: number; message: string | null; valid_until: string | null;
+  id: string; order_id: string; provider_id: string; amount: number; delivery_fee: number; message: string | null; valid_until: string | null;
   status: QuoteStatus; created_at: string; updated_at: string;
 }
 export interface RatingRow { id: string; order_id: string; customer_id: string; provider_id: string; score: number; created_at: string }

@@ -236,8 +236,8 @@ export function registerAssignmentRoutes(app: App, r: Router): void {
   r.get('/provider/offers', ...isProvider, (ctx: Ctx) => ({
     offers: app.assignment.listOffers(ctx.user!.providerId!).map((a) => {
       const pricingType = app.db.get<{pricing_type:string}>('SELECT pricing_type FROM orders WHERE id=?', a.order_id)?.pricing_type || 'FIXED';
-      const quote = pricingType === 'QUOTE' ? app.db.get<{id:string; amount:number; status:string}>('SELECT id, amount, status FROM quotes WHERE order_id=? AND provider_id=?', a.order_id, ctx.user!.providerId) : undefined;
-      return { id: a.id, orderId: a.order_id, orderCode: a.orderCode, serviceName: a.serviceName, areaName: a.areaName, priority: a.priority, customerAvatarUrl: a.customerAvatarUrl, distanceKm: a.distance_km, offeredAt: a.offered_at, expiresAt: a.expires_at, pricingType, quoteStatus: quote?.status || null, quoteId: quote?.id || null, quoteAmount: quote?.amount ?? null };
+      const quote = pricingType === 'QUOTE' ? app.db.get<{id:string; amount:number; delivery_fee:number; status:string}>('SELECT id, amount, delivery_fee, status FROM quotes WHERE order_id=? AND provider_id=?', a.order_id, ctx.user!.providerId) : undefined;
+      return { id: a.id, orderId: a.order_id, orderCode: a.orderCode, serviceName: a.serviceName, areaName: a.areaName, priority: a.priority, customerAvatarUrl: a.customerAvatarUrl, distanceKm: a.distance_km, offeredAt: a.offered_at, expiresAt: a.expires_at, pricingType, quoteStatus: quote?.status || null, quoteId: quote?.id || null, quoteAmount: quote?.amount ?? null, quoteDeliveryFee: quote?.delivery_fee ?? null, quoteTotalAmount: quote ? Number(quote.amount)+Number(quote.delivery_fee||0) : null };
     })
   }));
 

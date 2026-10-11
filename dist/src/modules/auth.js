@@ -69,7 +69,7 @@ async function issueCustomerOtp(app, phone) {
     return { maskedPhone: maskPhone(phone), ...(!app.config.whatsappOtpEnabled ? { devCode: code } : {}) };
 }
 export function serializeUser(u) {
-    return { id: u.id, fullName: u.full_name, phone: u.phone, email: u.email || null, role: u.role, locale: u.locale, status: u.status,
+    return { id: u.id, fullName: u.full_name, phone: u.phone, secondaryPhone: u.secondary_phone || null, email: u.email || null, role: u.role, locale: u.locale, status: u.status,
         avatarUrl: u.avatar_file_id ? `/api/v1/files/${u.avatar_file_id}` : null, adminLevel: u.admin_level ?? null };
 }
 export function createAuthService(app) {

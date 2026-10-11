@@ -2,7 +2,7 @@ import { s, parse, type Schema } from '../core/validate.js';
 import { E } from '../core/errors.js';
 import { readIdempotencyKey } from '../core/idempotency.js';
 import { uuid } from '../core/security.js';
-import { iso, tr, pageParams, cursorSql, finishPage, parseJson } from '../core/util.js';
+import { iso, tr, pageParams, cursorSql, finishPage, parseJson, haversineKm } from '../core/util.js';
 import { auth, roles } from './auth.middleware.js';
 import { locationSchema, type LocationInput } from './locations.js';
 import { validateFormData, type FormField } from './catalog.js';
@@ -117,6 +117,7 @@ export function createOrders(app: App): Orders {
       if (!['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(to)) {
         db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', now, o.id);
       }
+      if (to === 'CANCELLED') db.run("UPDATE order_contact_confirmations SET status='NOT_REQUIRED',updated_at=? WHERE order_id=? AND status='PENDING'",now,o.id);
       executionEvent(app,o.id,'STATUS',`تغيرت حالة الطلب إلى ${to}`,reason,actorRole,ctx.user?.id,metadata||{});
       if (to === 'ACCEPTED' || to === 'CANCELLED' || to === 'COMPLETED') db.run('UPDATE intent_audit SET outcome=?,updated_at=? WHERE order_id=?',to,now,o.id);
       if (to === 'COMPLETED' && o.provider_id) {
@@ -175,8 +176,10 @@ export function registerOrderRoutes(app: App, r: Router): void {
         if (!addr) throw E.unprocessable('العنوان غير موجود', 'INVALID_ADDRESS');
         locRow = db.get<LocationRow>('SELECT * FROM locations WHERE id = ?', addr.location_id)!;
       } else if (b.location) {
-        locRow = app.locations.create({ ...b.location, areaId: b.location.areaId || selectedAreaId || undefined }, { requireArea: false });
-        if (selectedAreaId) locRow = { ...locRow, area_id: selectedAreaId };
+        // Keep the geographic area resolved from the actual coordinates. A manually
+        // selected city is a scope preference, not permission to relabel GPS coordinates.
+        locRow = app.locations.create({ ...b.location, areaId: b.location.areaId || undefined }, { requireArea: false });
+        if (selectedAreaId && !locRow.area_id) { const chosen=catalog.all().areas.find(a=>a.id===selectedAreaId); if(chosen && haversineKm(locRow.lat,locRow.lng,chosen.center_lat,chosen.center_lng)>chosen.radius_km) throw E.unprocessable('الموقع الحالي خارج المدينة المختارة','LOCATION_OUTSIDE_SELECTED_CITY'); locRow = { ...locRow, area_id: selectedAreaId }; }
       } else {
         locRow = db.get<LocationRow>('SELECT * FROM locations WHERE id=?', 'no-location')!;
         const systemArea = db.get<{id:string}>("SELECT id FROM service_areas WHERE id IN ('system-yemen','yemen-unmapped') AND is_active=1 ORDER BY CASE id WHEN 'system-yemen' THEN 0 ELSE 1 END LIMIT 1");
@@ -184,6 +187,17 @@ export function registerOrderRoutes(app: App, r: Router): void {
         else if (locRow && systemArea && locRow.area_id !== systemArea.id) locRow = { ...locRow, area_id: systemArea.id };
         if (!locRow) throw E.unprocessable('تعذر حفظ الطلب بدون موقع حاليًا', 'LOCATION_PLACEHOLDER_MISSING');
         locationProvided = false;
+      }
+
+      // Server-side coverage enforcement: client-side filtering alone is not trusted.
+      const serviceAreaRules=db.all<{area_id:string}>('SELECT area_id FROM service_area_rules WHERE service_id=?',svc.id).map(x=>x.area_id);
+      if (selectedAreaId && locRow.area_id && !catalog.areaChain(locRow.area_id).includes(selectedAreaId)) {
+        throw E.unprocessable('موقع الخدمة لا يقع داخل المدينة المختارة. غيّر المدينة أو حدّد موقعًا داخلها.','LOCATION_OUTSIDE_SELECTED_CITY');
+      }
+      if (serviceAreaRules.length) {
+        if (!locationProvided) throw E.unprocessable('حدد موقع الخدمة حتى نتحقق من توفر هذه الخدمة في منطقتك','LOCATION_REQUIRED_FOR_COVERAGE');
+        const chain=locRow.area_id?catalog.areaChain(locRow.area_id):[];
+        if (!serviceAreaRules.some(areaId=>chain.includes(areaId))) throw E.unprocessable('الخدمة غير متاحة في منطقة موقع الخدمة المحدد','SERVICE_NOT_AVAILABLE_IN_AREA');
       }
 
       // حماية إضافية من الضغط/الإرسال المكرر: إذا أرسل العميل نفس الطلب فعليًا
@@ -238,6 +252,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
         b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get<string>('platform.currency'),
         b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName||null, b.recipientPhone||null, b.recipientUserId||null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', nowIso);
+      db.run('INSERT INTO order_contact_confirmations(order_id,status,attempt_count,created_at,updated_at) VALUES(?,?,?,?,?)',id,'PENDING',0,nowIso,nowIso);
       if (b.tasks?.length) { for (let i=0;i<b.tasks.length;i++) db.run('INSERT INTO order_tasks(id,order_id,sequence_no,title,task_type,status,details,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',uuid(),id,i+1,b.tasks[i].title,b.tasks[i].taskType||'GENERAL','PENDING',b.tasks[i].details||null,nowIso,nowIso); executionEvent(app,id,'COMPOUND_TASKS_CREATED','إنشاء طلب مركب',`تم إنشاء ${b.tasks.length} مهام مرتبطة بالطلب`,'CUSTOMER',ctx.user!.id,{count:b.tasks.length}); }
       if (b.assistantSessionId) db.run("UPDATE assistant_sessions SET status='CONFIRMED',updated_at=? WHERE id=? AND customer_id=?",nowIso,b.assistantSessionId,ctx.user!.id);
       if (b.assistantSessionId) db.run('UPDATE intent_audit SET order_id=?,selected_service_id=?,updated_at=? WHERE assistant_session_id=? AND order_id IS NULL',id,svc.id,nowIso,b.assistantSessionId);
@@ -299,6 +314,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
         actorRole, b.reason || null, fee, now, now, o.id, o.version);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)', o.id, o.status, 'CANCELLED', ctx.user!.id, actorRole, b.reason || null, now);
       db.run('UPDATE trip_shares SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL', now, o.id);
+      db.run("UPDATE order_contact_confirmations SET status='NOT_REQUIRED',updated_at=? WHERE order_id=? AND status='PENDING'",now,o.id);
       db.run(`UPDATE order_assignments SET status='WITHDRAWN', responded_at=? WHERE order_id=? AND status='OFFERED'`, now, o.id);
       db.run(`UPDATE quotes SET status='WITHDRAWN', updated_at=? WHERE order_id=? AND status='SUBMITTED'`, now, o.id);
       if (o.provider_id) app.payment.onCancelled(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!);
@@ -314,6 +330,30 @@ export function registerOrderRoutes(app: App, r: Router): void {
     const p = db.get<{ id:string; method:string; status:string; amount:number; currency:string; provider_ref:string|null; created_at:string; updated_at:string }>(
       'SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC LIMIT 1', o.id);
     return { payment: p ? { id:p.id, method:p.method, status:p.status, amount:p.amount, currency:p.currency, providerRef:p.provider_ref, createdAt:p.created_at, updatedAt:p.updated_at } : null };
+  });
+
+  r.get('/admin/order-confirmations', auth, (ctx: Ctx) => {
+    if (ctx.user!.role !== 'ADMIN') throw E.forbidden();
+    const status=String(ctx.query['status']||'PENDING').toUpperCase();
+    if(status!=='ALL'&&!['PENDING','CONFIRMED','UNREACHABLE','NEEDS_REVIEW','NOT_REQUIRED'].includes(status)) throw E.unprocessable('حالة تأكيد غير صالحة','INVALID_CONFIRMATION_STATUS');
+    const where=status==='ALL'?'': 'AND oc.status=?';
+    const rows=db.all<any>(`SELECT oc.*,o.code,o.status order_status,o.description,o.contact_phone,o.customer_notes,o.created_at order_created_at,u.full_name customer_name,s.name_i18n service_name FROM order_contact_confirmations oc JOIN orders o ON o.id=oc.order_id JOIN users u ON u.id=o.customer_id JOIN services s ON s.id=o.service_id WHERE 1=1 ${where} ORDER BY CASE oc.status WHEN 'PENDING' THEN 0 WHEN 'UNREACHABLE' THEN 1 WHEN 'NEEDS_REVIEW' THEN 2 ELSE 3 END,oc.created_at DESC LIMIT 300`,...(status==='ALL'?[]:[status]));
+    return {items:rows.map(x=>({orderId:x.order_id,orderCode:x.code,orderStatus:x.order_status,description:x.description,phone:x.contact_phone,customerName:x.customer_name,serviceName:JSON.parse(x.service_name||'{}').ar||x.service_name,customerNotes:x.customer_notes,orderCreatedAt:x.order_created_at,status:x.status,attemptCount:x.attempt_count,resultNote:x.result_note,attemptedAt:x.attempted_at,confirmedAt:x.confirmed_at,updatedAt:x.updated_at})),counts:{pending:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='PENDING'")?.n||0),unreachable:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='UNREACHABLE'")?.n||0),needsReview:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='NEEDS_REVIEW'")?.n||0)}};
+  });
+  r.patch('/admin/order-confirmations/:orderId', auth, (ctx: Ctx) => {
+    if (ctx.user!.role !== 'ADMIN') throw E.forbidden();
+    const b=parse<any>(s.obj({status:s.oneOf(['CONFIRMED','UNREACHABLE','NEEDS_REVIEW','NOT_REQUIRED','PENDING']),note:s.str({max:1000,optional:true})}),ctx.body);
+    return db.tx(()=>{
+      const row=db.get<any>('SELECT * FROM order_contact_confirmations WHERE order_id=?',ctx.params.orderId!); if(!row) throw E.notFound('سجل تأكيد الطلب غير موجود');
+      const order=db.get<any>('SELECT id,code,customer_id,status FROM orders WHERE id=?',row.order_id); if(!order) throw E.notFound('الطلب غير موجود');
+      const now=iso(app.clock.now()); const attempted=row.attempt_count+1;
+      const updated=db.run("UPDATE order_contact_confirmations SET status=?,attempt_count=?,result_note=?,attempted_by=?,attempted_at=?,confirmed_at=CASE WHEN ?='CONFIRMED' THEN ? WHEN ?='PENDING' THEN NULL ELSE confirmed_at END,updated_at=? WHERE order_id=? AND updated_at=?",b.status,attempted,b.note?.trim()||null,ctx.user!.id,now,b.status,now,b.status,now,row.order_id,row.updated_at);
+      if(!updated.changes) throw E.conflict('تغير سجل المتابعة من عملية أخرى؛ أعد المحاولة','CONFIRMATION_VERSION_CONFLICT');
+      const labels:any={PENDING:'بانتظار الاتصال',CONFIRMED:'تم تأكيد الطلب',UNREACHABLE:'تعذر الاتصال',NEEDS_REVIEW:'يحتاج مراجعة التفاصيل',NOT_REQUIRED:'لا يحتاج إلى اتصال'};
+      if(b.status==='CONFIRMED'||b.status==='UNREACHABLE'||b.status==='NEEDS_REVIEW') app.notifications.notify(order.customer_id,'ORDER_CONFIRMATION_RESULT',{code:order.code,result:labels[b.status]},{orderId:order.id,confirmationStatus:b.status});
+      app.audit.log({ctx,action:'order.contact_confirmation',entityType:'order',entityId:order.id,before:{status:row.status,attemptCount:row.attempt_count},after:{status:b.status,attemptCount:attempted,note:b.note||null}});
+      return {ok:true,status:b.status,attemptCount:attempted};
+    });
   });
 
   r.get('/admin/orders', auth, (ctx: Ctx) => {

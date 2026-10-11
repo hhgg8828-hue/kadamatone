@@ -29,6 +29,19 @@ export function registerFileRoutes(app, r) {
     const { db } = app;
     r.post('/files', auth, limit('upload', { max: 40, windowMs: 3600_000, key: (c) => c.user?.id || c.ip }), (ctx) => {
         const b = parse(s.obj({ purpose: s.oneOf(PURPOSES), name: s.str({ max: 120, optional: true }), dataBase64: s.str({ min: 8, max: 7_000_000, trim: false }) }), ctx.body);
+        // Enforce purpose at the upload boundary, not only when a file is later
+        // attached to a profile/order. This prevents customers from filling public
+        // provider-gallery purposes or creating orphaned provider documents.
+        const allowedRoles = {
+            avatar: ['CUSTOMER', 'PROVIDER', 'ADMIN'],
+            order_attachment: ['CUSTOMER', 'PROVIDER'],
+            provider_document: ['PROVIDER'],
+            work_photo: ['PROVIDER'],
+            service_icon: ['ADMIN'],
+        };
+        if (!allowedRoles[b.purpose].includes(ctx.user.role)) {
+            throw E.forbidden('لا تملك صلاحية رفع هذا النوع من الملفات', 'FILE_PURPOSE_FORBIDDEN');
+        }
         const encoded = b.dataBase64.replace(/^data:[^;]+;base64,/, '');
         // Buffer.from(base64) is deliberately permissive and may ignore invalid
         // characters. Validate canonical Base64 before allocating/accepting bytes.
@@ -46,11 +59,19 @@ export function registerFileRoutes(app, r) {
         const allowed = (b.purpose === 'provider_document') ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] : b.purpose === 'order_attachment' ? ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'audio/webm', 'audio/ogg'] : ['image/jpeg', 'image/png', 'image/webp'];
         if (!mime || !allowed.includes(mime))
             throw E.unprocessable('نوع الملف غير مدعوم', 'UNSUPPORTED_FILE_TYPE');
-        if (b.purpose === 'service_icon' && ctx.user.role !== 'ADMIN')
-            throw E.forbidden();
         const id = uuid();
-        app.storage.save(id, buf);
-        db.run('INSERT INTO files(id,owner_id,storage_key,original_name,mime,size,purpose,created_at) VALUES (?,?,?,?,?,?,?,?)', id, ctx.user.id, id, (b.name || '').replace(/[^\p{L}\p{N}._ -]/gu, '').slice(0, 120) || null, mime, buf.length, b.purpose, iso(app.clock.now()));
+        // Keep the database row and bytes consistent. If disk write or COMMIT fails,
+        // roll back the row and remove any partially written file.
+        try {
+            db.tx(() => {
+                db.run('INSERT INTO files(id,owner_id,storage_key,original_name,mime,size,purpose,created_at) VALUES (?,?,?,?,?,?,?,?)', id, ctx.user.id, id, (b.name || '').replace(/[^\p{L}\p{N}._ -]/gu, '').slice(0, 120) || null, mime, buf.length, b.purpose, iso(app.clock.now()));
+                app.storage.save(id, buf);
+            });
+        }
+        catch (err) {
+            app.storage.remove(id);
+            throw err;
+        }
         ctx.status = 201;
         return { file: { id, mime, size: buf.length, purpose: b.purpose, url: `/api/v1/files/${id}` } };
     });
