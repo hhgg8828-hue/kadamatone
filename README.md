@@ -150,3 +150,7 @@ SQLite ومحدد المعدل الموجود في الذاكرة مناسبان
 - مقدم الخدمة: `provider@demo.local` / `Demo12345`
 
 بيانات المدير تُحدد عبر `ADMIN_NAME`, `ADMIN_PHONE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` في `.env` أو تُنشأ كلمة مرور عشوائية عند أول seed إذا لم تُحدد.
+
+## أحدث إصدار
+
+الإصدار العام الحالي في حزمة المشروع: **2.7**. راجع `RELEASE_NOTES_2.7.md` و`TEST_REPORT_2.7.md` و`PRELAUNCH_CHECKLIST_2.7.md`. تم اختبار البناء محليًا؛ النشر إلى Railway والتحقق من GPS على هاتف فعلي ما زالا مطلوبين.

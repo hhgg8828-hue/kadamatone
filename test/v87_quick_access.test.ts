@@ -25,7 +25,7 @@ test('Quick access searches automatically and restricts suggestions to the loade
 
 test('Selecting a suggested service does not create an order and preserves the description for review', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  assert.ok(app.includes("openOrderForm(serviceId,{description:q})"));
+  assert.ok(app.includes("openServiceDetails(serviceId,{description:q})"));
   assert.ok(app.includes("localStorage.setItem('khadamat.pendingRequestDescription.v1',String(initial.description).slice(0,1000))"));
   assert.ok(app.includes('اختر الخدمة المناسبة؛ لن يُرسل أي طلب قبل مراجعتك وتأكيدك.'));
   assert.ok(!app.includes("api('/orders',{method:'POST',headers:{'Idempotency-Key':newIdempotencyKey()},body:JSON.stringify(body)});\n      toast('تم إرسال طلبك'"));
@@ -41,8 +41,8 @@ test('Unmatched needs have a dedicated custom-service path with the original des
 test('Release 2.5 keeps public asset cache identifiers aligned', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.5'), file);
-    assert.ok(html.includes('app.css?v=2.5'), file);
+    assert.ok(html.includes('app.js?v=2.7'), file);
+    assert.ok(html.includes('app.css?v=2.7'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-5'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-7'));
 });

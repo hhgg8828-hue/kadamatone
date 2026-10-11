@@ -667,7 +667,7 @@ async function openAccount() {
     }
 }
 function authBox(forcedRole = null) {
-    let locationGatePassed = localStorage.getItem('khadamat.locationGateDone.v1') === '1';
+    let locationGatePassed = forcedRole === 'ADMIN' || forcedRole === 'PROVIDER' || localStorage.getItem('khadamat.locationGateDone.v1') === '1';
     let selected = forcedRole;
     let mode = 'login';
     let customerOtpPhone = '';
@@ -864,7 +864,7 @@ async function customer() {
             const areaPayload = await api('/areas').catch(() => ({ areas: [] }));
             state.areas = areaPayload.areas || [];
             const storedArea = localStorage.getItem('khadamat.selectedAreaId') || '';
-            const validStoredArea = state.areas.some((a) => a.id === storedArea && ['GOVERNORATE', 'CITY'].includes(a.localityType || a.type));
+            const validStoredArea = state.areas.some((a) => a.id === storedArea);
             let inferredArea = null;
             if (!validStoredArea) {
                 try {
@@ -909,7 +909,7 @@ async function customer() {
         } return cur?.id || ''; };
         const storedArea = localStorage.getItem('khadamat.selectedAreaId') || '';
         const defaultArea = (addressPayload.addresses || []).find((a) => a.isDefault)?.location?.areaId || '';
-        state.selectedAreaId = resolveCity(storedArea) || resolveCity(defaultArea) || '';
+        state.selectedAreaId = state.areas.some((a) => a.id === storedArea) ? storedArea : (state.areas.some((a) => a.id === defaultArea) ? defaultArea : resolveCity(defaultArea) || '');
         const areaQuery = state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : '';
         const [catalogPayload, o, platformConfig] = await Promise.all([api('/catalog/bootstrap' + areaQuery), api('/orders'), api('/config').catch(() => ({ currency: 'YER' }))]);
         state.config = platformConfig || { currency: 'YER' };
@@ -1021,12 +1021,12 @@ async function openAskMe() {
             const matches = j.matches || [];
             if (j.clarification?.options?.length) {
                 box.innerHTML = `<div class="card"><b>${esc(j.clarification.question || 'ماذا تقصد؟')}</b><div style="margin-top:10px">${j.clarification.options.slice(0, 3).map((o) => `<button class="suggestion" data-ask-service="${esc(o.serviceId)}" type="button"><span>🛠️</span><span><b>${esc(o.label)}</b></span><span>←</span></button>`).join('')}</div></div>`;
-                box.querySelectorAll('[data-ask-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.askService)));
+                box.querySelectorAll('[data-ask-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.askService)));
             }
             else if (j.recommended) {
                 const steps = (j.steps || []).slice(0, 3);
                 box.innerHTML = `<div class="card"><b>${j.extracted?.compound ? 'فهمنا أن طلبك يجمع أكثر من حاجة' : 'أقرب خدمة مقترحة'}</b><p>${esc(j.recommended.icon || '🛠️')} ${esc(j.recommended.serviceName)}</p>${steps.length > 1 ? `<div class="notice">${steps.map((x) => esc(x.serviceName)).join(' + ')}</div>` : ''}<small class="muted">${esc(j.recommended.categoryName)} · ${j.source === 'AI' ? 'فحص ذكي للصورة والطلب' : 'فهم ذكي'}</small><div class="row" style="margin-top:10px"><button class="btn" id="askUse" type="button">استخدام هذه الخدمة</button><button class="btn secondary" id="askMore" type="button">عرض البدائل</button></div></div>`;
-                document.getElementById('askUse')?.addEventListener('click', () => openOrderForm(j.recommended.serviceId, { description: finalText, assistantSessionId: assistSessionId }));
+                document.getElementById('askUse')?.addEventListener('click', () => openServiceDetails(j.recommended.serviceId, { description: finalText, assistantSessionId: assistSessionId }));
                 document.getElementById('askMore')?.addEventListener('click', () => renderAskMatches(matches, j.customService));
             }
             else
@@ -1103,7 +1103,7 @@ function renderAskMatches(matches, customService) { const box = document.getElem
     box.innerHTML = '<div class="card"><b>لم نحدد الخدمة بدقة بعد</b><p class="muted">اكتب ما تريد كما تتكلم عادة. سنحاول مطابقة الخدمة، وإن لم نجد تطابقًا سنحوّل الوصف إلى طلب خاص يصل للتشغيل.</p><button class="btn" id="askCustom" type="button">➕ إرسال كطلب خاص</button></div>';
     document.getElementById('askCustom')?.addEventListener('click', () => customService ? openOrderForm(customService) : openOrderFormBySlug('custom-request'));
     return;
-} box.innerHTML = `<div class="card"><b>هل تقصد؟</b>${matches.slice(0, 5).map(m => `<button class="suggestion" data-ask-service="${esc(m.serviceId)}" type="button"><span>${esc(m.icon || '🛠️')}</span><span><b>${esc(m.serviceName)}</b><small>${esc(m.categoryName)}</small></span><span>←</span></button>`).join('')}${customService ? '<button class="btn secondary" id="askCustom" type="button">➕ طلب خدمة غير موجودة</button>' : ''}</div>`; box.querySelectorAll('[data-ask-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.askService))); document.getElementById('askCustom')?.addEventListener('click', () => customService ? openOrderForm(customService) : openOrderFormBySlug('custom-request')); }
+} box.innerHTML = `<div class="card"><b>هل تقصد؟</b>${matches.slice(0, 5).map(m => `<button class="suggestion" data-ask-service="${esc(m.serviceId)}" type="button"><span>${esc(m.icon || '🛠️')}</span><span><b>${esc(m.serviceName)}</b><small>${esc(m.categoryName)}</small></span><span>←</span></button>`).join('')}${customService ? '<button class="btn secondary" id="askCustom" type="button">➕ طلب خدمة غير موجودة</button>' : ''}</div>`; box.querySelectorAll('[data-ask-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.askService))); document.getElementById('askCustom')?.addEventListener('click', () => customService ? openOrderForm(customService) : openOrderFormBySlug('custom-request')); }
 async function openFavorites() { try {
     const j = await api('/me/favorites/providers');
     showModal(`<h2>⭐ مقدمو الخدمة المفضلون</h2>${(j.providers || []).map((p) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${esc(p.displayName)}</b><p class="muted">⭐ ${esc(p.rating || 0)} · ${esc(p.verificationStatus)}</p></div><button class="btn" data-fav-provider="${esc(p.id)}" type="button">إزالة</button></div></div>`).join('') || '<div class="empty">لا توجد حسابات مفضلة بعد.</div>'}`);
@@ -1161,7 +1161,7 @@ async function loadPersonalRecommendations() {
             return;
         }
         box.innerHTML = `<div class="section-heading"><div><h2>مقترحة لك</h2><p class="muted">مبنية على طلباتك وعمليات بحثك أنت فقط.</p></div></div><div class="personal-recommendations-grid">${rs.slice(0, 6).map((x) => `<button class="card quick-service" data-personal-service="${esc(x.id)}" type="button"><div class="icon">${serviceIconSvg(x.name, x.icon || '')}</div><b>${esc(x.name)}</b><small class="muted">طلبتها/بحثت عنها ${esc(x.personalUses)} مرة</small></button>`).join('')}</div>`;
-        box.querySelectorAll('[data-personal-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.personalService)));
+        box.querySelectorAll('[data-personal-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.personalService)));
     }
     catch {
         box.innerHTML = '';
@@ -1218,7 +1218,7 @@ async function setupQuickAssistComposer() {
         results.querySelectorAll('[data-quick-assist-service]').forEach(x => x.addEventListener('click', () => {
             const serviceId = x.dataset.quickAssistService || '';
             if (serviceId)
-                openOrderForm(serviceId, { description: q });
+                openServiceDetails(serviceId, { description: q });
         }));
         results.querySelectorAll('[data-quick-assist-custom]').forEach(x => x.addEventListener('click', () => openOrderFormBySlug('custom-request', { description: q })));
     };
@@ -1338,8 +1338,14 @@ async function openCustomerLocationSetup(auto) {
 }
 function renderCustomer() {
     const guestView = !state.user;
+    const areaById = new Map(state.areas.map((a) => [a.id, a]));
+    const areaPath = (a) => { const out = []; let cur = a; let guard = 0; while (cur && guard++ < 8) {
+        out.unshift(String(cur.name || ''));
+        cur = cur.parentId ? areaById.get(cur.parentId) : null;
+    } return out.join(' ← '); };
+    const selectableAreas = state.areas.slice().sort((a, b) => areaPath(a).localeCompare(areaPath(b), 'ar'));
     shell(`<section class="hero customer-simple-hero">
-    <div class="customer-city-select card customer-city-select-compact"><label for="customerCitySelect">📍 المنطقة</label><select id="customerCitySelect"><option value="">كل المناطق المتاحة</option>${state.areas.filter((a) => ['GOVERNORATE', 'CITY'].includes(a.localityType || a.type)).sort((a, b) => { const rank = (x) => x.localityType === 'GOVERNORATE' ? 0 : 1; return rank(a) - rank(b) || String(a.name).localeCompare(String(b.name), 'ar'); }).map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(a.name)}${a.localityType === 'GOVERNORATE' ? ' · محافظة' : ' · مدينة'}</option>`).join('')}</select><button class="btn secondary small" id="customerUseLocation" type="button">📍 موقعي</button><small class="muted">تظهر فقط المناطق التي فعّلت الإدارة خدماتها.</small></div>
+    <div class="customer-city-select card customer-city-select-compact"><label for="customerCitySelect">📍 المحافظة / المنطقة / الحي</label><select id="customerCitySelect"><option value="">كل المناطق المتاحة</option>${selectableAreas.map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(areaPath(a))} · ${esc(a.localityType || a.type || 'منطقة')}</option>`).join('')}</select><button class="btn secondary small" id="customerUseLocation" type="button">📍 موقعي</button><small class="muted">يمكنك اختيار المحافظة أو المدينة أو المديرية أو القرية أو الحي من المناطق التي فعّلتها الإدارة.</small></div>
     <div class="quick-assist-head"><div><h1>الوصول السريع</h1><p>اكتب ما تحتاجه أو تحدث، وسنبحث في الخدمات المتاحة.</p></div></div>
     <form id="quickAssistForm" class="quick-assist-card" autocomplete="off">
       <div class="quick-assist-input-row"><textarea id="quickAssistText" maxlength="500" rows="1" aria-label="اكتب ما تحتاجه" placeholder="مثال: أريد واحد يشتري لي بيبسي ويوصله للبيت"></textarea><button class="btn quick-assist-voice" id="quickAssistVoice" type="button" aria-label="التحدث لكتابة الطلب">🎤 تحدث</button></div>
@@ -1409,7 +1415,7 @@ function renderCustomer() {
         }
         suggestions.className = 'suggestions';
         suggestions.innerHTML = matches.map(m => `<button class="suggestion" type="button" data-suggest-service="${esc(m.serviceId)}"><span class="suggestion-icon">${esc(m.icon || '🛠️')}</span><span class="suggestion-text"><b>${esc(m.serviceName)}</b><small>${esc(m.categoryName)}</small></span><span class="suggestion-arrow">←</span></button>`).join('');
-        suggestions.querySelectorAll('[data-suggest-service]').forEach(x => x.addEventListener('click', () => { suggestions.className = 'suggestions hide'; openOrderForm(x.dataset.suggestService); }));
+        suggestions.querySelectorAll('[data-suggest-service]').forEach(x => x.addEventListener('click', () => { suggestions.className = 'suggestions hide'; openServiceDetails(x.dataset.suggestService); }));
     };
     search.addEventListener('input', () => {
         clear.style.display = search.value ? 'block' : 'none';
@@ -1515,9 +1521,9 @@ function renderCustomer() {
         toast('تعذر فتح الخدمة', 'الإعلان غير مرتبط بخدمة فعالة حاليًا.'); };
     document.querySelectorAll('[data-temp-id]').forEach(x => x.addEventListener('click', () => openTemporaryAction(x.dataset.tempId || '')));
     document.querySelectorAll('[data-temp-action]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); openTemporaryAction(x.dataset.tempAction || ''); }));
-    document.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService)));
+    document.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.quickService)));
     document.getElementById('showMoreServices')?.addEventListener('click', () => { const box = document.getElementById('quickServices'); if (!box)
-        return; const more = state.services.slice(8); box.innerHTML += more.map((s) => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${serviceIconSvg(s.name, s.icon || s.categoryIcon || s.categoryName || '')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join(''); box.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.quickService))); document.getElementById('showMoreServices').remove(); });
+        return; const more = state.services.slice(8); box.innerHTML += more.map((s) => `<button class="card quick-service quick-service-${esc(s.categorySlug || '')}" data-quick-service="${esc(s.id)}" type="button"><div class="icon">${serviceIconSvg(s.name, s.icon || s.categoryIcon || s.categoryName || '')}</div><b>${esc(s.name)}</b><small class="muted">${esc(s.categoryName || '')}</small></button>`).join(''); box.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.quickService))); document.getElementById('showMoreServices').remove(); });
     setupQuickAssistComposer();
     document.getElementById('servicesTab').onclick = () => switchCustomerSection('services');
     document.getElementById('ordersTab')?.addEventListener('click', () => switchCustomerSection('orders'));
@@ -1550,6 +1556,36 @@ function switchCustomerSection(section) {
     st.classList.toggle('active', isServices);
     ot.classList.toggle('active', !isServices);
 }
+async function openServiceDetails(serviceId, initial = null) {
+    try {
+        const payload = await api('/services/' + encodeURIComponent(serviceId));
+        const sv = payload.service;
+        if (!sv)
+            throw new Error('الخدمة غير موجودة أو غير متاحة حاليًا');
+        const fixed = sv.pricingType === 'FIXED' && sv.basePrice != null;
+        const description = String(initial?.description || '');
+        showModal(`<div class="service-detail-view"><div class="service-detail-heading"><div class="service-detail-icon">${serviceIconSvg(sv.name, sv.icon || sv.categoryName || '')}</div><div><h2>${esc(sv.name)}</h2><p class="muted">${esc(sv.categoryName || 'خدمات')}</p></div></div><p>${esc(sv.description || 'اختر هذه الخدمة لعرض تفاصيل الطلب ومقدمي الخدمة المتاحين في منطقتك.')}</p><div class="service-detail-facts card"><div><b>السعر</b><span>${fixed ? `${esc(sv.basePrice)} ${esc(currencyLabel())}` : 'يُحدد حسب تفاصيل الخدمة وعرض مقدم الخدمة'}</span></div><div><b>المنطقة</b><span>${esc((state.areas || []).find((a) => a.id === state.selectedAreaId)?.name || 'اختر منطقتك من الصفحة الرئيسية')}</span></div></div>${description ? `<div class="notice"><b>وصفك:</b> ${esc(description)}</div>` : ''}<p class="muted">يمكنك الاطلاع على الخدمة أولًا. لا يُرسل أي طلب حتى تختار الخدمة وتراجع التفاصيل وتؤكد الإرسال.</p>${state.user?.role === 'CUSTOMER' ? '<button class="btn secondary" id="serviceDetailNearby" type="button">📍 عرض مقدمي الخدمة القريبين</button>' : '<p class="muted">بعد تسجيل الدخول وتحديد موقع التنفيذ، يمكنك رؤية مقدمي الخدمة القريبين والمتاحين.</p>'}<div class="row service-detail-actions"><button class="btn" id="serviceDetailRequest" type="button">${state.user ? 'متابعة طلب هذه الخدمة' : 'تسجيل الدخول لطلب الخدمة'}</button><button class="btn secondary" id="serviceDetailClose" type="button">العودة للخدمات</button></div></div>`);
+        document.getElementById('serviceDetailClose')?.addEventListener('click', closeModal);
+        document.getElementById('serviceDetailNearby')?.addEventListener('click', () => { let loc = null; try {
+            loc = JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
+        }
+        catch { } closeModal(); openNearbyProviders(serviceId, Number.isFinite(Number(loc?.lat)) ? Number(loc.lat) : undefined, Number.isFinite(Number(loc?.lng)) ? Number(loc.lng) : undefined); });
+        document.getElementById('serviceDetailRequest')?.addEventListener('click', () => {
+            closeModal();
+            if (!state.user) {
+                localStorage.setItem('khadamat.pendingCustomerRequest.v1', serviceId);
+                if (description)
+                    localStorage.setItem('khadamat.pendingRequestDescription.v1', description.slice(0, 1000));
+                authBox('CUSTOMER');
+                return;
+            }
+            openOrderForm(serviceId, initial);
+        });
+    }
+    catch (e) {
+        toast('تعذر فتح الخدمة', e.message || 'حاول مرة أخرى.');
+    }
+}
 async function openCategory(slug) { let services = []; try {
     if (slug) {
         const j = await api('/categories/' + encodeURIComponent(slug) + '/services' + (state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : ''));
@@ -1566,7 +1602,7 @@ catch (e) {
 } if (!services.length) {
     showModal('<div class="empty">لا توجد خدمات متاحة في هذا القسم حاليًا</div>');
     return;
-} showModal(`<div class="service-picker-head"><div><h2>اختر الخدمة</h2><p class="muted">اختر الخدمة الفعلية التي تريد طلبها</p></div></div><div class="grid service-picker">${services.map(s => `<button class="card service service-option" data-service="${esc(s.id)}" type="button"><div class="service-option-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div class="service-option-body"><b>${esc(s.name)}</b><p>${esc(s.description || 'اطلب هذه الخدمة وسيتم البحث عن مقدم خدمة مناسب')}</p><span class="choose-link">طلب الخدمة ←</span></div></button>`).join('')}</div>`); document.querySelectorAll('[data-service]').forEach(x => x.addEventListener('click', () => openOrderForm(x.dataset.service))); }
+} showModal(`<div class="service-picker-head"><div><h2>اختر الخدمة</h2><p class="muted">اختر الخدمة الفعلية التي تريد طلبها</p></div></div><div class="grid service-picker">${services.map(s => `<button class="card service service-option" data-service="${esc(s.id)}" type="button"><div class="service-option-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div class="service-option-body"><b>${esc(s.name)}</b><p>${esc(s.description || 'اطلب هذه الخدمة وسيتم البحث عن مقدم خدمة مناسب')}</p><span class="choose-link">${state.user ? 'طلب الخدمة' : 'عرض التفاصيل'} ←</span></div></button>`).join('')}</div>`); document.querySelectorAll('[data-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.service))); }
 async function openMotorcycleTripForm(service, savedAddresses) {
     const purposeLabels = { PASSENGER: 'نقل شخص', PARCEL: 'توصيل طلب أو غرض', ITEM_PURCHASE: 'شراء وإحضار غرض', MEDICINE: 'شراء دواء من الصيدلية', RESTAURANT_PICKUP: 'استلام طلب من مطعم', DOCUMENT_DELIVERY: 'استلام وتسليم مستندات', TECHNICIAN_PICKUP: 'إحضار فني أو عامل', STORE_SHOPPING: 'شراء أغراض من متجر', SMALL_CARGO: 'نقل أغراض صغيرة', HOME_PICKUP: 'استلام أو توصيل شيء من/إلى المنزل', OTHER: 'أخرى' };
     showModal(`<div class="trip-modal"><div class="trip-head"><div><h2>🛵 مشاوير بالدباب</h2><p class="muted">حدد نقطة الانطلاق والوجهة. يمكنك وضع العلامة على الخريطة حتى لو لم يكن للمكان اسم.</p></div></div><form id="tripForm">
@@ -1737,10 +1773,7 @@ async function openNearbyProviders(serviceId, lat, lng) {
 }
 async function openOrderForm(serviceId, initial = null) {
     if (!state.user) {
-        localStorage.setItem('khadamat.pendingCustomerRequest.v1', serviceId);
-        if (initial?.description)
-            localStorage.setItem('khadamat.pendingRequestDescription.v1', String(initial.description).slice(0, 1000));
-        authBox('CUSTOMER');
+        openServiceDetails(serviceId, initial);
         return;
     }
     const idempotencyKey = newIdempotencyKey();
@@ -1754,12 +1787,12 @@ async function openOrderForm(serviceId, initial = null) {
     const beneficiaries = beneficiaryPayload.beneficiaries || [];
     const requiredFields = (s.formSchema || []).filter((f) => f.required);
     const optionalFields = (s.formSchema || []).filter((f) => !f.required);
-    const renderField = (f) => `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب المعلومة الضرورية فقط')}"></textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`;
+    const renderField = (f) => `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب المعلومة الضرورية فقط')}"></textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${f.required ? '<option value="">اختر الخيار</option>' : ''}${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`;
     const fields = requiredFields.map(renderField).join('');
     const optionalFieldsHtml = optionalFields.length ? `<details class="optional-order-details"><summary>تفاصيل إضافية (فقط إذا كانت مهمة)</summary><div class="optional-order-fields">${optionalFields.map(renderField).join('')}</div></details>` : '';
     const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
     const suggestionHtml = descSuggestions.length ? `<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x => `<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : '';
-    showModal(`<h2>${esc(s.name)}</h2><div class="row" style="margin-bottom:10px"><button class="btn secondary small" id="nearbyProvidersBtn" type="button">📍 مقدمو الخدمة القريبون</button><span class="muted">اعرض المتاحين حول موقعك قبل إرسال الطلب.</span></div><div class="field"><label>المنطقة أو القرية (اختياري)</label><select id="orderAreaId"><option value="">سيحددها النظام من الموقع تلقائيًا</option></select><small class="muted">يمكنك اختيار مدينة أو مديرية أو عزلة أو قرية أو حارة حتى لو لم تكن منطقتك ظاهرة على الخريطة.</small></div><form id="orderForm"><div class="field beneficiary-first"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div></div><div class="field description-field"><label>ماذا تريد؟</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}${optionalFieldsHtml}<div class="field location-field"><label>الموقع</label><div class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div class="location-human-fields"><div class="field"><label>وصف الموقع عند الحاجة</label><input id="localityText" name="localityText" maxlength="300" placeholder="مثال: القرية أو الحي أو أقرب معلم"></div></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="card order-price-preview"><h3>ملخص الطلب قبل التأكيد</h3><p><b>الخدمة:</b> ${esc(s.name)}</p><div id="orderItemSummary" class="order-item-summary"></div>${s.pricingType === 'FIXED' && s.basePrice != null ? `<p>السعر الأساسي المعتمد: <b>${esc(s.basePrice)} ${esc(state.config.currency || 'YER')}</b></p>` : `<p class="muted">السعر النهائي: بانتظار عرض سعر من مقدم الخدمة. لن نعرض سعرًا غير مؤكد على أنه إجمالي نهائي.</p>`}<p><b>طريقة الدفع المتاحة حاليًا:</b> نقدًا</p><p class="muted">إذا كانت هناك رسوم توصيل أو انتقال، فسيتم توضيحها ضمن عرض السعر قبل قبوله. يمكنك مراجعة التفاصيل وتأكيد قبول العرض لاحقًا.</p></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
+    showModal(`<h2>${esc(s.name)}</h2><div class="row" style="margin-bottom:10px"><button class="btn secondary small" id="nearbyProvidersBtn" type="button">📍 مقدمو الخدمة القريبون</button><span class="muted">اعرض المتاحين حول موقعك قبل إرسال الطلب.</span></div><div class="field"><label>المنطقة أو القرية (اختياري)</label><select id="orderAreaId"><option value="">سيحددها النظام من الموقع تلقائيًا</option></select><small class="muted">يمكنك اختيار مدينة أو مديرية أو عزلة أو قرية أو حارة حتى لو لم تكن منطقتك ظاهرة على الخريطة.</small></div><form id="orderForm"><div class="field beneficiary-first"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div></div><div class="field description-field"><label>ماذا تريد؟</label><textarea id="orderDescription" name="description" required placeholder="اكتب ما تحتاجه فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}${optionalFieldsHtml}<div class="field location-field"><label>${s.slug === 'mobile-car-wash' ? 'مكان تنفيذ غسيل السيارة' : 'الموقع'}</label>${s.slug === 'mobile-car-wash' ? '<div class="card car-wash-location-choice"><b>هل تريد غسيل السيارة في موقعك الحالي أم في موقع آخر؟</b><label class="choice-row"><input type="radio" name="carWashLocationChoice" value="current" checked> موقعي الحالي</label><label class="choice-row"><input type="radio" name="carWashLocationChoice" value="other"> موقع آخر أو عنوان محفوظ</label><small class="muted">سنستخدم GPS بعد إذنك، ويمكنك تغيير الموقع يدويًا.</small></div>' : ''}<div id="savedAddressCard" class="card ${s.slug === 'mobile-car-wash' ? 'hide-section' : ''}" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا. يمكنك أيضًا إرسال الطلب بدون موقع، وإذا سمح هاتفك بالموقع سنحاول إضافته تلقائيًا.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">لا تحتاج لمعرفة الخريطة؛ إضافة الموقع تساعد مقدم الخدمة، لكنها ليست شرطًا لإرسال الطلب.</span></div><div class="location-human-fields"><div class="field"><label>وصف الموقع عند الحاجة</label><input id="localityText" name="localityText" maxlength="300" placeholder="مثال: القرية أو الحي أو أقرب معلم"></div></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label>ملاحظات</label><textarea name="notes" placeholder="أي معلومة تساعد مقدم الخدمة"></textarea></div><div class="field"><label>صورة مرفقة <span class="muted">(اختيارية)</span></label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة إذا كانت تساعد على فهم المطلوب، مثل جهاز أو قطعة أو غرض.</small></div><div class="card order-price-preview"><h3>ملخص الطلب قبل التأكيد</h3><p><b>الخدمة:</b> ${esc(s.name)}</p><div id="orderItemSummary" class="order-item-summary"></div>${s.pricingType === 'FIXED' && s.basePrice != null ? `<p>السعر الأساسي المعتمد: <b>${esc(s.basePrice)} ${esc(state.config.currency || 'YER')}</b></p>` : `<p class="muted">السعر النهائي: بانتظار عرض سعر من مقدم الخدمة. لن نعرض سعرًا غير مؤكد على أنه إجمالي نهائي.</p>`}<p><b>طريقة الدفع المتاحة حاليًا:</b> نقدًا</p><p class="muted">إذا كانت هناك رسوم توصيل أو انتقال، فسيتم توضيحها ضمن عرض السعر قبل قبوله. يمكنك مراجعة التفاصيل وتأكيد قبول العرض لاحقًا.</p></div><div class="order-submit-note"><b>قبل الإرسال</b><span>يمكنك إرسال الطلب الآن، وسنستخدم موقعك إذا توفر، ويمكنك وصف المكان بالكلمات عند الحاجة.</span></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">إرسال الطلب</button><p id="msg"></p></form>`);
     const updateOrderItemSummary = () => { const el = document.getElementById('orderItemSummary'), form = document.getElementById('orderForm'); if (!el || !form)
         return; const fd = new FormData(form); const values = (s.formSchema || []).map((f) => ({ key: String(f.key), label: String(f.labelText || f.label?.ar || f.key), value: String(fd.get(String(f.key)) || '').trim() })).filter((x) => x.value); const desc = String(fd.get('description') || '').trim(); el.innerHTML = [desc ? `<p><b>وصف الطلب:</b> ${esc(desc)}</p>` : '', ...values.map((x) => `<p><b>${esc(x.label)}:</b> ${esc(x.value)}${x.key === 'max_price' ? ' (حد أعلى وليس سعرًا نهائيًا)' : ''}</p>`)].filter(Boolean).join(''); };
     document.getElementById('orderForm')?.addEventListener('input', updateOrderItemSummary);
@@ -1798,7 +1831,7 @@ async function openOrderForm(serviceId, initial = null) {
             status.textContent = a ? `سيُستخدم الموقع المحفوظ: ${a.label}` : 'سيُستخدم العنوان المحفوظ.';
             status.className = 'success';
             preview.className = '';
-            preview.innerHTML = a ? `<div class="card"><b>${esc(a.label)}</b><p class="muted">الإحداثيات: ${Number(a.location.lat).toFixed(6)} — ${Number(a.location.lng).toFixed(6)}</p><p class="muted">هذا العنوان محفوظ في حسابك ولن نحتاج لتحديد GPS مرة أخرى.</p></div>` : '';
+            preview.innerHTML = a ? `<div class="card"><b>${esc(a.label)}</b><p class="muted">هذا العنوان محفوظ في حسابك وسيُستخدم لتنفيذ الخدمة دون الحاجة إلى تحديد GPS مرة أخرى.</p></div>` : '';
             confirm.value = '1';
             btn.disabled = true;
             btn.textContent = '📍 اختر موقعًا جديدًا';
@@ -1813,6 +1846,53 @@ async function openOrderForm(serviceId, initial = null) {
             addressIdInput.value = '';
         }
     });
+    if (s.slug === 'mobile-car-wash') {
+        const savedCard = document.getElementById('savedAddressCard');
+        const radios = Array.from(document.querySelectorAll('input[name="carWashLocationChoice"]'));
+        const applyWashLocation = (mode, requestGps) => {
+            const other = mode === 'other';
+            savedCard?.classList.toggle('hide-section', !other);
+            if (other) {
+                if (savedSelect.value === '') {
+                    document.getElementById('lat').value = '';
+                    document.getElementById('lng').value = '';
+                    document.getElementById('accuracy').value = '';
+                    document.getElementById('locationConfirmed').value = '0';
+                    document.getElementById('addressId').value = '';
+                    const status = document.getElementById('savedAddressStatus');
+                    if (status)
+                        status.textContent = 'اختر عنوانًا محفوظًا أو اضغط «تحديد موقعي» لاختيار موقع آخر.';
+                    const preview = document.getElementById('locationPreview');
+                    if (preview) {
+                        preview.className = 'hide-section';
+                        preview.innerHTML = '';
+                    }
+                }
+                const label = document.querySelector('.location-row #useLocation');
+                if (label)
+                    label.textContent = '📍 تحديد الموقع الآخر من GPS';
+                const status = document.getElementById('locationStatus');
+                if (status)
+                    status.textContent = 'حدد موقعًا آخر أو اختر عنوانًا محفوظًا.';
+            }
+            else {
+                if (savedSelect.value) {
+                    savedSelect.value = '';
+                    savedSelect.dispatchEvent(new Event('change'));
+                }
+                const label = document.querySelector('.location-row #useLocation');
+                if (label)
+                    label.textContent = '📍 إرسال موقعي الحالي';
+                const status = document.getElementById('locationStatus');
+                if (status)
+                    status.textContent = 'سيكون موقع تنفيذ الغسيل هو موقعك الحالي بعد تحديده وتأكيده.';
+                if (requestGps)
+                    document.getElementById('useLocation')?.click();
+            }
+        };
+        radios.forEach(r => r.addEventListener('change', () => { if (r.checked)
+            applyWashLocation(r.value, true); }));
+    }
     document.getElementById('useLocation').addEventListener('click', () => {
         const status = document.getElementById('locationStatus');
         const preview = document.getElementById('locationPreview');
@@ -1870,7 +1950,7 @@ async function openOrderForm(serviceId, initial = null) {
             status.textContent = `أفضل قراءة حتى الآن: دقة تقريبية ${Math.round(accuracy)} متر — ${quality}. جارٍ البحث عن قراءة أدق (${age} ثانية).`;
             status.className = accuracy <= 500 ? 'success' : 'muted';
             preview.className = '';
-            preview.innerHTML = `<div class="card" style="margin-top:10px"><b>الموقع الذي سيُحفظ في الطلب</b><p class="muted">خط العرض: ${lat.toFixed(6)} — خط الطول: ${lng.toFixed(6)} — أفضل دقة: ${Math.round(accuracy)} متر</p><p class="muted">المصدر: موقع الجهاز عبر Geolocation API — لا يتم تخمين الموقع من اسم المدينة أو IP.</p><div id="captureMap" style="height:260px;width:100%;border-radius:12px;overflow:hidden;margin:10px 0"></div><button class="btn" id="confirmLocation" type="button" ${accuracy > 1000 ? 'disabled' : ''}>${accuracy > 1000 ? '⏳ انتظر دقة GPS أفضل' : '✅ تأكيد هذا الموقع وإرفاقه بالطلب'}</button></div>`;
+            preview.innerHTML = `<div class="card" style="margin-top:10px"><b>الموقع الذي سيُحفظ في الطلب</b><p class="muted">تم تحديد موقعك على الخريطة — دقة تقريبية ${Math.round(accuracy)} متر.</p><p class="muted">المصدر: موقع الجهاز عبر Geolocation API — لا يتم تخمين الموقع من اسم المدينة أو IP.</p><div id="captureMap" style="height:260px;width:100%;border-radius:12px;overflow:hidden;margin:10px 0"></div><button class="btn" id="confirmLocation" type="button" ${accuracy > 1000 ? 'disabled' : ''}>${accuracy > 1000 ? '⏳ انتظر دقة GPS أفضل' : '✅ تأكيد هذا الموقع وإرفاقه بالطلب'}</button></div>`;
             const mapEl = document.getElementById('captureMap');
             const L = await ensureLeaflet().catch(() => null);
             if (L && mapEl) {
@@ -1897,7 +1977,7 @@ async function openOrderForm(serviceId, initial = null) {
                     return;
                 }
                 confirmedInput.value = '1';
-                status.textContent = `تم تأكيد الموقع. سيتم حفظ نفس الإحداثيات (${lat.toFixed(6)}, ${lng.toFixed(6)}) في الطلب.`;
+                status.textContent = 'تم تأكيد الموقع؛ سيُرفق الموقع المحدد بالطلب لتسهيل وصول مقدم الخدمة.';
                 status.className = 'success';
                 cleanup();
             });
@@ -1969,6 +2049,15 @@ async function openOrderForm(serviceId, initial = null) {
         const addressId = String(fd.get('addressId') || '');
         const lat = Number(fd.get('lat')), lng = Number(fd.get('lng')), accuracy = Number(fd.get('accuracy')), confirmed = String(fd.get('locationConfirmed')) === '1';
         const msg = document.getElementById('msg');
+        if (s.slug === 'mobile-car-wash') {
+            const washChoice = String(document.querySelector('input[name="carWashLocationChoice"]:checked')?.value || 'current');
+            const hasGps = confirmed && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+            if (!addressId && !hasGps) {
+                msg.textContent = washChoice === 'other' ? 'اختر عنوانًا محفوظًا أو حدّد الموقع الآخر على الخريطة ثم أكّده قبل إرسال الطلب.' : 'حدّد موقعك الحالي عبر GPS وأكّده قبل إرسال طلب غسيل السيارة.';
+                msg.className = 'error';
+                return;
+            }
+        }
         const beneficiaryId = String(document.getElementById('beneficiarySelect')?.value || '');
         const ben = beneficiaries.find((x) => x.id === beneficiaryId);
         const beneficiaryLocation = !!ben?.location;
@@ -2453,6 +2542,45 @@ async function nativeShare(title, text, url) {
         return false;
     }
 }
+function renderCustomerLocationDetails(location) {
+    if (!location)
+        return '<p class="muted">لم يُحفظ موقع مع هذا الطلب.</p>';
+    const lat = location.lat, lng = location.lng;
+    const hasCoords = lat !== null && lat !== undefined && lng !== null && lng !== undefined && String(lat) !== '' && String(lng) !== '' && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) && Math.abs(Number(lat)) <= 90 && Math.abs(Number(lng)) <= 180;
+    const mapUrl = hasCoords ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(lat)},${Number(lng)}`)}` : '';
+    const parts = [];
+    if (location.addressText)
+        parts.push(`<p>${esc(location.addressText)}</p>`);
+    else if (location.localityText || location.areaName)
+        parts.push(`<p>${esc([location.localityText, location.areaName].filter(Boolean).join('، '))}</p>`);
+    else if (hasCoords)
+        parts.push('<p class="muted">تم تحديد موقع الخدمة على الخريطة، لكن لم يُدخل عنوان تفصيلي.</p>');
+    else
+        parts.push('<p class="muted">لم يُدخل عنوان تفصيلي لهذا الطلب.</p>');
+    if (location.areaName && location.addressText)
+        parts.push(`<p><b>المنطقة:</b> ${esc(location.areaName)}</p>`);
+    if (location.localityText && location.addressText)
+        parts.push(`<p><b>القرية/الحي:</b> ${esc(location.localityText)}</p>`);
+    if (location.landmarkText)
+        parts.push(`<p><b>علامة مميزة:</b> ${esc(location.landmarkText)}</p>`);
+    if (location.accessNotes)
+        parts.push(`<p><b>إرشادات الوصول:</b> ${esc(location.accessNotes)}</p>`);
+    if (hasCoords)
+        parts.push(`<p><a class="btn secondary small" target="_blank" rel="noopener noreferrer" href="${mapUrl}">📍 عرض الموقع على الخريطة</a></p>`);
+    return parts.join('');
+}
+function renderCustomerTripDestination(destination) {
+    if (!destination)
+        return 'لم تُحدد الوجهة بعد — يمكن تحديدها لاحقًا';
+    if (destination.addressText)
+        return esc(destination.addressText);
+    const lat = destination.lat, lng = destination.lng;
+    const hasCoords = lat !== null && lat !== undefined && lng !== null && lng !== undefined && String(lat) !== '' && String(lng) !== '' && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) && Math.abs(Number(lat)) <= 90 && Math.abs(Number(lng)) <= 180;
+    if (!hasCoords)
+        return 'تم تحديد الوجهة دون عنوان تفصيلي';
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${Number(lat)},${Number(lng)}`)}`;
+    return `تم تحديد الوجهة على الخريطة — <a target="_blank" rel="noopener noreferrer" href="${mapUrl}">عرض الموقع</a>`;
+}
 async function openOrder(id) {
     try {
         const [j, timelinePayload] = await Promise.all([api('/orders/' + encodeURIComponent(id)), api('/orders/' + encodeURIComponent(id) + '/timeline').catch(() => ({ timeline: [] }))]);
@@ -2461,7 +2589,7 @@ async function openOrder(id) {
         const quotePayload = o.pricingType === 'QUOTE' ? await api('/orders/' + encodeURIComponent(id) + '/quotes').catch(() => ({ quotes: [] })) : { quotes: [] };
         const acceptedQuote = (quotePayload.quotes || []).find((q) => q.status === 'ACCEPTED');
         const purchaseChanges = (o.service?.slug === 'purchase-and-delivery' || o.service?.slug === 'pharmacy-purchase') ? ((await api('/orders/' + encodeURIComponent(id) + '/purchase-change')).changes || []) : [];
-        showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> <span class="status">${esc(statusAr(o.status))}</span></p><p>${esc(o.description)}</p><div class="order-details-accordion"><details open><summary>معلومات الطلب</summary><div class="order-detail-content"><p><b>رقم الطلب:</b> ${esc(o.code)}</p><p><b>تاريخ الطلب:</b> ${esc(formatDateTime(o.createdAt))}</p><p><b>طريقة الدفع:</b> ${esc({ CASH: 'الدفع نقدًا', CASH_ON_DELIVERY: 'الدفع عند الاستلام' }[o.paymentMethod] || o.paymentMethod || 'غير محددة')}</p><p><b>الخدمة:</b> ${esc(o.service?.name || 'الخدمة')}</p></div></details><details><summary>📍 عنوان التوصيل أو موقع الخدمة</summary><div class="order-detail-content">${o.location ? `<p>${esc(o.location.addressText || 'لم يُدخل عنوان نصي')}</p>${o.location.areaName ? `<p><b>المنطقة:</b> ${esc(o.location.areaName)}</p>` : ''}${o.location.localityText ? `<p><b>القرية/الحي:</b> ${esc(o.location.localityText)}</p>` : ''}${o.location.landmarkText ? `<p><b>علامة مميزة:</b> ${esc(o.location.landmarkText)}</p>` : ''}${o.location.accessNotes ? `<p><b>إرشادات الوصول:</b> ${esc(o.location.accessNotes)}</p>` : ''}<p class="muted">الإحداثيات المحفوظة مع الطلب: ${Number(o.location.lat).toFixed(6)} ، ${Number(o.location.lng).toFixed(6)}</p>` : '<p class="muted">لم يُحفظ موقع دقيق مع هذا الطلب.</p>'}</div></details><details><summary>📝 ملاحظات الطلب</summary><div class="order-detail-content">${o.notes ? `<p>${esc(o.notes)}</p>` : '<p class="muted">لا توجد ملاحظات</p>'}</div></details><details><summary>💰 الملخص المالي</summary><div class="order-detail-content">${o.trip ? `<p>أجرة المشوار: <b>${esc(o.trip.fare)} ${esc(o.trip.currency || o.currency)}</b></p>` : acceptedQuote ? `<p>قيمة الخدمة/المشتريات: <b>${esc(acceptedQuote.amount)} ${esc(o.currency)}</b></p><p>رسوم التوصيل أو الانتقال: <b>${esc(acceptedQuote.deliveryFee ?? 0)} ${esc(o.currency)}</b></p><p>الإجمالي المعتمد: <b>${esc(acceptedQuote.totalAmount ?? o.agreedPrice)} ${esc(o.currency)}</b></p>` : o.agreedPrice != null ? `<p>السعر المتفق عليه: <b>${esc(o.agreedPrice)} ${esc(o.currency)}</b></p>` : o.priceSnapshot != null ? `<p>السعر الأساسي: <b>${esc(o.priceSnapshot)} ${esc(o.currency)}</b></p>` : o.pricingType === 'QUOTE' ? '<p class="muted">بانتظار عروض الأسعار؛ لم يُحدد الإجمالي النهائي بعد.</p>' : '<p class="muted">سيُحدد السعر وفق تفاصيل الخدمة أو عرض السعر. لا يوجد إجمالي مثبت بعد.</p>'}<p class="muted">طريقة الدفع المسجلة: ${esc({ CASH: 'نقدًا', CASH_ON_DELIVERY: 'عند الاستلام' }[o.paymentMethod] || o.paymentMethod || 'غير محددة')}</p></div></details>${o.formData && Object.keys(o.formData).length ? `<details><summary>تفاصيل إضافية للخدمة</summary><div class="order-detail-content">${Object.entries(o.formData).map(([k, v]) => `<p><b>${esc({ item: 'الغرض المطلوب', medicine: 'اسم الدواء أو وصفه', quantity: 'الكمية', max_price: 'الحد الأقصى للسعر', alternatives: 'البدائل المقبولة' }[k] || k)}:</b> ${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}${k === 'max_price' ? ' (حد أقصى يحدده العميل، وليس سعرًا نهائيًا)' : ''}</p>`).join('')}</div></details>` : ''}</div>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${o.trip.destination ? esc(o.trip.destination.addressText || `${Number(o.trip.destination.lat).toFixed(6)} ، ${Number(o.trip.destination.lng).toFixed(6)}`) : 'لم تُحدد بعد — يمكن تحديدها لاحقًا'}</p></div>` : ''}<p class="muted">${esc(formatDateTime(o.createdAt))}</p>${o.provider ? `<div class="card" style="margin-top:12px"><div class="row" style="justify-content:space-between"><div><b>👤 ${esc(o.provider.displayName)}</b><p class="muted">⭐ ${esc(o.provider.rating)} · مقدم خدمة موثق</p></div><div class="row"><button class="btn secondary small" id="viewProviderProfile" type="button">عرض الملف</button><button class="btn secondary small" id="favoriteProviderBtn" type="button">⭐ حفظ كمفضل</button></div></div></div>` : ''}${o.provider && ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<div class="row"><button class="btn secondary" id="openChatBtn" type="button">💬 محادثة مع مقدم الخدمة</button><button class="btn secondary" id="trackTripBtn" type="button">📍 تتبع الموقع</button><button class="btn secondary" id="shareTripBtn" type="button">🔗 مشاركة المشوار</button></div>` : ''}${o.pricingType === 'QUOTE' && ['SEARCHING', 'ASSIGNED'].includes(o.status) ? `<button class="btn" id="openQuotesBtn" type="button">💰 مشاهدة عروض الأسعار</button>` : ''}${purchaseChanges.some((c) => c.status === 'PENDING') ? `<div class="card"><b>🛒 تعديل مطلوب في الشراء</b>${purchaseChanges.filter((c) => c.status === 'PENDING').slice(0, 1).map((c) => `<p>السعر المقترح: <b>${esc(c.requestedPrice)}</b></p><p class="muted">${esc(c.requestedProduct || '')}${c.reason ? ' — ' + esc(c.reason) : ''}</p><div class="row"><button class="btn" id="approvePurchaseChange" type="button">موافقة</button><button class="btn danger secondary" id="rejectPurchaseChange" type="button">رفض</button></div>`).join('')}</div>` : ''}${o.service?.deliveryProofType === 'RECIPIENT_CONFIRMATION' && ['ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>👤 تأكيد الاستلام</b><p class="muted">أدخل اسم الشخص الذي استلم الخدمة ليتمكن مقدم الخدمة من إنهاء الطلب.</p><div class="row"><input id="customerRecipientConfirmName" maxlength="120" placeholder="اسم المستلم"><button class="btn" id="customerRecipientConfirmBtn" type="button">تأكيد الاستلام</button></div></div>` : ''}<div class="order-timeline">${(j.timeline || []).map((t) => `<div class="card"><b>${esc(t.title)}</b><small class="muted">${esc(formatDateTime(t.at))}</small><div>${esc(t.detail || '')}</div></div>`).join('')}</div><div class="card"><h3>سجل متابعة الطلب</h3><p class="muted">يعرض هذا السجل الأحداث المسجلة فعليًا لهذا الطلب.</p></div>${['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn danger" id="cancel">إلغاء الطلب</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="complaintBtn" type="button">⚠️ ${o.status === 'DISPUTED' ? 'متابعة الشكوى' : 'فتح شكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="rating-box card"><h3>⭐ التقييم</h3><p class="muted">الخدمة مكتملة. افتح شاشة التقييم لإرسال نجومك وتعليقك.</p><button class="btn" id="openRatingBtn" type="button">⭐ تقييم مقدم الخدمة</button></div>` : ''}</div>`);
+        showModal(`<h2>${esc(o.code)}</h2><p><b>الخدمة:</b> ${esc(o.service.name)}</p><p><b>الحالة:</b> <span class="status">${esc(statusAr(o.status))}</span></p><div class="order-request-summary card"><b>📝 ماذا تحتاج؟</b><p>${esc(o.description || 'لم يُضف وصف للطلب.')}</p></div><div class="order-details-accordion"><details open><summary>معلومات الطلب</summary><div class="order-detail-content"><p><b>رقم الطلب:</b> ${esc(o.code)}</p><p><b>تاريخ الطلب:</b> ${esc(formatDateTime(o.createdAt))}</p><p><b>طريقة الدفع:</b> ${esc({ CASH: 'الدفع نقدًا', CASH_ON_DELIVERY: 'الدفع عند الاستلام' }[o.paymentMethod] || o.paymentMethod || 'غير محددة')}</p><p><b>الخدمة:</b> ${esc(o.service?.name || 'الخدمة')}</p></div></details><details><summary>📍 عنوان التوصيل أو موقع الخدمة</summary><div class="order-detail-content">${renderCustomerLocationDetails(o.location)}</div></details><details><summary>📝 ملاحظات الطلب</summary><div class="order-detail-content">${o.notes ? `<p>${esc(o.notes)}</p>` : '<p class="muted">لا توجد ملاحظات</p>'}</div></details><details><summary>💰 الملخص المالي</summary><div class="order-detail-content">${o.trip ? `<p>أجرة المشوار: <b>${esc(o.trip.fare)} ${esc(o.trip.currency || o.currency)}</b></p>` : acceptedQuote ? `<p>قيمة الخدمة/المشتريات: <b>${esc(acceptedQuote.amount)} ${esc(o.currency)}</b></p><p>رسوم التوصيل أو الانتقال: <b>${esc(acceptedQuote.deliveryFee ?? 0)} ${esc(o.currency)}</b></p><p>الإجمالي المعتمد: <b>${esc(acceptedQuote.totalAmount ?? o.agreedPrice)} ${esc(o.currency)}</b></p>` : o.agreedPrice != null ? `<p>السعر المتفق عليه: <b>${esc(o.agreedPrice)} ${esc(o.currency)}</b></p>` : o.priceSnapshot != null ? `<p>السعر الأساسي: <b>${esc(o.priceSnapshot)} ${esc(o.currency)}</b></p>` : o.pricingType === 'QUOTE' ? '<p class="muted">بانتظار عروض الأسعار؛ لم يُحدد الإجمالي النهائي بعد.</p>' : '<p class="muted">سيُحدد السعر وفق تفاصيل الخدمة أو عرض السعر. لا يوجد إجمالي مثبت بعد.</p>'}<p class="muted">طريقة الدفع المسجلة: ${esc({ CASH: 'نقدًا', CASH_ON_DELIVERY: 'عند الاستلام' }[o.paymentMethod] || o.paymentMethod || 'غير محددة')}</p></div></details>${o.formData && Object.keys(o.formData).length ? `<details><summary>تفاصيل إضافية للخدمة</summary><div class="order-detail-content">${Object.entries(o.formData).map(([k, v]) => `<p><b>${esc({ item: 'الغرض المطلوب', medicine: 'اسم الدواء أو وصفه', quantity: 'الكمية', max_price: 'الحد الأقصى للسعر', alternatives: 'البدائل المقبولة' }[k] || k)}:</b> ${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}${k === 'max_price' ? ' (حد أقصى يحدده العميل، وليس سعرًا نهائيًا)' : ''}</p>`).join('')}</div></details>` : ''}</div>${o.trip ? `<div class="trip-summary card"><b>🛵 تفاصيل المشوار</b><p>الغرض: ${esc(o.trip.purposeName)} · المسافة: ${esc(o.trip.distanceKm)} كم · الأجرة: ${esc(o.trip.fare)} ${esc(o.trip.currency)}</p><p class="muted">الوجهة: ${renderCustomerTripDestination(o.trip.destination)}</p></div>` : ''}<p class="muted">${esc(formatDateTime(o.createdAt))}</p>${o.provider ? `<div class="card" style="margin-top:12px"><div class="row" style="justify-content:space-between"><div><b>👤 ${esc(o.provider.displayName)}</b><p class="muted">⭐ ${esc(o.provider.rating)} · مقدم خدمة موثق</p></div><div class="row"><button class="btn secondary small" id="viewProviderProfile" type="button">عرض الملف</button><button class="btn secondary small" id="favoriteProviderBtn" type="button">⭐ حفظ كمفضل</button></div></div></div>` : ''}${o.provider && ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<div class="row"><button class="btn secondary" id="openChatBtn" type="button">💬 محادثة مع مقدم الخدمة</button><button class="btn secondary" id="trackTripBtn" type="button">📍 تتبع الموقع</button><button class="btn secondary" id="shareTripBtn" type="button">🔗 مشاركة المشوار</button></div>` : ''}${o.pricingType === 'QUOTE' && ['SEARCHING', 'ASSIGNED'].includes(o.status) ? `<button class="btn" id="openQuotesBtn" type="button">💰 مشاهدة عروض الأسعار</button>` : ''}${purchaseChanges.some((c) => c.status === 'PENDING') ? `<div class="card"><b>🛒 تعديل مطلوب في الشراء</b>${purchaseChanges.filter((c) => c.status === 'PENDING').slice(0, 1).map((c) => `<p>السعر المقترح: <b>${esc(c.requestedPrice)}</b></p><p class="muted">${esc(c.requestedProduct || '')}${c.reason ? ' — ' + esc(c.reason) : ''}</p><div class="row"><button class="btn" id="approvePurchaseChange" type="button">موافقة</button><button class="btn danger secondary" id="rejectPurchaseChange" type="button">رفض</button></div>`).join('')}</div>` : ''}${o.service?.deliveryProofType === 'RECIPIENT_CONFIRMATION' && ['ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<div class="card"><b>👤 تأكيد الاستلام</b><p class="muted">أدخل اسم الشخص الذي استلم الخدمة ليتمكن مقدم الخدمة من إنهاء الطلب.</p><div class="row"><input id="customerRecipientConfirmName" maxlength="120" placeholder="اسم المستلم"><button class="btn" id="customerRecipientConfirmBtn" type="button">تأكيد الاستلام</button></div></div>` : ''}<div class="order-timeline">${(j.timeline || []).map((t) => `<div class="card"><b>${esc(t.title)}</b><small class="muted">${esc(formatDateTime(t.at))}</small><div>${esc(t.detail || '')}</div></div>`).join('')}</div><div class="card"><h3>سجل متابعة الطلب</h3><p class="muted">يعرض هذا السجل الأحداث المسجلة فعليًا لهذا الطلب.</p></div>${['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status) ? `<button class="btn danger" id="cancel">إلغاء الطلب</button>` : ''}${['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'].includes(o.status) ? `<button class="btn secondary" id="complaintBtn" type="button">⚠️ ${o.status === 'DISPUTED' ? 'متابعة الشكوى' : 'فتح شكوى'}</button>` : ''}${o.status === 'COMPLETED' ? `<div class="rating-box card"><h3>⭐ التقييم</h3><p class="muted">الخدمة مكتملة. افتح شاشة التقييم لإرسال نجومك وتعليقك.</p><button class="btn" id="openRatingBtn" type="button">⭐ تقييم مقدم الخدمة</button></div>` : ''}</div>`);
         document.getElementById('openChatBtn')?.addEventListener('click', () => openOrderChat(id));
         document.getElementById('trackTripBtn')?.addEventListener('click', () => openTripTracking(id));
         document.getElementById('shareTripBtn')?.addEventListener('click', async () => { try {

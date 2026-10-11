@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.5.0",
-  "description": "خدمات (Khadamat) — الإصدار 2.5: واجهة وصول سريع مختصرة ومطابقة الخدمات المتاحة",
+  "version": "2.7.0",
+  "description": "خدمات (Khadamat) — الإصدار 2.7: تحسين تفاصيل الخدمات، طلب غسيل السيارات، والتوجيه المباشر للواجهات",
   "private": true,
   "type": "module",
   "engines": {

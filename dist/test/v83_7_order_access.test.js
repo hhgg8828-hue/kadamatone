@@ -43,8 +43,8 @@ test('V83.7: مقدم الخدمة الذي ما زال لديه عرض قائم
 });
 test('V83.7: كل واجهات PWA تستخدم أصول الإصدار الجديد', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.5'), file);
+        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.7'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-5'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-7'));
 });
 //# sourceMappingURL=v83_7_order_access.test.js.map

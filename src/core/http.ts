@@ -119,7 +119,7 @@ function serveStatic(config: StaticConfig, urlPath: string, res: ServerResponse,
   if (!file.startsWith(base + path.sep) && file !== base) return false; // منع Path Traversal
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
   const ext = path.extname(file).toLowerCase();
-  res.writeHead(200, { ...headers, 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300' });
+  res.writeHead(200, { ...headers, 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-store, max-age=0, must-revalidate' : 'public, max-age=300' });
   fs.createReadStream(file).pipe(res);
   return true;
 }

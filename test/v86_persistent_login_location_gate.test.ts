@@ -22,11 +22,13 @@ test('Release 2.5 allows public browsing and gates only service requests behind 
   const app = fs.readFileSync('public/app.ts', 'utf8');
   assert.match(app, /async function startGuestHome\(\)/);
   assert.match(app, /api\('\/catalog\/bootstrap'\+areaQuery\)/);
-  assert.match(app, /if\(!state\.user\)\{localStorage\.setItem\('khadamat\.pendingCustomerRequest\.v1',serviceId\);if\(initial\?\.description\)localStorage\.setItem\('khadamat\.pendingRequestDescription\.v1'/);
+  assert.match(app, /async function openServiceDetails\(serviceId:string, initial:any=null\)/);
+  assert.match(app, /if\(!state\.user\)\{openServiceDetails\(serviceId,initial\);return\}/);
+  assert.match(app, /تسجيل الدخول لطلب الخدمة/);
   assert.match(app, /id="guestLocate"/);
   assert.match(app, /id="guestContinue"/);
   assert.match(app, /id="guestLoginBtn"/);
   assert.match(app, /if\(!guestView\)loadPersonalRecommendations\(\)/);
-  assert.match(app, /async function openOrderForm\(serviceId:string, initial:any = null\)\{\s*if\(!state\.user\)\{localStorage\.setItem\('khadamat\.pendingCustomerRequest\.v1',serviceId\);if\(initial\?\.description\)localStorage\.setItem\('khadamat\.pendingRequestDescription\.v1'/);
+  assert.match(app, /async function openOrderForm\(serviceId:string, initial:any = null\)\{\s*if\(!state\.user\)\{openServiceDetails\(serviceId,initial\);return\}/);
   assert.match(app, /pendingRequest.startsWith\('slug:'\)\?openOrderFormBySlug/);
 });
