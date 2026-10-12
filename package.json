@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.13.1",
-  "description": "خدمات (Khadamat) — 2.13.1 build fix and refreshed app icons and provider navigation polish",
+  "version": "2.13.2",
+  "description": "خدمات (Khadamat) — 2.13.2 restores the approved compact customer quick-access layout",
   "private": true,
   "type": "module",
   "engines": {

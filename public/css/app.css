@@ -655,3 +655,59 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .provider-verification-dropdown-body .btn{display:inline-flex;align-items:center;justify-content:center}
 .provider-panel-in-modal .provider-notification-workspace{margin:0}
 @media(max-width:600px){.provider-quick-nav button{font-size:12px;min-height:42px;padding:7px 5px}.provider-panel-modal-card{max-height:94vh!important;padding:13px!important}.provider-panel-modal-head h2{font-size:20px}.provider-verification-dropdown summary{padding:12px;font-size:14px}}
+
+
+/* Release 2.13.2 — restore compact quick access from the approved 2.10/2.11 layout */
+/* Release 2.5 — compact, catalog-backed customer quick access */
+.customer-shell .hero.customer-simple-hero{padding:14px 16px;border-radius:22px;margin-bottom:14px;box-shadow:0 10px 28px rgba(29,76,71,.07)}
+.customer-shell .customer-city-select-compact{display:grid;grid-template-columns:auto minmax(120px,1fr) auto;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:14px;box-shadow:none;background:rgba(255,255,255,.88)}
+.customer-shell .customer-city-select-compact label{font-size:12px;white-space:nowrap;color:#315b54}
+.customer-shell .customer-city-select-compact select{width:100%;max-width:none;min-height:36px;padding:6px 10px;border-radius:10px}
+.customer-shell .customer-city-select-compact .btn{min-height:36px;padding:6px 10px;white-space:nowrap}
+.customer-shell .customer-city-select-compact small{grid-column:1/-1;font-size:11px;line-height:1.4;margin-top:-2px}
+.customer-shell .quick-assist-head{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 8px;position:relative;z-index:1}
+.customer-shell .quick-assist-head h1{margin:0 0 2px;color:#1c4945;font-size:clamp(20px,3.5vw,26px);letter-spacing:-.35px}
+.customer-shell .quick-assist-head p{margin:0;color:#62736f!important;font-size:12px;line-height:1.5}
+.customer-shell .quick-assist-card{position:relative;z-index:1;margin:0;padding:9px;background:rgba(255,255,255,.97);border:1px solid #d8e8e4;border-radius:16px;box-shadow:0 7px 20px rgba(31,76,71,.07)}
+.customer-shell .quick-assist-input-row{display:flex;align-items:stretch;gap:8px}
+.customer-shell .quick-assist-input-row textarea{display:block;flex:1;min-width:0;min-height:42px;max-height:120px;resize:vertical;border:1px solid #dbe7e4;border-radius:12px;background:#fbfdfc;padding:10px 12px;font:inherit;font-size:14px;line-height:1.6;color:#20322f;outline:none}
+.customer-shell .quick-assist-input-row textarea:focus{border-color:#4a978f;box-shadow:0 0 0 3px rgba(35,122,115,.09)}
+.customer-shell .quick-assist-input-row textarea::placeholder{color:#8b9b97}
+.customer-shell .quick-assist-voice{flex:0 0 auto;min-width:88px;padding:8px 12px;border-radius:12px;white-space:nowrap}
+.customer-shell .quick-assist-status{font-size:12px;color:#667a75;margin:6px 3px 0;line-height:1.5}
+.customer-shell .quick-assist-results{margin-top:8px}
+.customer-shell .quick-assist-results:empty{display:none}
+.customer-shell .quick-assist-results-heading{font-size:13px;font-weight:800;color:#315a53;margin:10px 2px 6px}
+.customer-shell .quick-assist-result-list{display:grid;gap:6px}
+.customer-shell .quick-assist-result{display:flex;align-items:center;gap:9px;width:100%;min-width:0;text-align:right;direction:rtl;border:1px solid #e0ebe8;border-radius:12px;background:#fff;padding:9px 10px;color:#243a36;cursor:pointer;transition:border-color .15s,background .15s}
+.customer-shell .quick-assist-result:hover{border-color:#9bc9c1;background:#f7fcfa}
+.customer-shell .quick-assist-result-icon{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:#edf7f4;font-size:19px}
+.customer-shell .quick-assist-result-copy{display:grid;gap:2px;min-width:0;flex:1}
+.customer-shell .quick-assist-result-copy b{font-size:13px;line-height:1.5}
+.customer-shell .quick-assist-result-copy small{font-size:11px;color:#71817d}
+.customer-shell .quick-assist-result-action{font-size:11px;font-weight:800;color:#237a73;white-space:nowrap}
+.customer-shell .quick-assist-no-match{border:1px dashed #cbded9;background:#f8fcfb;border-radius:12px;padding:12px;color:#35524d}
+.customer-shell .quick-assist-no-match b{font-size:13px}
+.customer-shell .quick-assist-no-match p{font-size:12px;color:#687a76;margin:5px 0 10px;line-height:1.6}
+.customer-shell .quick-assist-custom-link{margin-top:8px}
+.customer-shell .quick-assist-custom-link .btn{font-size:12px}
+@media(max-width:650px){
+ .customer-shell .hero.customer-simple-hero{padding:11px;border-radius:18px}
+ .customer-shell .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;gap:6px;padding:7px}
+ .customer-shell .customer-city-select-compact label{font-size:11px}
+ .customer-shell .customer-city-select-compact select{font-size:12px;min-height:35px;padding:5px}
+ .customer-shell .customer-city-select-compact .btn{font-size:11px;min-height:35px;padding:5px 7px}
+ .customer-shell .customer-city-select-compact small{font-size:10px}
+ .customer-shell .quick-assist-input-row{gap:6px}
+ .customer-shell .quick-assist-input-row textarea{padding:9px 10px;font-size:13px}
+ .customer-shell .quick-assist-voice{min-width:76px;padding:8px;font-size:12px}
+ .customer-shell .quick-assist-result{padding:8px}
+ .customer-shell .quick-assist-result-action{font-size:10px}
+}
+
+
+.customer-shell .hero.customer-simple-hero{position:relative;padding:12px 14px!important;margin-bottom:12px!important;border-radius:16px!important;background:linear-gradient(145deg,#f8fcfb 0%,#eef7f5 56%,#fbf5e9 100%)!important;box-shadow:0 8px 22px rgba(29,76,71,.07)!important;overflow:hidden}
+.customer-shell .hero.customer-simple-hero:after{display:none!important}
+.customer-shell .quick-assist-card{box-shadow:0 5px 15px rgba(31,76,71,.06)!important}
+.customer-shell .campaign-strip{margin:0 0 14px}
+@media(max-width:650px){.customer-shell .hero.customer-simple-hero{padding:10px!important;border-radius:15px!important}.customer-shell .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;gap:6px;padding:7px}.customer-shell .customer-city-select-compact small{font-size:10px}.customer-shell .quick-assist-head h1{font-size:21px}}
