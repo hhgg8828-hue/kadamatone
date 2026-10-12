@@ -8,7 +8,7 @@ test('Release 2.9 keeps optional order details collapsed by default', () => {
     assert.ok(form.includes('<details class="optional-order-details beneficiary-first"><summary>الطلب لشخص آخر؟</summary>'));
     assert.ok(form.includes('<details class="optional-order-details"><summary>إضافات اختيارية</summary>'));
     assert.ok(form.includes('id="orderDescription" name="description" required'));
-    assert.ok(form.includes('id="submitOrderBtn" type="submit">إرسال الطلب</button>'));
+    assert.ok(form.includes('id="submitOrderBtn" type="submit">متابعة الطلب</button>'));
 });
 test('Release 2.11 hides internal status events from customer tracking in order tracking', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');

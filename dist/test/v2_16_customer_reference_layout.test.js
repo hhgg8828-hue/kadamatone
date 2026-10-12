@@ -5,7 +5,7 @@ import { startApp, loginAdmin } from './helpers.js';
 const frontend = fs.readFileSync('public/app.ts', 'utf8');
 const css = fs.readFileSync('public/css/app.css', 'utf8');
 const customerShell = fs.readFileSync('public/customer.html', 'utf8');
-test('2.18 keeps the agreed one-box quick access and visible background', () => {
+test('2.19 keeps the agreed one-box quick access and visible background', () => {
     assert.match(frontend, /id="quickAssistForm" class="quick-assist-card"/);
     assert.match(frontend, /id="quickAssistText"/);
     assert.match(frontend, /id="quickAssistVoice"/);
@@ -33,10 +33,33 @@ test('campaign cards open their configured service/order/trip action and categor
     assert.match(css, /scroll-snap-type:x mandatory/);
     assert.match(css, /aspect-ratio:1\/1;object-fit:cover;border-radius:0;grid-row:auto/);
 });
-test('customer shell uses versioned 2.18 assets to refresh cached layout', () => {
-    assert.match(customerShell, /app\.css\?v=2\.18/);
-    assert.match(customerShell, /app\.js\?v=2\.18/);
-    assert.match(customerShell, /sw\.js\?v=2\.18/);
+test('customer account exposes request area, expandable phone, optional contact and GPS', () => {
+    assert.match(frontend, /accountCurrentArea/);
+    assert.match(frontend, /account-phone-disclosure/);
+    assert.match(frontend, /رقم تواصل إضافي \(اختياري\)/);
+    assert.match(frontend, /accountSetLocation/);
+});
+test('customer order confirmation includes coupon, address edit, inline note and quantity floor of one', () => {
+    assert.match(frontend, /orderConfirmationStep/);
+    assert.match(frontend, /هل لديك قسيمة تخفيض/);
+    assert.match(frontend, /reviewChangeAddress/);
+    assert.match(frontend, /reviewOrderNote/);
+    assert.match(frontend, /Math\.max\(1,Math\.floor\(Number\(qty\.value\|\|1\)\)\|\|1\)/);
+    assert.match(frontend, /الدفع عند الاستلام/);
+    assert.match(frontend, /pharmacyProductName/);
+    assert.match(frontend, /orderProductUrl/);
+});
+test('customer offer filters and favorites are interactive and saved locally', () => {
+    assert.match(frontend, /data-offer-filter="nearby"/);
+    assert.match(frontend, /data-offer-filter="new"/);
+    assert.match(frontend, /data-offer-filter="favorite"/);
+    assert.match(frontend, /khadamat\.favoriteCampaigns\.v1/);
+    assert.match(css, /customer-offer-filters/);
+});
+test('customer shell uses versioned 2.19 assets to refresh cached layout', () => {
+    assert.match(customerShell, /app\.css\?v=2\.19/);
+    assert.match(customerShell, /app\.js\?v=2\.19/);
+    assert.match(customerShell, /sw\.js\?v=2\.19/);
 });
 test('admin category editor can store an uploaded-image URL without a database migration', async () => {
     const t = await startApp();
