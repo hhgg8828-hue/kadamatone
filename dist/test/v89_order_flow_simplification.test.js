@@ -10,7 +10,7 @@ test('Release 2.9 keeps optional order details collapsed by default', () => {
     assert.ok(form.includes('id="orderDescription" name="description" required'));
     assert.ok(form.includes('id="submitOrderBtn" type="submit">إرسال الطلب</button>'));
 });
-test('Release 2.10 puts current status and essential actions first in order tracking', () => {
+test('Release 2.11 hides internal status events from customer tracking in order tracking', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const view = app.slice(app.indexOf('async function openOrder(id:string)'), app.indexOf('async function openSavedLocations'));
     assert.ok(view.includes('class="order-current-status"'));
@@ -19,7 +19,7 @@ test('Release 2.10 puts current status and essential actions first in order trac
     assert.ok(view.includes('id="trackTripBtn"'));
     assert.ok(view.includes('<h3>معلومات الطلب</h3>'));
     assert.ok(view.includes('<h3>نوع الخدمة</h3>'));
-    assert.ok(view.includes('class="order-latest-update"'));
+    assert.ok(!view.includes('class="order-latest-update"'));
     assert.ok(!view.includes('<summary>تفاصيل إضافية</summary>'));
     assert.ok(!view.includes('الملخص المالي'));
 });

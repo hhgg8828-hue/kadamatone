@@ -36,9 +36,9 @@ test('V84.0: طلبا دفع متزامنان لا يستطيعان تسوية �
 });
 test('V84.0: صفحات التطبيق وذاكرة التخزين المؤقت تستخدم إصدار الأصول الحالي', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.10'), file);
+        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.11'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-10'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-11'));
 });
 test('V84.1: لا تُدفع تسوية إذا كانت حالة الطلب أو الاستحقاق غير متطابقة', async () => {
     const t = await startApp();

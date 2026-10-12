@@ -20,7 +20,7 @@ test('V83.6: الروابط العامة لا تخلط موقع مقدم الخ�
 
 test('V83.6: كل واجهات PWA تستخدم أصول الإصدار الجديد', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
-    assert.ok(fs.readFileSync(file,'utf8').includes('v=2.10'), file);
+    assert.ok(fs.readFileSync(file,'utf8').includes('v=2.11'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-10'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-11'));
 });

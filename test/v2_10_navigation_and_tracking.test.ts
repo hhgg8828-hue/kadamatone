@@ -19,7 +19,9 @@ test('customer tracking is concise and omits extra service details and financial
   const view = app.slice(app.indexOf('async function openOrder(id:string)'), app.indexOf('async function openSavedLocations'));
   assert.ok(view.includes('<h3>معلومات الطلب</h3>'));
   assert.ok(view.includes('<h3>نوع الخدمة</h3>'));
-  assert.ok(view.includes('class="order-latest-update"'));
+  assert.ok(!view.includes('class="order-latest-update"'));
+  assert.ok(!view.includes('activeTimeline[0]?.title'));
+  assert.ok(!view.includes('/timeline'));
   assert.ok(!view.includes('<summary>تفاصيل إضافية</summary>'));
   assert.ok(!view.includes('الملخص المالي'));
   assert.ok(view.includes('id="openQuotesBtn"'));
@@ -33,7 +35,7 @@ test('role-specific PWAs use separate icons and cache refreshes navigation from 
     assert.ok(manifest.includes(`/icons/icon-${role}-192.png`));
   }
   const sw = fs.readFileSync('public/sw.js', 'utf8');
-  assert.ok(sw.includes('khadamat-shell-v2-10'));
+  assert.ok(sw.includes('khadamat-shell-v2-11'));
   assert.ok(sw.includes("e.request.mode==='navigate'"));
   assert.ok(sw.includes("'/js/app.js'"));
 });

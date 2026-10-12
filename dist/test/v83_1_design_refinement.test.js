@@ -4,7 +4,7 @@ import test from 'node:test';
 test('V83.2: الهوية الموحدة خضراء عبر واجهات العميل والمقدم والإدارة', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
-        assert.ok(html.includes('app.js?v=2.10'), `${file} should request current app assets`);
+        assert.ok(html.includes('app.js?v=2.11'), `${file} should request current app assets`);
         assert.ok(html.includes('#176b4d'), `${file} should use the green brand theme`);
     }
     for (const file of ['public/manifest.webmanifest', 'public/manifest-customer.webmanifest', 'public/manifest-provider.webmanifest', 'public/manifest-admin.webmanifest']) {
