@@ -11,7 +11,7 @@ fi
 log_dir="$(mktemp -d)"
 export KHADAMAT_TEST_LOG_DIR="$log_dir"
 export KHADAMAT_TEST_TIMEOUT_SECONDS="30"
-printf '%s\0' "${files[@]}" | xargs -0 -n 1 -P 4 bash -c '
+printf '%s\0' "${files[@]}" | xargs -0 -n 1 -P 2 bash -c '
   file="$1"
   name="$(basename "$file")"
   if timeout "${KHADAMAT_TEST_TIMEOUT_SECONDS}s" node --test --test-force-exit --test-concurrency=1 "$file" > "$KHADAMAT_TEST_LOG_DIR/$name.log" 2>&1; then

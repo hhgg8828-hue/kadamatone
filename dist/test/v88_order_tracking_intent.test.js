@@ -7,7 +7,9 @@ test('Release 2.6 customer order details use readable location text and a map li
     assert.ok(app.includes('function renderCustomerLocationDetails(location:any):string'));
     assert.ok(app.includes('📍 عرض الموقع على الخريطة'));
     assert.ok(app.includes('تم تحديد موقع الخدمة على الخريطة، لكن لم يُدخل عنوان تفصيلي.'));
-    assert.ok(app.includes('<b>📝 ماذا تحتاج؟</b>'));
+    assert.ok(app.includes('<h3>نوع الخدمة</h3>'));
+    assert.ok(app.includes('<h3>معلومات الطلب</h3>'));
+    assert.ok(!app.includes('<summary>تفاصيل إضافية</summary>'));
     const customerOrderView = app.slice(app.indexOf('async function openOrder(id:string)'), app.indexOf('async function openProviderOrder'));
     assert.ok(customerOrderView.length > 0);
     assert.ok(!customerOrderView.includes('الإحداثيات المحفوظة مع الطلب'));
@@ -55,8 +57,8 @@ test('Release 2.6 keeps specific labor categories ahead of generic daily labor',
 test('Release 2.6 uses the current cache identifiers in all app shells', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
-        assert.ok(html.includes('v=2.8'), file);
+        assert.ok(html.includes('v=2.10'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-8'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-10'));
 });
 //# sourceMappingURL=v88_order_tracking_intent.test.js.map

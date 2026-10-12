@@ -692,3 +692,48 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 /* Release 2.7: guest-safe service detail and focused mobile car-wash location choice. */
 .service-detail-view{display:flex;flex-direction:column;gap:12px}.service-detail-heading{display:flex;align-items:center;gap:13px}.service-detail-heading h2{margin:0}.service-detail-heading p{margin:4px 0 0}.service-detail-icon{width:56px;height:56px;display:grid;place-items:center;border-radius:16px;background:#edf7f0;color:var(--primary);border:1px solid #d7e8dc;flex:none}.service-detail-icon .service-icon-svg{width:31px;height:31px}.service-detail-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;background:#f8fbf8}.service-detail-facts>div{display:flex;flex-direction:column;gap:5px;min-width:0}.service-detail-facts b{font-size:12px;color:#667085}.service-detail-facts span{font-size:14px;font-weight:700;overflow-wrap:anywhere}.service-detail-actions{margin-top:4px}.service-detail-actions .btn{flex:1}.car-wash-location-choice{margin:8px 0 12px;background:#f8fbf8}.car-wash-location-choice>b{display:block;margin-bottom:10px}.car-wash-location-choice .choice-row{display:flex;flex-direction:row;align-items:center;gap:9px;padding:9px 0;cursor:pointer}.car-wash-location-choice input[type=radio]{width:18px;height:18px;accent-color:var(--primary)}.car-wash-location-choice .muted{display:block;margin-top:4px;font-size:12px}
 @media(max-width:600px){.service-detail-facts{grid-template-columns:1fr}.service-detail-actions{flex-direction:column}.service-detail-actions .btn{width:100%}}
+
+/* V89.0 — اختصار نموذج الطلب ومتابعته دون حذف الوظائف */
+.order-advanced-area{margin:8px 0 12px;background:var(--surface-2)}
+.order-advanced-area .field{margin:12px 0 2px}
+.order-price-preview{padding:14px;margin-top:12px}
+.order-price-preview h3{margin:0 0 8px;font-size:16px}
+.order-price-preview>p{margin:6px 0}
+.customer-order-tracking{display:grid;gap:12px}
+.order-tracking-head{padding:4px 2px 8px}
+.order-tracking-head>p{margin:0 0 4px}
+.order-tracking-head h2{margin:0 0 12px}
+.order-current-status{border:1px solid var(--line);border-radius:16px;background:var(--primary-soft);padding:13px 14px}
+.order-current-status p{margin:8px 0 3px;font-weight:800;color:var(--ink)}
+.order-current-status small{display:block}
+.order-tracking-summary{margin:0;padding:14px}
+.order-tracking-summary h3{margin:0 0 8px;font-size:16px}
+.order-tracking-summary>p{margin:7px 0;line-height:1.6}
+.provider-compact-row{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.provider-compact-row .muted{margin:4px 0 0}
+.order-primary-actions{display:flex;gap:8px;flex-wrap:wrap}
+.order-primary-actions .btn{flex:1;min-width:100px}
+.order-secondary-details{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:12px 14px}
+.order-secondary-details summary{cursor:pointer;font-weight:800;color:var(--ink)}
+.order-secondary-details[open] summary{margin-bottom:12px}
+.order-secondary-details .order-detail-content p{margin:8px 0;overflow-wrap:anywhere}
+.order-timeline-item{padding:10px 0;border-bottom:1px solid var(--line)}
+.order-timeline-item:last-child{border-bottom:0}
+.order-timeline-item small{display:block;margin-top:4px}
+.order-timeline-item p{margin:5px 0 0}
+@media(max-width:480px){.provider-compact-row{align-items:flex-start;flex-direction:column}.provider-compact-row .row{width:100%}.provider-compact-row .btn{flex:1}.order-primary-actions .btn{font-size:13px;padding-inline:8px}}
+
+/* V2.10 — focused admin navigation and compact customer order updates. */
+.order-info-compact{margin:0;padding:13px 14px}
+.order-info-compact h3{font-size:15px;margin:0 0 10px}
+.order-info-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;align-items:start;font-size:13px}
+.order-info-grid span{color:var(--muted,#667085)}
+.order-info-grid b{overflow-wrap:anywhere;text-align:start}
+.order-tracking-summary h3{margin:0 0 8px;font-size:15px}
+.order-tracking-summary>p{margin:6px 0;line-height:1.55}
+.order-location-compact{padding-top:8px;border-top:1px solid var(--line)}
+.order-latest-update{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.order-update-dot{width:10px;height:10px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 4px var(--primary-soft);margin:5px 2px 0 0;flex:none}
+.order-latest-update b{font-size:13px}
+.order-latest-update p{margin:4px 0;font-weight:700}
+.order-latest-update small{display:block}
