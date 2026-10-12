@@ -5,7 +5,7 @@ import { startApp, loginAdmin } from './helpers.js';
 const frontend = fs.readFileSync('public/app.ts', 'utf8');
 const css = fs.readFileSync('public/css/app.css', 'utf8');
 const migration = fs.readFileSync('src/db/migrations/034_reinforce_operational_coverage.sql', 'utf8');
-test('customer-facing promotions use square image cards and keep the quick-access one-box design', () => {
+test('customer-facing promotions use compact 16:9 image cards and keep the quick-access one-box design', () => {
     assert.match(frontend, /id="quickAssistForm" class="quick-assist-card"/);
     assert.equal(/simple-request-step/.test(frontend), false);
     assert.match(frontend, /customer-offers/);

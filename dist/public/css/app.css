@@ -957,22 +957,43 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .customer-shell .quick-assist-card{border:1px solid #d9e8df;background:linear-gradient(145deg,#fff 0%,#f4fbf6 100%);box-shadow:0 5px 16px rgba(28,91,60,.08)}
 @media(max-width:420px){.customer-shell .customer-category-showcase-top .customer-category-tile{flex-basis:64px}.customer-shell .customer-category-showcase-top .customer-category-art{width:44px;height:44px;flex-basis:44px}}
 
-/* V2.21 — offers represent service categories and use compact artwork. */
-.customer-shell .campaign-card{flex-basis:min(38%,180px)}
+/* Khadamat 2.24 — compact category rail, complete offers gallery, and simplified order confirmation */
+.customer-shell .customer-category-showcase-top{margin:4px 0 12px;padding:0;background:transparent;border:0;box-shadow:none}
+.customer-shell .customer-category-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+.customer-shell .customer-category-heading h2{font-size:16px;margin:0}
+.customer-shell .all-categories-button{white-space:nowrap;min-height:34px;padding:5px 10px}
+.customer-shell .all-categories-button span{font-size:16px;margin-inline-end:4px}
+.customer-shell .customer-category-showcase-top .customer-category-rail{display:flex;gap:9px;overflow-x:auto;overflow-y:hidden;padding:3px 1px 8px;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.customer-shell .customer-category-showcase-top .customer-category-rail::-webkit-scrollbar{display:none}
+.customer-shell .customer-category-showcase-top .customer-category-tile{flex:0 0 70px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:5px 4px;border:0;border-radius:12px;background:transparent;box-shadow:none;scroll-snap-align:start}
+.customer-shell .customer-category-showcase-top .customer-category-art{width:46px;height:46px;flex:0 0 46px;aspect-ratio:1/1;margin:0 auto;border-radius:50%;border:1px solid #e7e9e5;background:#f7f8f6;color:#2b7559;display:grid;place-items:center}
+.customer-shell .customer-category-showcase-top .customer-category-tile b{font-size:10px;line-height:1.3;font-weight:700;color:#4b5b52;text-align:center;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.customer-shell .customer-category-showcase-top .customer-category-tile small{display:none}
+.customer-shell .customer-offers{margin:8px 0 10px;padding:10px;background:linear-gradient(135deg,#fff8dc,#fffdf4);border:1px solid #f0d67a;border-radius:16px}
+.customer-shell .campaign-card .campaign-image{height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:10px;grid-row:auto}
+.customer-shell .campaign-card{flex-basis:min(76%,290px);overflow:hidden}
+.customer-shell .campaign-card-copy p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.all-offers-row{display:flex;justify-content:center;margin:8px 0 2px}
+.all-offers-button{min-width:140px;border-radius:10px}
+.all-offers-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.all-offer-item{display:flex;flex-direction:column;align-items:stretch;gap:7px;text-align:right;min-width:0;overflow:hidden}
+.all-offer-item img,.all-offer-placeholder{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:9px}
+.all-offer-placeholder{display:grid;place-items:center;background:#edf7f0;font-size:28px;color:#176b4d}
+.all-offer-item b,.all-offer-item small{overflow-wrap:anywhere}
+.all-offer-item small{color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.all-categories-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.all-categories-grid .service-option{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.all-categories-grid .customer-category-art{width:48px;height:48px;border-radius:50%;display:grid;place-items:center}
+.order-confirmation-step{gap:9px}
+.order-confirmation-step .order-confirmation-heading h2{font-size:20px}
+.order-confirmation-step .order-confirmation-summary,.order-confirmation-step .order-confirmation-extra,.order-confirmation-step .payment-methods,.order-confirmation-step .order-time-choice{padding:12px;margin:0}
+.order-confirmation-step .order-confirmation-summary>p{margin:7px 0}
+.order-confirmation-step .order-confirmation-inline{margin:6px 0}
+.order-confirmation-step .order-confirmation-inline>span{max-width:55%;font-size:12px}
+.order-confirmation-step .payment-choice{padding:8px 0}
+.order-confirmation-step .order-confirmation-actions{position:sticky;bottom:72px;background:#fff;padding:8px 0;z-index:2}
+@media(max-width:420px){.customer-shell .customer-category-showcase-top .customer-category-tile{flex-basis:62px}.customer-shell .customer-category-showcase-top .customer-category-art{width:42px;height:42px;flex-basis:42px}.customer-shell .campaign-card{flex-basis:82%}.all-offers-grid,.all-categories-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .customer-shell .campaign-card .campaign-image{aspect-ratio:16/9;object-fit:cover}
-.customer-shell .campaign-card .campaign-image-placeholder{aspect-ratio:16/9}
-.customer-shell .campaign-card-copy{padding:9px 10px 10px}
-.customer-shell .campaign-card-copy b{font-size:13px}
-@media(max-width:520px){.customer-shell .campaign-card{flex-basis:min(44%,165px)}}
-
-/* V2.22 — reference-aligned customer home: compact location, categories before offers. */
-.customer-shell > .customer-city-select-compact{margin:0 0 8px;padding:6px 9px;gap:7px;border-radius:12px;border-color:#e4ebe6;background:#fff;box-shadow:0 2px 8px rgba(20,70,48,.04)}
-.customer-shell > .customer-city-select-compact label{font-size:11px;color:#50685b}
-.customer-shell > .customer-city-select-compact select{min-height:32px;padding:5px 8px;font-size:12px}
-.customer-shell > .customer-city-select-compact .btn{min-height:32px;padding:5px 8px;font-size:11px}
-.customer-shell .customer-category-showcase-top{margin:2px 0 10px}
-.customer-shell .customer-category-showcase-top .section-heading{margin:0 0 5px}
-.customer-shell .customer-category-showcase-top .section-heading h2{margin:0;font-size:14px;color:#355b49}
-@media(max-width:420px){.customer-shell > .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;padding:5px 7px;gap:5px}.customer-shell > .customer-city-select-compact label{font-size:10px}.customer-shell > .customer-city-select-compact select{font-size:11px;min-height:30px}.customer-shell > .customer-city-select-compact .btn{font-size:10px;min-height:30px;padding:4px 6px}}
 
 .customer-shell > .customer-city-select-compact small{display:none}
+.account-menu-list{margin-top:14px;display:grid;gap:10px}.account-menu-list>h3{margin:0}.account-menu-list details{border:1px solid var(--border,#dce8e1);border-radius:12px;padding:10px}.account-menu-list summary{cursor:pointer;font-weight:800}.account-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.account-menu-grid .btn{min-width:0;white-space:normal}.account-app-footer{display:flex;flex-direction:column;align-items:center;gap:5px;padding:18px 8px 4px;text-align:center;color:var(--muted)}.account-app-logo{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:#eaf6ef;color:#176b4d;font-size:24px;font-weight:900}.account-app-footer b{color:var(--text,#20342b)}.account-app-footer small{font-size:11px}

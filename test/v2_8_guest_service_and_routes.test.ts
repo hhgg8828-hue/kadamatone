@@ -65,7 +65,7 @@ test('direct /admin, /provider, and /customer paths and refreshes serve the corr
       assert.equal(refreshed.status, 200, `${route} refresh should return HTTP 200`);
       assert.ok(refreshed.text.includes(expected));
     }
-    const assets = await t.api('GET', '/js/app.js?v=2.22');
+    const assets = await t.api('GET', '/js/app.js?v=2.24');
     assert.equal(assets.status, 200);
     assert.match(assets.headers.get('content-type') || '', /javascript/);
     assert.ok(assets.text.length > 1000);
