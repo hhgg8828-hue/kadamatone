@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.12.0",
-  "description": "خدمات — الإصدار 2.12: إصلاح توجيه البوابات وفتح أقسام الإدارة في نوافذ منبثقة",
+  "version": "2.13.1",
+  "description": "خدمات (Khadamat) — 2.13.1 build fix and refreshed app icons and provider navigation polish",
   "private": true,
   "type": "module",
   "engines": {

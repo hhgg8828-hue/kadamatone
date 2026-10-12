@@ -270,7 +270,7 @@ export function registerCatalogRoutes(app, r) {
         const isInArea = (ids) => !scopeAreaIds || !Array.isArray(ids) || ids.length === 0 || ids.some((id) => scopeAreaIds.has(String(id)));
         const services = data.services.filter(x => { if (!x.is_active || !catalog.getActiveService(x.id))
             return false; if (!scopeAreaIds)
-            return true; const rules = app.db.all('SELECT area_id FROM service_area_rules WHERE service_id=?', x.id).map(y => y.area_id); return rules.length === 0 || rules.some((id) => scopeAreaIds.has(id) || catalog.areaChain(validArea.id).includes(id)); }).map(x => catalog.serializeService(x, locale));
+            return true; const rules = app.db.all('SELECT area_id FROM service_area_rules WHERE service_id=?', x.id).map(y => y.area_id); return rules.length === 0 || rules.some((id) => scopeAreaIds.has(id)); }).map(x => catalog.serializeService(x, locale));
         const temporaryServices = app.db.all(`SELECT * FROM temporary_services WHERE is_active=1 AND start_at<=? AND end_at>? ORDER BY priority DESC, sort_order ASC, start_at ASC`, now, now).filter((x) => isInArea(parseJson(x.area_ids_json || '[]'))).map((x) => ({
             id: x.id, linkedServiceId: x.linked_service_id, name: tr(parseJson(x.name_i18n), locale), title: tr(parseJson(x.title_i18n), locale), description: tr(parseJson(x.description_i18n || '{}'), locale), icon: x.icon, categoryId: x.category_id, startAt: x.start_at, endAt: x.end_at, sortOrder: x.sort_order, priority: Number(x.priority || 0), requestFlow: x.request_flow || 'SERVICE', actionValue: x.action_value || x.linked_service_id, actionLabel: tr(parseJson(x.action_label_i18n || '{}'), locale), areaIds: parseJson(x.area_ids_json || '[]'), maxOrders: x.max_orders, pricing: parseJson(x.pricing_json || '{}'), targetCapabilities: parseJson(x.target_capabilities_json || '[]') || []
         }));
@@ -295,7 +295,7 @@ export function registerCatalogRoutes(app, r) {
             throw E.unprocessable('المدينة أو المنطقة المختارة غير صالحة', 'INVALID_AREA');
         const scope = validArea ? new Set(data.areas.filter(a => catalog.areaChain(a.id).includes(validArea.id)).map(a => a.id)) : null;
         const services = data.services.filter(x => allowed.has(x.category_id) && x.is_active).filter(x => { if (!scope)
-            return true; const rules = app.db.all('SELECT area_id FROM service_area_rules WHERE service_id=?', x.id).map(y => y.area_id); return rules.length === 0 || rules.some((id) => scope.has(id) || catalog.areaChain(validArea.id).includes(id)); }).map(x => catalog.serializeService(x, ctx.locale));
+            return true; const rules = app.db.all('SELECT area_id FROM service_area_rules WHERE service_id=?', x.id).map(y => y.area_id); return rules.length === 0 || rules.some((id) => scope.has(id)); }).map(x => catalog.serializeService(x, ctx.locale));
         return { category: catalog.serializeCategory(c, ctx.locale, { withServices: false }), services };
     });
     r.get('/services/:id', (ctx) => {

@@ -22,8 +22,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 
 test('provider page and frontend assets use the current version', () => {
   assert.ok(provider.includes('data-page="provider"'));
-  assert.ok(provider.includes('app.js?v=2.12')); 
-  assert.ok(index.includes('app.js?v=2.12')); 
+  assert.ok(provider.includes('app.js?v=2.13')); 
+  assert.ok(index.includes('app.js?v=2.13')); 
 });
 
 
@@ -34,9 +34,8 @@ test('provider order action is not nested inside the clickable order detail butt
 
 test('provider portal does not redirect an existing customer back to the customer home', () => {
   assert.ok(app.includes("if(state.user!.role!=='PROVIDER'){redirectToRole(state.user!.role);return}"));
-  assert.ok(app.includes("const portalRole=page==='admin'?'ADMIN':page==='provider'?'PROVIDER':'CUSTOMER'"));
-  assert.ok(app.includes('A saved session for one role must not hijack a different portal URL.'));
-  assert.ok(app.includes("if(page==='provider')authBox('PROVIDER');else if(page==='admin')authBox('ADMIN')"));
+  assert.ok(app.includes("const expected=roleHome(state.user!.role)"));
+  assert.ok(app.includes("location.replace(expected)"));
 });
 
 test('provider route alias serves the provider page', () => {

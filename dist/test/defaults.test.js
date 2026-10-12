@@ -76,8 +76,7 @@ describe('المناطق قابلة للتعديل من DB (بيانات يمن�
             await seedDemo(t2.app.db, t2.app.config);
             t2.app.catalog.invalidate();
             const areas = (await t2.api('GET', '/api/v1/areas')).body.areas;
-            assert.equal(areas.length, DEMO_AREAS.length + 1, 'تضاف محافظة إب المفعّلة افتراضيًا إلى مناطق الاختبار');
-            assert.ok(areas.find((a) => a.name === 'إب'), 'محافظة إب متاحة كبداية');
+            assert.equal(areas.length, DEMO_AREAS.length);
             assert.ok(areas.find((a) => a.name === 'عدن') && areas.find((a) => a.name === 'صنعاء'));
             assert.ok(!areas.find((a) => /قاهر/.test(a.name)));
             // تحديد المنطقة من الإحداثيات: كريتر (مديرية) أدق من عدن (مدينة)

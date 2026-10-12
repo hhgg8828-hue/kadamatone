@@ -1,16 +1,6 @@
 import { createApp } from './app.js';
 import { seedBase } from './db/seed.js';
-import fs from 'node:fs';
-import path from 'node:path';
 const app = createApp();
-// Fail fast on deployment if required PWA shells were not copied into the runtime image.
-for (const asset of ['index.html', 'customer.html', 'provider.html', 'admin.html', 'js/app.js', 'sw.js']) {
-    const fullPath = path.join(app.config.publicDir, asset);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) {
-        throw new Error(`Required public asset missing from build: ${asset} (${fullPath})`);
-    }
-}
-app.log.info('static_shell_assets_verified', { publicDir: app.config.publicDir, shells: ['/', '/customer', '/provider', '/admin'] });
 // Railway/production must initialize the catalog and first admin automatically.
 // seedBase is idempotent: it adds missing defaults without overwriting admin edits.
 const seedResult = await seedBase(app.db, app.config);

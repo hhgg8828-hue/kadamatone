@@ -84,8 +84,8 @@ test('V68: ملفات الواجهة تشير إلى إصدار الكاش ال�
   const index=fs.readFileSync('public/index.html','utf8');
   const app=fs.readFileSync('public/app.ts','utf8');
   const sw=fs.readFileSync('public/sw.js','utf8');
-  assert.ok(index.includes('app.js?v=2.12'));
-  assert.ok(sw.includes('khadamat-shell-v2-12'));
+  assert.ok(index.includes('app.js?v=2.13'));
+  assert.ok(sw.includes('khadamat-shell-v2-13'));
   assert.ok(app.includes('أقرب معلم'));
   assert.ok(app.includes('customerMainCategories'));
 });

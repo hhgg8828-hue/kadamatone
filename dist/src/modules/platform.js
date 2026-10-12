@@ -46,22 +46,15 @@ export function registerPlatformRoutes(app, r) {
     });
     r.patch('/admin/areas/:id', auth, adminLevel('ADMIN'), (ctx) => {
         const b = parse(s.obj({
-            name: { ...I18N, optional: true }, localityType: s.oneOf(['COUNTRY', 'GOVERNORATE', 'CITY', 'DISTRICT', 'DIRECTORATE', 'ISOLATION', 'VILLAGE', 'NEIGHBORHOOD'], { optional: true }), parentId: s.str({ max: 64, optional: true }), isActive: s.bool({ optional: true }), centerLat: s.num({ min: -90, max: 90, optional: true }),
+            name: { ...I18N, optional: true }, localityType: s.oneOf(['COUNTRY', 'GOVERNORATE', 'CITY', 'DISTRICT', 'DIRECTORATE', 'ISOLATION', 'VILLAGE', 'NEIGHBORHOOD'], { optional: true }), isActive: s.bool({ optional: true }), centerLat: s.num({ min: -90, max: 90, optional: true }),
             centerLng: s.num({ min: -180, max: 180, optional: true }), radiusKm: s.num({ min: 0.1, max: 5000, optional: true }),
         }), ctx.body);
         return db.tx(() => {
             const a = db.get('SELECT * FROM service_areas WHERE id = ?', ctx.params['id']);
             if (!a)
                 throw E.notFound('المنطقة غير موجودة');
-            if (b.parentId !== undefined) {
-                const parentId = b.parentId.trim() || null;
-                if (parentId && !db.get('SELECT 1 FROM service_areas WHERE id=? AND is_active=1', parentId))
-                    throw E.unprocessable('المنطقة الأم غير موجودة أو غير نشطة', 'INVALID_PARENT');
-                if (parentId === a.id || (parentId && catalog.areaChain(parentId).includes(a.id)))
-                    throw E.unprocessable('لا يمكن جعل المنطقة أبًا لنفسها أو لأحد أسلافها', 'AREA_HIERARCHY_CYCLE');
-            }
-            db.run(`UPDATE service_areas SET name_i18n = COALESCE(?, name_i18n), locality_type = COALESCE(?, locality_type), parent_id = CASE WHEN ? = 1 THEN ? ELSE parent_id END, is_active = COALESCE(?, is_active), center_lat = COALESCE(?, center_lat),
-              center_lng = COALESCE(?, center_lng), radius_km = COALESCE(?, radius_km), updated_at = ? WHERE id = ?`, b.name ? JSON.stringify(b.name) : null, b.localityType || null, b.parentId === undefined ? 0 : 1, b.parentId === undefined ? null : (b.parentId.trim() || null), b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.centerLat ?? null, b.centerLng ?? null, b.radiusKm ?? null, iso(app.clock.now()), a.id);
+            db.run(`UPDATE service_areas SET name_i18n = COALESCE(?, name_i18n), locality_type = COALESCE(?, locality_type), is_active = COALESCE(?, is_active), center_lat = COALESCE(?, center_lat),
+              center_lng = COALESCE(?, center_lng), radius_km = COALESCE(?, radius_km), updated_at = ? WHERE id = ?`, b.name ? JSON.stringify(b.name) : null, b.localityType || null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.centerLat ?? null, b.centerLng ?? null, b.radiusKm ?? null, iso(app.clock.now()), a.id);
             catalog.invalidate();
             app.sse.broadcast('sync', { scope: 'catalog' });
             app.audit.log({ ctx, action: 'area.update', entityType: 'area', entityId: a.id, before: { isActive: !!a.is_active, radiusKm: a.radius_km }, after: b });
