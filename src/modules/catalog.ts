@@ -159,7 +159,7 @@ export function registerCatalogAdminRoutes(app: App, r: App['router']): void {
   const categoryInput: Schema = s.obj({
     slug: s.str({ min: 2, max: 80, pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ }), name: I18N_ADMIN,
     description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),
-    icon: s.str({ max: 20, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords,
+    icon: s.str({ max: 200, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords,
     moduleType: s.str({ min: 1, max: 40, optional: true, default: 'STANDARD' }), sortOrder: s.int({ min: -100000, max: 100000, optional: true, default: 0 }),
   });
   const serviceInput: Schema = s.obj({
@@ -184,7 +184,7 @@ export function registerCatalogAdminRoutes(app: App, r: App['router']): void {
   });
   r.patch('/admin/categories/:id', auth, adminLevel('ADMIN'), (ctx: Ctx) => {
     const old=db.get<CategoryRow>('SELECT * FROM categories WHERE id=?',ctx.params['id']); if(!old) throw E.notFound('القسم غير موجود');
-    const b=parse<any>(s.obj({name:s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),description:s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),icon:s.str({max:20,optional:true}),parentId:s.str({max:64,optional:true}),keywords,sortOrder:s.int({min:-100000,max:100000,optional:true}),isActive:s.bool({optional:true})}),ctx.body);
+    const b=parse<any>(s.obj({name:s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),description:s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),icon:s.str({max:200,optional:true}),parentId:s.str({max:64,optional:true}),keywords,sortOrder:s.int({min:-100000,max:100000,optional:true}),isActive:s.bool({optional:true})}),ctx.body);
     if(b.parentId===old.id) throw E.unprocessable('لا يمكن أن يكون القسم أبًا لنفسه','INVALID_PARENT');
     if(b.parentId && !db.get('SELECT 1 FROM categories WHERE id=?',b.parentId)) throw E.unprocessable('القسم الأب غير موجود','INVALID_PARENT');
     db.run(`UPDATE categories SET name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),parent_id=COALESCE(?,parent_id),keywords=COALESCE(?,keywords),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),updated_at=? WHERE id=?`,b.name?JSON.stringify(b.name):null,b.description?JSON.stringify(b.description):null,b.icon??null,b.parentId??null,b.keywords?JSON.stringify(b.keywords):null,b.sortOrder??null,b.isActive===undefined?null:(b.isActive?1:0),iso(app.clock.now()),old.id);

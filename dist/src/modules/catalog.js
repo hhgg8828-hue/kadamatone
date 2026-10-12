@@ -152,7 +152,7 @@ export function registerCatalogAdminRoutes(app, r) {
     const categoryInput = s.obj({
         slug: s.str({ min: 2, max: 80, pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ }), name: I18N_ADMIN,
         description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),
-        icon: s.str({ max: 20, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords,
+        icon: s.str({ max: 200, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords,
         moduleType: s.str({ min: 1, max: 40, optional: true, default: 'STANDARD' }), sortOrder: s.int({ min: -100000, max: 100000, optional: true, default: 0 }),
     });
     const serviceInput = s.obj({
@@ -185,7 +185,7 @@ export function registerCatalogAdminRoutes(app, r) {
         const old = db.get('SELECT * FROM categories WHERE id=?', ctx.params['id']);
         if (!old)
             throw E.notFound('القسم غير موجود');
-        const b = parse(s.obj({ name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 20, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords, sortOrder: s.int({ min: -100000, max: 100000, optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
+        const b = parse(s.obj({ name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 200, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords, sortOrder: s.int({ min: -100000, max: 100000, optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
         if (b.parentId === old.id)
             throw E.unprocessable('لا يمكن أن يكون القسم أبًا لنفسه', 'INVALID_PARENT');
         if (b.parentId && !db.get('SELECT 1 FROM categories WHERE id=?', b.parentId))

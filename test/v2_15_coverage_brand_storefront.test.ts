@@ -13,7 +13,11 @@ test('customer storefront keeps one quick-access box, restores ticker and image-
   assert.match(frontend, /id="quickAssistVoice"/);
   assert.match(frontend, /khadamat-news-ticker/);
   assert.match(frontend, /customer-offers/);
+  assert.match(frontend, /customer-category-rail/);
+  assert.match(frontend, /customer-category-tile/);
+  assert.match(frontend, /news-ticker-track/);
   assert.match(css, /campaign-image\{display:block;width:100%;height:auto;aspect-ratio:1\/1/);
+  assert.match(css, /customer-category-art/);
   assert.match(frontend, /data-campaign-action/);
 });
 

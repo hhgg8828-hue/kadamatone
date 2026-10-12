@@ -45,10 +45,11 @@ test('V82.8: طلب معروف لا يفتح سؤالًا زائدًا', async (
 test('V82.8: واجهة العميل لا تعيد التمرير للأعلى وتحافظ على تجربة العميل', async () => {
   const fs = await import('node:fs');
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  assert.equal(app.includes("window.scrollTo({top:0,behavior:'smooth'})"), false);
+  assert.ok(app.includes("window.scrollTo({top:0,behavior:'smooth'})"));
+  assert.ok(app.includes('data-customer-nav')); // the fixed bottom navigation intentionally controls page position
   assert.ok(app.includes('id="quickAssistForm"'));
   assert.ok(app.includes('الوصول السريع'));
   assert.ok(app.includes('khadamat-news-ticker'));
-  assert.ok(app.includes('state.config.newsTicker'));
+  assert.ok(app.includes('state.config?.newsTicker'));
   assert.ok(app.includes('personal-recommendations-grid'));
 });

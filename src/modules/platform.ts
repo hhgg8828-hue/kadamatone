@@ -15,7 +15,7 @@ export function registerPlatformRoutes(app: App, r: Router): void {
 
   r.get('/config', () => {
     const locale = settings.get<'ar' | 'en'>('platform.default_locale');
-    return { country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
+    return { appVersion: '2.17.0', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
       appName: settings.get('app.name'), appTagline: settings.get('app.tagline'), appSymbol: settings.get('app.symbol'),
       newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'),
       defaultLocale: locale, supportedLocales: ['ar', 'en'], direction: locale === 'ar' ? 'rtl' : 'ltr', mapProvider: app.config.mapProvider };
@@ -23,8 +23,11 @@ export function registerPlatformRoutes(app: App, r: Router): void {
 
   r.get('/admin/settings', auth, adminLevel('ADMIN'), () => ({ settings: settings.all() }));
 
-  r.put('/admin/settings/:key', auth, adminLevel('SUPER_ADMIN'), (ctx: Ctx) => {
+  const publicBrandSettings = new Set(['app.name','app.tagline','app.symbol','app.news_ticker','app.about','app.release_notes']);
+  r.put('/admin/settings/:key', auth, adminLevel('ADMIN'), (ctx: Ctx) => {
     const key = ctx.params['key']!;
+    // Ordinary administrators may maintain customer-facing content; technical and financial settings remain SUPER_ADMIN-only.
+    if (ctx.user!.adminLevel !== 'SUPER_ADMIN' && !publicBrandSettings.has(key)) throw E.forbidden('هذا الإعداد يتطلب صلاحية المدير الأعلى', 'INSUFFICIENT_ADMIN_LEVEL');
     const before = settings.all().find((x) => x.key === key);
     if (!before) throw E.notFound('إعداد غير معروف', 'UNKNOWN_SETTING');
     const b = parse<{ value: unknown }>(s.obj({ value: s.any() }), ctx.body);

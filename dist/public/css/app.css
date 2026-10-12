@@ -773,3 +773,127 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 @media(min-width:560px){.customer-shell .campaign-strip{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
 @media(min-width:900px){.customer-shell .campaign-strip{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.customer-shell .campaign-card{transition:none}.customer-shell .campaign-card:hover{transform:none}}
+
+/* V2.17 — customer home inspired by the supplied Tawseel One screenshots, keeping Khadamat branding and the one-box quick access. */
+.customer-shell .hero.customer-simple-hero{background:linear-gradient(135deg,#075b45 0%,#087b59 58%,#269878 100%);border:1px solid rgba(255,255,255,.18);box-shadow:0 16px 36px rgba(7,91,69,.17)}
+.customer-shell .hero.customer-simple-hero:after{background:rgba(217,173,98,.15)}
+.customer-shell .customer-city-select-compact{background:rgba(255,255,255,.97);border-color:rgba(255,255,255,.65);box-shadow:0 5px 18px rgba(0,0,0,.07)}
+.customer-shell .quick-assist-head h1{color:#fff!important;text-shadow:0 1px 1px rgba(0,0,0,.08)}
+.customer-shell .quick-assist-head p{color:rgba(255,255,255,.88)!important}
+.customer-shell .quick-assist-card{background:#fff;border-color:#d7e9e2}
+.customer-shell .khadamat-news-ticker{display:flex;align-items:center;gap:12px;overflow:hidden;border:1px solid #d5e6dd;background:linear-gradient(90deg,#fff,#f0f8f3);border-radius:14px;margin:0 0 16px;padding:10px 12px;box-shadow:var(--shadow-sm);direction:rtl}
+.customer-shell .news-ticker-label{flex:none;border-radius:8px;padding:6px 9px;background:#176b4d;color:#fff;font-size:11px;font-weight:900;white-space:nowrap}
+.customer-shell .news-ticker-window{flex:1;min-width:0;overflow:hidden;color:#285541;font-size:13px;font-weight:800;line-height:1.7}
+.customer-shell .news-ticker-track{display:flex;align-items:center;width:max-content;gap:60px;white-space:nowrap;animation:khadamatCustomerTicker 24s linear infinite}
+.customer-shell .news-ticker-track span{display:block;white-space:nowrap}
+.customer-shell .news-ticker-track span:before{content:'◆';font-size:8px;color:#c9a45c;margin-inline:0 9px}
+.customer-shell .khadamat-news-ticker:hover .news-ticker-track{animation-play-state:paused}
+@keyframes khadamatCustomerTicker{from{transform:translateX(0)}to{transform:translateX(50%)}}
+.customer-shell .customer-offers{margin:10px 0 20px}
+.customer-shell .customer-offers .section-heading{margin-bottom:10px}
+.customer-shell .customer-section-mark{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:11px;background:#fff7e7;border:1px solid #f0dfb9;color:#9a6c17;font-size:20px}
+.customer-shell .campaign-strip{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;scrollbar-width:thin;padding:2px 1px 10px;margin:0 0 10px;-webkit-overflow-scrolling:touch}
+.customer-shell .campaign-card{display:flex;flex:0 0 min(44%,220px);flex-direction:column;align-items:stretch;gap:0;min-width:0;overflow:hidden;padding:0;border:1px solid #e0e9e3;border-radius:18px;background:#fff;box-shadow:0 7px 20px rgba(23,74,54,.08);scroll-snap-align:start;cursor:pointer}
+.customer-shell .campaign-card:hover{transform:translateY(-2px);border-color:#a8d2ba;box-shadow:0 12px 26px rgba(23,74,54,.13)}
+.customer-shell .campaign-image-wrap{position:relative;width:100%;overflow:hidden;background:linear-gradient(135deg,#e8f5ef,#fff5df)}
+.customer-shell .campaign-card .campaign-image{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;border-radius:0;grid-row:auto}
+.customer-shell .campaign-card .campaign-image-placeholder{display:grid;place-items:center;aspect-ratio:1/1;background:linear-gradient(120deg,#e8f5ef,#fff5df 65%,#d9eee5);color:#176b4d}
+.customer-shell .campaign-card .campaign-image-placeholder .service-icon-svg{width:64px;height:64px;stroke-width:1.3}
+.customer-shell .campaign-image-badge{position:absolute;right:10px;top:10px;max-width:75%;overflow:hidden;text-overflow:ellipsis;border-radius:999px;padding:6px 10px;background:#fff;color:#176b4d;font-size:11px;font-weight:900;box-shadow:0 3px 10px rgba(0,0,0,.10);white-space:nowrap}
+.customer-shell .campaign-card-copy{display:grid;gap:4px;padding:12px 13px 13px;min-width:0}
+.customer-shell .campaign-card-copy b{font-size:14px;line-height:1.55;color:#173d30}
+.customer-shell .campaign-card-copy p{margin:0;color:#65756d;font-size:12px;line-height:1.65;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.customer-shell .campaign-cta{justify-self:start;margin-top:4px;border-radius:9px;padding:7px 10px;background:#eaf6ef;color:#176b4d;font-size:12px;font-weight:900}
+.customer-shell .customer-empty-banner{display:flex;align-items:center;gap:14px;flex:0 0 100%;min-width:0;min-height:136px;padding:18px;border:1px solid #d6e9de;border-radius:18px;background:linear-gradient(115deg,#e9f6ef,#fff8e8);color:#174b37;text-align:right;cursor:pointer;scroll-snap-align:start}
+.customer-shell .customer-empty-banner-art{display:grid;place-items:center;flex:0 0 82px;width:82px;height:82px;border-radius:20px;background:#fff;border:1px solid #d7e8dc;color:#176b4d;box-shadow:0 6px 16px rgba(23,74,54,.08)}
+.customer-shell .customer-empty-banner-art .service-icon-svg{width:48px;height:48px}
+.customer-shell .customer-empty-banner>span:last-child{display:grid;gap:5px;min-width:0}
+.customer-shell .customer-empty-banner b{font-size:16px;line-height:1.5}
+.customer-shell .customer-empty-banner small{color:#62756a;font-size:12px;line-height:1.6}
+.customer-shell .customer-empty-banner strong{font-size:12px;color:#176b4d}
+.customer-shell .customer-category-showcase{margin:12px 0 20px}
+.customer-shell .customer-category-showcase .section-heading{margin-bottom:10px}
+.customer-shell .customer-category-rail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(92px,23%);gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-inline:contain;padding:2px 1px 10px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.customer-shell .customer-category-tile{display:flex;flex-direction:column;align-items:stretch;min-width:0;gap:7px;padding:8px;border:1px solid #e0e9e4;border-radius:15px;background:#fff;box-shadow:0 5px 15px rgba(17,55,42,.045);text-align:center;font:inherit;cursor:pointer;scroll-snap-align:start;transition:transform .16s,border-color .16s,box-shadow .16s}
+.customer-shell .customer-category-tile:hover{transform:translateY(-2px);border-color:#a8d3c0;box-shadow:0 10px 22px rgba(8,123,89,.09)}
+.customer-shell .customer-category-art{display:grid;place-items:center;width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:11px;background:linear-gradient(145deg,#e8f5ef,#fff5df);color:#176b4d}
+.customer-shell .customer-category-art .service-icon-svg{width:43%;height:43%;min-width:30px;min-height:30px;stroke-width:1.45}
+.customer-shell .customer-category-art img{display:block;width:100%;height:100%;object-fit:cover}
+.customer-shell .customer-category-tile:nth-child(4n+2) .customer-category-art{background:linear-gradient(145deg,#fdf2dc,#fffaf1)}
+.customer-shell .customer-category-tile:nth-child(4n+3) .customer-category-art{background:linear-gradient(145deg,#e8f1ff,#f8fbff);color:#3769a5}
+.customer-shell .customer-category-tile:nth-child(4n+4) .customer-category-art{background:linear-gradient(145deg,#f4eafa,#fff8ff);color:#8553a5}
+.customer-shell .customer-category-tile b{font-size:12px;line-height:1.5;color:#203b30;overflow-wrap:anywhere}
+.customer-shell .customer-category-tile small{font-size:10px;color:#718078;line-height:1.3}
+.customer-shell .manual-service-fallback{margin-top:12px;background:#fff;border-color:#dce8e1;box-shadow:0 5px 16px rgba(17,55,42,.04)}
+.customer-shell .quick-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.customer-shell .quick-service{display:flex;align-items:center;gap:10px;min-width:0;padding:11px;border-radius:15px;background:#fff;border-color:#e0e9e4;box-shadow:0 5px 15px rgba(17,55,42,.045)}
+.customer-shell .quick-service-art{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:13px;background:linear-gradient(145deg,#e8f5ef,#fff5df);color:#176b4d}
+.customer-shell .quick-service-art .service-icon-svg{width:27px;height:27px}
+.customer-shell .quick-service-copy{display:grid;gap:3px;min-width:0;text-align:right}
+.customer-shell .quick-service-copy b{font-size:12px;line-height:1.5;color:#203b30}
+.customer-shell .quick-service-copy small{font-size:10px;line-height:1.4}
+.customer-shell .quick-service-open{font-size:10px;font-weight:900;color:#176b4d}
+.customer-shell .quick-service:hover{transform:translateY(-1px);border-color:#a8d3c0}
+@media(min-width:600px){.customer-shell .customer-category-rail{grid-auto-columns:minmax(110px,1fr);grid-auto-flow:initial;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible}.customer-shell .quick-services{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:950px){.customer-shell .quick-services{grid-template-columns:repeat(4,minmax(0,1fr))}.customer-shell .campaign-card{flex-basis:min(48%,480px)}}
+@media(max-width:420px){.customer-shell .hero.customer-simple-hero{padding:10px}.customer-shell .customer-city-select-compact{grid-template-columns:1fr auto}.customer-shell .customer-city-select-compact label{grid-column:1/-1}.customer-shell .customer-city-select-compact select{grid-column:1}.customer-shell .customer-city-select-compact .btn{grid-column:2;grid-row:2}.customer-shell .customer-city-select-compact small{font-size:10px}.customer-shell .campaign-card{flex-basis:88%}.customer-shell .customer-category-rail{grid-auto-columns:27%}.customer-shell .customer-category-tile{padding:6px}.customer-shell .customer-empty-banner{gap:10px;padding:12px}.customer-shell .customer-empty-banner-art{flex-basis:62px;width:62px;height:62px;border-radius:15px}.customer-shell .customer-empty-banner b{font-size:14px}}
+@media(prefers-reduced-motion:reduce){.customer-shell .news-ticker-track{animation:none}.customer-shell .campaign-card,.customer-shell .customer-category-tile,.customer-shell .quick-service{transition:none}.customer-shell .campaign-card:hover,.customer-shell .customer-category-tile:hover,.customer-shell .quick-service:hover{transform:none}}
+
+/* 2.17 customer app navigation and order-flow surfaces. */
+.customer-shell{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+.customer-shell .customer-bottom-nav{position:fixed;z-index:500;right:50%;bottom:0;transform:translateX(50%);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:min(100%,760px);padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));border:1px solid #dce8e1;border-bottom:0;border-radius:18px 18px 0 0;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);box-shadow:0 -8px 28px rgba(17,55,42,.10)}
+.customer-shell .customer-bottom-nav button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:48px;padding:3px 5px;border:0;border-radius:12px;background:transparent;color:#738078;font:inherit;cursor:pointer}
+.customer-shell .customer-bottom-nav button>span{font-size:23px;line-height:1.1;font-weight:900}
+.customer-shell .customer-bottom-nav button small{font-size:10px;font-weight:800;white-space:nowrap}
+.customer-shell .customer-bottom-nav button.active{color:#176b4d;background:#eaf6ef}
+.customer-shell .customer-bottom-nav button i{position:absolute;top:0;right:calc(50% - 22px);min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:#d9ad62;color:#fff;font-size:9px;font-style:normal;font-weight:900;line-height:16px}
+.customer-shell .modal>.card{border-radius:20px}
+.customer-shell .customer-order-tracking{gap:10px}
+.customer-shell .order-tracking-head{padding:17px 16px;border:0;border-radius:17px;background:linear-gradient(135deg,#075b45,#087b59 62%,#269878);color:#fff;box-shadow:0 8px 20px rgba(7,91,69,.14)}
+.customer-shell .order-tracking-head .muted{color:rgba(255,255,255,.78)!important}
+.customer-shell .order-tracking-head h2{color:#fff;margin:3px 0 9px;font-size:21px}
+.customer-shell .order-tracking-head .status{background:#fff;color:#075b45;border-color:rgba(255,255,255,.75)}
+.customer-shell .order-info-compact,.customer-shell .order-tracking-summary{border-color:#e0e9e3;background:#fff;box-shadow:0 4px 14px rgba(17,55,42,.035)}
+.customer-shell .order-info-compact h3,.customer-shell .order-tracking-summary h3{margin:0 0 10px;color:#1d503a;font-size:15px}
+.customer-shell .order-info-grid{display:grid;grid-template-columns:minmax(90px,.8fr) minmax(0,1.4fr);gap:7px 12px;font-size:13px}
+.customer-shell .order-info-grid span{color:#7a8980}
+.customer-shell .order-info-grid b{overflow-wrap:anywhere;color:#203b30}
+.customer-shell .order-tracking-summary>p{line-height:1.8;overflow-wrap:anywhere}
+.customer-shell .provider-compact-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #edf1ed}
+.customer-shell .order-primary-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.customer-shell .order-primary-actions .btn{min-width:0}
+.customer-shell .modal #orderForm{display:grid;gap:8px}
+.customer-shell .modal #orderForm>.field{padding:12px;margin:0;border:1px solid #e5ece7;border-radius:14px;background:#fff}
+.customer-shell .modal #orderForm .order-price-preview{margin:2px 0;background:linear-gradient(135deg,#f0f8f3,#fff9eb);border-color:#dbe9df}
+.customer-shell .modal #submitOrderBtn{position:sticky;bottom:0;z-index:5;width:100%;min-height:48px;margin-top:5px;border-radius:13px;box-shadow:0 -4px 16px rgba(8,123,89,.10),0 6px 14px rgba(8,123,89,.14)}
+@media(max-width:420px){.customer-shell .customer-bottom-nav{padding-inline:6px}.customer-shell .customer-bottom-nav button small{font-size:9px}.customer-shell .order-info-grid{grid-template-columns:minmax(78px,.7fr) minmax(0,1.3fr)}.customer-shell .order-primary-actions{grid-template-columns:1fr 1fr}}
+
+/* 2.18.0 — responsive polish for the customer experience and accessible touch targets. */
+.customer-shell{--customer-green:#176b4d;--customer-ink:#203b30;--customer-line:#dce9e2;scroll-padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+.customer-shell .app-topbar{gap:12px;align-items:center}
+.customer-shell .brand-lockup{min-width:0;max-width:100%}
+.customer-shell .brand-lockup>span:last-child{min-width:0}
+.customer-shell .brand-lockup strong,.customer-shell .brand-lockup small{overflow-wrap:anywhere}
+.customer-shell button,.customer-shell a,.customer-shell select,.customer-shell input,.customer-shell textarea{touch-action:manipulation}
+.customer-shell :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #d9ad62;outline-offset:3px}
+.customer-shell .customer-offers,.customer-shell .customer-category-showcase{min-width:0}
+.customer-shell .campaign-strip,.customer-shell .customer-category-rail{scrollbar-color:#b8d4c5 transparent;scrollbar-width:thin}
+.customer-shell .campaign-card,.customer-shell .customer-category-tile,.customer-shell .quick-service{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.customer-shell .customer-bottom-nav{padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 24px rgba(17,55,42,.09)}
+.customer-shell .customer-bottom-nav button{min-height:52px}
+.customer-shell .modal{padding-bottom:env(safe-area-inset-bottom,0px)}
+.customer-shell .modal #submitOrderBtn{min-height:52px}
+@media(max-width:520px){
+ .customer-shell .app-topbar{align-items:flex-start;flex-wrap:wrap}
+ .customer-shell .top-actions{max-width:100%;flex-wrap:wrap;gap:6px}
+ .customer-shell .top-actions .btn{min-height:36px;padding-inline:9px}
+ .customer-shell .khadamat-news-ticker{gap:8px;padding:8px 9px}
+ .customer-shell .news-ticker-label{padding:5px 7px;font-size:10px}
+ .customer-shell .news-ticker-window{font-size:12px}
+ .customer-shell .customer-category-rail{grid-auto-columns:minmax(88px,25%);gap:8px}
+ .customer-shell .customer-category-tile{border-radius:13px}
+ .customer-shell .campaign-card-copy{padding:10px}
+ .customer-shell .customer-bottom-nav{border-radius:15px 15px 0 0}
+}
+@media(hover:none){.customer-shell .campaign-card:hover,.customer-shell .customer-category-tile:hover,.customer-shell .quick-service:hover{transform:none;box-shadow:0 5px 15px rgba(17,55,42,.045)}}
+@media(prefers-reduced-motion:reduce){.customer-shell .campaign-card,.customer-shell .customer-category-tile,.customer-shell .quick-service{transition:none}}

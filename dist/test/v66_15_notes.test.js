@@ -64,7 +64,7 @@ test('V66.15: إشعارات مقدم الخدمة مختصرة في الصفح�
 test('V66.15: زر الإعلان والخدمة المؤقتة لهما مسار تفاعلي فعلي إلى طلب الخدمة', async () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     assert.match(app, /data-campaign-action/);
-    assert.match(app, /type="button" class="btn small" data-campaign-action/);
+    assert.match(app, /type="button" class="btn small[^\"]*" data-campaign-action/);
     assert.match(app, /openOrderForm\(v\)/);
     assert.match(app, /data-temp-action/);
     assert.match(app, /openTemporaryAction/);
