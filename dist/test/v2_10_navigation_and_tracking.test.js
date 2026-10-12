@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-test('admin section navigation returns the viewport to the top after rendering', () => {
+test('admin sections open in an overlay with an explicit return button', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    const handler = app.slice(app.indexOf("document.querySelectorAll('[data-admin-tab]')"), app.indexOf("document.querySelectorAll('[data-admin-tab]')") + 600);
-    assert.ok(handler.includes("window.scrollTo({top:0,behavior:'auto'})"));
-    assert.ok(handler.includes("draw().then(()=>requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'})))"));
+    const css = fs.readFileSync('public/css/app.css', 'utf8');
+    assert.ok(app.includes('class=\"admin-tab-backdrop\"'));
+    assert.ok(app.includes('class=\"admin-tab-dialog\"'));
+    assert.ok(app.includes('id=\"adminTabClose\"'));
+    assert.ok(app.includes("document.getElementById('adminTabClose')?.addEventListener('click'"));
+    assert.ok(css.includes('.admin-tab-dialog-content{'));
 });
 test('guest home no longer shows the unnecessary phone-verification notice', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
@@ -31,7 +34,7 @@ test('role-specific PWAs use separate icons and cache refreshes navigation from 
         assert.ok(manifest.includes(`/icons/icon-${role}-192.png`));
     }
     const sw = fs.readFileSync('public/sw.js', 'utf8');
-    assert.ok(sw.includes('khadamat-shell-v2-11'));
+    assert.ok(sw.includes('khadamat-shell-v2-12'));
     assert.ok(sw.includes("e.request.mode==='navigate'"));
     assert.ok(sw.includes("'/js/app.js'"));
 });
