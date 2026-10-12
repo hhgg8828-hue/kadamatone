@@ -11,11 +11,17 @@ export interface ApiOpts { token?: string; body?: unknown; cookie?: string | nul
 export type Api = (method: string, url: string, opts?: ApiOpts) => Promise<ApiResponse>;
 export interface TestApp { app: App; api: Api; base: string; close: () => Promise<void> }
 
-export async function startApp(extra: EnvOverrides = {}): Promise<TestApp> {
+export async function startApp(extra: EnvOverrides & { __keepCountryInactive?: boolean } = {}): Promise<TestApp> {
+  const keepCountryInactive = extra.__keepCountryInactive === true;
+  const envOverrides: EnvOverrides = { ...extra };
+  delete (envOverrides as any).__keepCountryInactive;
   const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'khadamat-test-'));
   const app = createApp({ DB_PATH: ':memory:', UPLOAD_DIR: uploadDir, LOG_LEVEL: 'silent', JWT_SECRET: 'test-secret-test-secret-test-secret-1234', DISABLE_SCHEDULER: 'true', DISABLE_RATE_LIMIT: 'true', ROUTING_URL: 'mock://straight-line',
-    ADMIN_PHONE: '+967700000000', ADMIN_EMAIL: 'admin@test.local', ADMIN_PASSWORD: 'AdminPass123', __skipDotEnv: true, ...extra });
+    ADMIN_PHONE: '+967700000000', ADMIN_EMAIL: 'admin@test.local', ADMIN_PASSWORD: 'AdminPass123', __skipDotEnv: true, ...envOverrides });
   await seedBase(app.db, app.config);
+  // General integration fixtures historically test nationwide matching. Scoped-coverage tests opt out and use production defaults.
+  if (!keepCountryInactive) app.db.run("UPDATE service_areas SET is_active=1 WHERE id='system-yemen'");
+  app.catalog.invalidate();
   await new Promise<void>((res) => { app.server.listen(0, '127.0.0.1', res); });
   const addr = app.server.address();
   const base = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;

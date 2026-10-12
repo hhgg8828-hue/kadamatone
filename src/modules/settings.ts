@@ -7,6 +7,12 @@ interface SettingMeta { def: unknown; schema: Schema; desc: string }
 
 /** سجل الإعدادات: كل إعداد له قيمة افتراضية ومخطط تحقق. لا قيم أعمال مبرمجة داخل المنطق. */
 export const SETTINGS: Record<string, SettingMeta> = {
+  'app.name': { def: 'خدمات', schema: s.str({ min: 1, max: 60 }), desc: 'اسم التطبيق الظاهر في الواجهات' },
+  'app.tagline': { def: 'كل خدمة تحتاجها في مكان واحد', schema: s.str({ max: 160 }), desc: 'العبارة التعريفية أسفل اسم التطبيق' },
+  'app.symbol': { def: 'خ', schema: s.str({ max: 8 }), desc: 'الرمز المختصر الظاهر بجانب اسم التطبيق' },
+  'app.news_ticker': { def: 'أهلًا بك في خدمات — اختر منطقتك لتظهر لك الخدمات المتاحة فيها.', schema: s.str({ max: 500 }), desc: 'نص الشريط الإخباري الظاهر في واجهة العميل؛ اتركه فارغًا لإخفائه' },
+  'app.about': { def: 'منصة تجمع العملاء بمقدمي الخدمات وتسهّل طلب الخدمات ومتابعتها.', schema: s.str({ max: 2000 }), desc: 'نبذة قابلة للتعديل تظهر في معلومات التطبيق' },
+  'app.release_notes': { def: 'تحسينات على تجربة العميل وإدارة المناطق ومحتوى العروض.', schema: s.str({ max: 2000 }), desc: 'معلومات ما الجديد في الإصدار الحالي' },
   'platform.country': { def: 'YE', schema: s.str({ min: 2, max: 2, pattern: /^[A-Z]{2}$/ }), desc: 'الدولة المستهدفة (ISO 3166-1 alpha-2)' },
   'platform.currency': { def: 'YER', schema: s.str({ min: 3, max: 3, pattern: /^[A-Z]{3}$/ }), desc: 'رمز العملة (ISO 4217)' },
   'platform.timezone': { def: 'Asia/Aden', schema: s.str({ min: 1, max: 60 }), desc: 'المنطقة الزمنية (IANA) لحساب أوقات العمل' },

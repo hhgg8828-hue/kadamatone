@@ -4,10 +4,17 @@ import path from 'node:path';
 import { createApp } from '../src/app.js';
 import { seedBase } from '../src/db/seed.js';
 export async function startApp(extra = {}) {
+    const keepCountryInactive = extra.__keepCountryInactive === true;
+    const envOverrides = { ...extra };
+    delete envOverrides.__keepCountryInactive;
     const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'khadamat-test-'));
     const app = createApp({ DB_PATH: ':memory:', UPLOAD_DIR: uploadDir, LOG_LEVEL: 'silent', JWT_SECRET: 'test-secret-test-secret-test-secret-1234', DISABLE_SCHEDULER: 'true', DISABLE_RATE_LIMIT: 'true', ROUTING_URL: 'mock://straight-line',
-        ADMIN_PHONE: '+967700000000', ADMIN_EMAIL: 'admin@test.local', ADMIN_PASSWORD: 'AdminPass123', __skipDotEnv: true, ...extra });
+        ADMIN_PHONE: '+967700000000', ADMIN_EMAIL: 'admin@test.local', ADMIN_PASSWORD: 'AdminPass123', __skipDotEnv: true, ...envOverrides });
     await seedBase(app.db, app.config);
+    // General integration fixtures historically test nationwide matching. Scoped-coverage tests opt out and use production defaults.
+    if (!keepCountryInactive)
+        app.db.run("UPDATE service_areas SET is_active=1 WHERE id='system-yemen'");
+    app.catalog.invalidate();
     await new Promise((res) => { app.server.listen(0, '127.0.0.1', res); });
     const addr = app.server.address();
     const base = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;

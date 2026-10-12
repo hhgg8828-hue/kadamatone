@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
   "version": "2.15.0",
-  "description": "خدمات (Khadamat) — 2.15.0 restores the green customer hero, news ticker and square featured service cards",
+  "description": "خدمات — الإصدار 2.15: إدارة التغطية المحلية ومحتوى واجهة العميل من لوحة التحكم",
   "private": true,
   "type": "module",
   "engines": {

@@ -119,7 +119,7 @@ function serveStatic(config: StaticConfig, urlPath: string, res: ServerResponse,
   if (!file.startsWith(base + path.sep) && file !== base) return false; // منع Path Traversal
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
   const ext = path.extname(file).toLowerCase();
-  res.writeHead(200, { ...headers, 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300' });
+  res.writeHead(200, { ...headers, 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-store, max-age=0, must-revalidate' : 'public, max-age=300' });
   fs.createReadStream(file).pipe(res);
   return true;
 }
@@ -152,6 +152,16 @@ export function createRequestHandler(app: App) {
       if (!url.pathname.startsWith('/api/')) {
         if (url.pathname === '/health') { status = 200; return json(200, { status: 'ok', time: new Date().toISOString() }); }
         if (url.pathname === '/ready') { app.db.get('SELECT 1 AS ok'); status = 200; return json(200, { status: 'ready' }); }
+        // Build PWA manifests from admin-editable branding so the installed app name follows platform settings.
+        if (req.method === 'GET' && ['/manifest.webmanifest','/manifest-customer.webmanifest','/manifest-provider.webmanifest','/manifest-admin.webmanifest'].includes(url.pathname)) {
+          const role = url.pathname.includes('provider') ? 'provider' : url.pathname.includes('admin') ? 'admin' : url.pathname.includes('customer') ? 'customer' : 'app';
+          const appName = String(app.settings.get('app.name') || 'خدمات').trim().slice(0, 60) || 'خدمات';
+          const roleName = role === 'provider' ? 'مقدم الخدمة' : role === 'admin' ? 'الإدارة' : role === 'customer' ? 'العميل' : 'التطبيق';
+          const rolePath = role === 'provider' ? '/provider' : role === 'admin' ? '/admin' : '/customer';
+          const iconBase = role === 'provider' ? 'provider' : role === 'admin' ? 'admin' : 'customer';
+          const manifest = { id: rolePath, name: `${appName} — ${roleName}`, short_name: appName.slice(0, 18), description: String(app.settings.get('app.tagline') || 'كل خدمة تحتاجها في مكان واحد').slice(0, 160), start_url: rolePath, scope: rolePath, display: 'standalone', display_override: ['window-controls-overlay','standalone'], dir: 'rtl', lang: 'ar', background_color: '#f7f9f7', theme_color: '#176b4d', icons: [{ src: `/icons/icon-${iconBase}-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any maskable' }, { src: `/icons/icon-${iconBase}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }] };
+          status = 200; res.writeHead(200, { ...headers, 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-store, max-age=0, must-revalidate' }); res.end(JSON.stringify(manifest)); return;
+        }
         if (req.method === 'GET' && serveStatic(config, url.pathname, res, headers)) { status = 200; return; }
         status = 404; return json(404, { error: { code: 'NOT_FOUND', message: 'الصفحة غير موجودة', requestId } });
       }

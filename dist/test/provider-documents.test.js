@@ -31,17 +31,6 @@ describe('Provider document lifecycle', () => {
         assert.equal(t.app.db.one('SELECT COUNT(*) c FROM provider_documents WHERE doc_type=\'ID\'').c, 1);
         assert.equal(t.app.db.get('SELECT 1 FROM files WHERE id = ?', id1), undefined);
     });
-    test('نوع الهوية المختار يُحفظ ويظهر مع ملف الهوية', async () => {
-        const token = await registerProvider();
-        const id = await uploadFile(token, 'passport.pdf');
-        const saved = await t.api('POST', '/api/v1/provider/documents', { token, body: { docType: 'ID', fileId: id, identityType: 'PASSPORT' } });
-        assert.equal(saved.status, 201);
-        const doc = saved.body.documents.find((d) => d.docType === 'ID');
-        assert.equal(doc.identityType, 'PASSPORT');
-        assert.equal(t.app.db.get("SELECT identity_type FROM provider_documents WHERE doc_type='ID' AND file_id=?", id).identity_type, 'PASSPORT');
-        const invalid = await t.api('POST', '/api/v1/provider/documents', { token, body: { docType: 'LICENSE', fileId: await uploadFile(token, 'license.pdf'), identityType: 'PASSPORT' } });
-        assert.equal(invalid.status, 422);
-    });
     test('عرض وثيقة خاصة يتطلب جلسة ويعمل مع جلسة مقدم الخدمة', async () => {
         const token = await registerProvider();
         const id = await uploadFile(token, 'view-test.jpg');

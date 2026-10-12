@@ -24,9 +24,9 @@ test('V83.3: تفاصيل الشراء لا تظهر ولا تُرسل إلا ل
 
 test('V83.3: أصول الصفحات وكاش الخدمة يستخدمان الإصدار الجديد', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
-    assert.ok(fs.readFileSync(file,'utf8').includes('app.js?v=2.14.0'), file);
+    assert.ok(fs.readFileSync(file,'utf8').includes('app.js?v=2.15'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-14-0'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-15'));
 });
 
 

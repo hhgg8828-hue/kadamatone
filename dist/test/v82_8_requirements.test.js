@@ -41,14 +41,14 @@ test('V82.8: طلب معروف لا يفتح سؤالًا زائدًا', async (
     assert.equal(r.body.recommended?.serviceSlug, 'purchase-and-delivery');
     assert.equal(r.body.clarification, null);
 });
-test('V82.8: واجهة العميل تحافظ على التمرير وتستخدم الوصول السريع المختصر', async () => {
+test('V82.8: واجهة العميل لا تعيد التمرير للأعلى وتحافظ على تجربة العميل', async () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync('public/app.ts', 'utf8');
     assert.equal(app.includes("window.scrollTo({top:0,behavior:'smooth'})"), false);
-    assert.ok(!app.includes('khadamat-news-ticker'));
     assert.ok(app.includes('id="quickAssistForm"'));
-    assert.ok(app.includes('id="quickAssistVoice"'));
-    assert.ok(app.includes('المحافظة / المنطقة / الحي'));
+    assert.ok(app.includes('الوصول السريع'));
+    assert.ok(app.includes('khadamat-news-ticker'));
+    assert.ok(app.includes('state.config.newsTicker'));
     assert.ok(app.includes('personal-recommendations-grid'));
 });
 //# sourceMappingURL=v82_8_requirements.test.js.map
