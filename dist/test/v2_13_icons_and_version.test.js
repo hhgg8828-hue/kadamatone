@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-test('2.13.3: public release version and PWA cache are aligned', () => {
+test('2.15.0: public release version and PWA cache are aligned', () => {
     const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-    assert.equal(pkg.version, '2.13.3');
+    assert.equal(pkg.version, '2.15.0');
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.13.3'), `${file} should use current assets`);
+        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.15.0'), `${file} should use current assets`);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-13-3'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-15-0'));
 });
-test('2.13.3: every install manifest points to matching role-specific icon files', () => {
+test('2.15.0: every install manifest points to matching role-specific icon files', () => {
     const pairs = [
         ['public/manifest.webmanifest', 'icon-192.png', 'icon-512.png'],
         ['public/manifest-customer.webmanifest', 'icon-customer-192.png', 'icon-customer-512.png'],

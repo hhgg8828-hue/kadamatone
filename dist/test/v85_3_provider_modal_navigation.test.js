@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 test('V85.3: provider verification and vehicle actions use visible, intentional controls', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    assert.match(app, /id="addVehicleBtn" type="button">\+ إضافة مركبة/);
+    assert.match(app, /id="addVehicleBtn" class="btn provider-primary-action" type="button">\+ إضافة مركبة/);
     assert.match(app, /id="saveCapabilities" type="button">حفظ القدرات/);
     assert.match(app, /id="identityUploadDropdown"/);
     assert.match(app, /id="licenseUploadDropdown"/);

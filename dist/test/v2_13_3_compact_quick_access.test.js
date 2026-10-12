@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-test('2.13.3 restores the compact single-box quick access from 2.10/2.11 in source and bundle', () => {
+test('2.15.0 keeps compact single-box quick access and places the ticker below it in source and bundle', () => {
     const ts = fs.readFileSync('public/app.ts', 'utf8');
     const js = fs.readFileSync('public/js/app.js', 'utf8');
     for (const source of [ts, js]) {
@@ -11,12 +11,13 @@ test('2.13.3 restores the compact single-box quick access from 2.10/2.11 in sour
         assert.ok(!source.includes('simpleRequestForm'), 'large three-step request form must not return');
         assert.ok(!source.includes('simpleRequestImage'), 'image upload must not be part of quick access');
         assert.ok(!source.includes('service-orbit'), 'decorative service orbit must not be above quick access');
-        assert.ok(!source.includes('khadamat-news-ticker'), 'moving ticker must not be above quick access');
+        assert.ok(source.indexOf('id=\"quickAssistForm\"') < source.indexOf('khadamat-news-ticker'), 'ticker must appear after the compact quick access form');
+        assert.ok(source.indexOf('khadamat-news-ticker') < source.indexOf('promo-square-grid'), 'ticker must precede the square promotional cards');
     }
     assert.ok(ts.includes('setupQuickAssistComposer()'), 'compact intent-search composer must be wired');
     assert.ok(!ts.includes('setupSimpleRequestComposer'), 'three-step composer must be removed from source');
 });
-test('2.13.3 restores hierarchical customer region selection and keeps GPS location control', () => {
+test('2.15.0 keeps hierarchical customer region selection and GPS location control', () => {
     const ts = fs.readFileSync('public/app.ts', 'utf8');
     assert.ok(ts.includes('المحافظة / المنطقة / الحي'), 'hierarchical region label must be restored');
     assert.ok(ts.includes('areaPath(a)'), 'full administrative area path must be shown');

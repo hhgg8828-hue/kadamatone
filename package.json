@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.13.3",
-  "description": "خدمات (Khadamat) — 2.13.3 restores the approved compact customer quick-access layout and hierarchical location selector",
+  "version": "2.15.0",
+  "description": "خدمات (Khadamat) — 2.15.0 restores the green customer hero, news ticker and square featured service cards",
   "private": true,
   "type": "module",
   "engines": {

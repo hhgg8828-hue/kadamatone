@@ -706,8 +706,53 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 }
 
 
-.customer-shell .hero.customer-simple-hero{position:relative;padding:12px 14px!important;margin-bottom:12px!important;border-radius:16px!important;background:linear-gradient(145deg,#f8fcfb 0%,#eef7f5 56%,#fbf5e9 100%)!important;box-shadow:0 8px 22px rgba(29,76,71,.07)!important;overflow:hidden}
-.customer-shell .hero.customer-simple-hero:after{display:none!important}
-.customer-shell .quick-assist-card{box-shadow:0 5px 15px rgba(31,76,71,.06)!important}
-.customer-shell .campaign-strip{margin:0 0 14px}
-@media(max-width:650px){.customer-shell .hero.customer-simple-hero{padding:10px!important;border-radius:15px!important}.customer-shell .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;gap:6px;padding:7px}.customer-shell .customer-city-select-compact small{font-size:10px}.customer-shell .quick-assist-head h1{font-size:21px}}
+/* 2.15.0: preserve the original green hero background while keeping the quick-access form compact */
+.customer-shell .hero.customer-simple-hero{position:relative;padding:12px 14px!important;margin-bottom:12px!important;border-radius:20px!important;background:linear-gradient(135deg,#075b45 0%,#087b59 58%,#269878 100%)!important;box-shadow:0 12px 28px rgba(7,91,69,.18)!important;overflow:hidden;color:#fff!important}
+.customer-shell .hero.customer-simple-hero:after{display:block!important;background:rgba(217,173,98,.18)!important}
+.customer-shell .quick-assist-head h1{color:#fff!important}
+.customer-shell .quick-assist-head p{color:rgba(255,255,255,.88)!important}
+.customer-shell .quick-assist-card{box-shadow:0 5px 15px rgba(5,45,34,.12)!important}
+.customer-shell .customer-city-select-compact{position:relative;z-index:1}
+.customer-shell .khadamat-news-ticker{display:flex;align-items:center;gap:12px;padding:0 12px;min-height:42px}
+.customer-shell .khadamat-news-label{flex:0 0 auto;font-size:12px;font-weight:900;color:#08704f;background:#e8f5ef;border-radius:9px;padding:7px 9px}
+.customer-shell .khadamat-news-viewport{overflow:hidden;min-width:0;flex:1}
+.customer-shell .khadamat-news-track{gap:36px;animation-duration:30s}
+.customer-shell .promo-square-section{margin:0 0 16px}
+.customer-shell .promo-square-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px}
+.customer-shell .promo-square-heading h2{font-size:17px;margin:0;color:var(--ink)}
+.customer-shell .promo-square-heading>span{font-size:11px;color:var(--muted)}
+.customer-shell .promo-square-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.customer-shell .promo-square-card{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;gap:7px;aspect-ratio:1/1;min-width:0;overflow:hidden;border:1px solid rgba(8,123,89,.13);border-radius:17px;padding:12px;text-align:right;color:#fff;background:linear-gradient(145deg,#087b59,#075b45);box-shadow:0 7px 18px rgba(17,55,42,.09);cursor:pointer;isolation:isolate}
+.customer-shell .promo-square-card>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.customer-shell .promo-square-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,34,25,.05) 5%,rgba(5,34,25,.82) 100%);z-index:-1}
+.customer-shell .promo-square-copy{display:grid;gap:5px;position:relative;z-index:1}
+.customer-shell .promo-square-copy small,.customer-shell .promo-square-kicker{font-size:10px;font-weight:800;color:rgba(255,255,255,.8)}
+.customer-shell .promo-square-copy b,.customer-shell .promo-square-service b{font-size:15px;line-height:1.45;font-weight:900;overflow-wrap:anywhere}
+.customer-shell .promo-square-copy>span,.customer-shell .promo-square-copy-action{font-size:11px;font-weight:800;color:#fff}
+.customer-shell .promo-square-action{position:relative;z-index:2;align-self:flex-start;border:1px solid rgba(255,255,255,.55);border-radius:9px;padding:5px 8px;background:rgba(255,255,255,.16);color:#fff;font-size:10px;font-weight:800}
+.customer-shell .promo-square-service{background:linear-gradient(145deg,#087b59,#075b45)}
+.customer-shell .promo-square-tone-2{background:linear-gradient(145deg,#1b8275,#145e62)}
+.customer-shell .promo-square-tone-3{background:linear-gradient(145deg,#ba9144,#80602a)}
+.customer-shell .promo-square-tone-4{background:linear-gradient(145deg,#477b6c,#284f47)}
+@media(min-width:560px){.customer-shell .promo-square-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.customer-shell .promo-square-card{padding:14px}}
+@media(max-width:650px){.customer-shell .hero.customer-simple-hero{padding:10px!important;border-radius:17px!important}.customer-shell .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;gap:6px;padding:7px}.customer-shell .customer-city-select-compact small{font-size:10px}.customer-shell .quick-assist-head h1{font-size:21px}.customer-shell .khadamat-news-ticker{gap:7px;padding:0 7px}.customer-shell .khadamat-news-label{font-size:10px;padding:6px}.customer-shell .promo-square-card{padding:10px;border-radius:14px}.customer-shell .promo-square-copy b,.customer-shell .promo-square-service b{font-size:13px}}
+
+
+/* Release 2.14.0: modal admin sections and release history */
+.admin-tab-content.is-overview{display:contents}
+.admin-tab-content.is-modal{position:fixed;inset:0;z-index:1100;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));background:rgba(16,24,40,.56);backdrop-filter:blur(3px)}
+.admin-tab-modal-panel{width:min(1120px,100%);max-height:100%;overflow:auto;overscroll-behavior:contain;box-sizing:border-box;background:#f7f9fc;color:#172b24;border-radius:18px;padding:14px;box-shadow:0 24px 70px rgba(0,0,0,.24)}
+.admin-tab-modal-head{position:sticky;top:-14px;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-14px -14px 14px;padding:14px;background:rgba(255,255,255,.97);border-bottom:1px solid #e3e9e6;border-radius:18px 18px 0 0}
+.admin-tab-modal-head h2{margin:0;font-size:clamp(18px,3vw,24px)}
+.admin-tab-modal-head p{margin:4px 0 0;font-size:12px}
+.provider-primary-action{background:linear-gradient(135deg,#176b4d,#2a8a65)!important;color:#fff!important;border-color:#176b4d!important;box-shadow:0 7px 18px rgba(23,107,77,.22)!important}
+.release-history-list{display:grid;gap:10px;margin-top:12px}
+.release-history-item{border:1px solid #e2ebe5;border-radius:14px;padding:12px 14px;background:#fbfefc}
+.release-history-heading{justify-content:space-between;gap:8px;margin-bottom:4px}
+.release-history-item>strong{display:block;color:#176b4d;margin:3px 0}
+.release-history-item ul{margin:7px 0 0;padding-right:20px;line-height:1.7}
+.release-history-item li{margin:2px 0}
+@media(max-width:600px){.admin-tab-content.is-modal{padding:8px}.admin-tab-modal-panel{border-radius:14px;padding:10px}.admin-tab-modal-head{top:-10px;margin:-10px -10px 10px;padding:10px;border-radius:14px 14px 0 0}.admin-tab-modal-head .btn{min-height:40px}.release-history-item{padding:10px}}
+
+/* Ensure action dialogs opened from an admin section appear above that section modal. */
+.modal{z-index:1200}

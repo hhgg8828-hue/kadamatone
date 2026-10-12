@@ -22,8 +22,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 
 test('provider page and frontend assets use the current version', () => {
   assert.ok(provider.includes('data-page="provider"'));
-  assert.ok(provider.includes('app.js?v=2.13')); 
-  assert.ok(index.includes('app.js?v=2.13')); 
+  assert.ok(provider.includes('app.js?v=2.14.0')); 
+  assert.ok(index.includes('app.js?v=2.14.0')); 
 });
 
 
@@ -32,10 +32,10 @@ test('provider order action is not nested inside the clickable order detail butt
   assert.equal(/<button class=\"card order-card\"[\s\S]*<span class=\"btn\" data-id=/.test(app), false);
 });
 
-test('provider portal does not redirect an existing customer back to the customer home', () => {
-  assert.ok(app.includes("if(state.user!.role!=='PROVIDER'){redirectToRole(state.user!.role);return}"));
-  assert.ok(app.includes("const expected=roleHome(state.user!.role)"));
-  assert.ok(app.includes("location.replace(expected)"));
+test('provider portal stays on the requested role-specific entry screen when another role session is saved', () => {
+  assert.ok(app.includes("const portalRole:'CUSTOMER'|'PROVIDER'|'ADMIN'=page==='provider'?'PROVIDER':page==='admin'?'ADMIN':'CUSTOMER'"));
+  assert.ok(app.includes('authBox(portalRole)'));
+  assert.ok(!app.includes('if(location.pathname!==expected) location.replace(expected)'));
 });
 
 test('provider route alias serves the provider page', () => {
