@@ -956,3 +956,23 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .customer-shell .quick-assist-head h1{font-size:20px}
 .customer-shell .quick-assist-card{border:1px solid #d9e8df;background:linear-gradient(145deg,#fff 0%,#f4fbf6 100%);box-shadow:0 5px 16px rgba(28,91,60,.08)}
 @media(max-width:420px){.customer-shell .customer-category-showcase-top .customer-category-tile{flex-basis:64px}.customer-shell .customer-category-showcase-top .customer-category-art{width:44px;height:44px;flex-basis:44px}}
+
+/* V2.21 — offers represent service categories and use compact artwork. */
+.customer-shell .campaign-card{flex-basis:min(38%,180px)}
+.customer-shell .campaign-card .campaign-image{aspect-ratio:16/9;object-fit:cover}
+.customer-shell .campaign-card .campaign-image-placeholder{aspect-ratio:16/9}
+.customer-shell .campaign-card-copy{padding:9px 10px 10px}
+.customer-shell .campaign-card-copy b{font-size:13px}
+@media(max-width:520px){.customer-shell .campaign-card{flex-basis:min(44%,165px)}}
+
+/* V2.22 — reference-aligned customer home: compact location, categories before offers. */
+.customer-shell > .customer-city-select-compact{margin:0 0 8px;padding:6px 9px;gap:7px;border-radius:12px;border-color:#e4ebe6;background:#fff;box-shadow:0 2px 8px rgba(20,70,48,.04)}
+.customer-shell > .customer-city-select-compact label{font-size:11px;color:#50685b}
+.customer-shell > .customer-city-select-compact select{min-height:32px;padding:5px 8px;font-size:12px}
+.customer-shell > .customer-city-select-compact .btn{min-height:32px;padding:5px 8px;font-size:11px}
+.customer-shell .customer-category-showcase-top{margin:2px 0 10px}
+.customer-shell .customer-category-showcase-top .section-heading{margin:0 0 5px}
+.customer-shell .customer-category-showcase-top .section-heading h2{margin:0;font-size:14px;color:#355b49}
+@media(max-width:420px){.customer-shell > .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;padding:5px 7px;gap:5px}.customer-shell > .customer-city-select-compact label{font-size:10px}.customer-shell > .customer-city-select-compact select{font-size:11px;min-height:30px}.customer-shell > .customer-city-select-compact .btn{font-size:10px;min-height:30px;padding:4px 6px}}
+
+.customer-shell > .customer-city-select-compact small{display:none}

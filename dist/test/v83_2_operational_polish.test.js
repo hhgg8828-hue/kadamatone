@@ -4,9 +4,9 @@ import test from 'node:test';
 test('V83.2: جميع بوابات التطبيق تستخدم إصدار الأصول الجديد', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
-        assert.ok(html.includes('app.js?v=2.19'), `${file} should use V83.2 assets`);
+        assert.ok(html.includes('app.js?v=2.22'), `${file} should use V83.2 assets`);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-19'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-22'));
 });
 test('V83.2: لوحة الإدارة ومؤشرات مقدم الخدمة تستخدم تخطيطًا متجاوبًا وألوانًا خضراء', () => {
     const css = fs.readFileSync('public/css/app.css', 'utf8');
