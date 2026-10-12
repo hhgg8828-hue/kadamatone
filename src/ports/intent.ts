@@ -36,9 +36,6 @@ const SHOPPING_WORDS = ['مقاضي','مقاضي البيت','بقالة','بق�
 const AGRI_PLOW = ['يحرث','احرث','حرث','حراثة','تجهيز الأرض','تجهيز الارض','يجهز الأرض','يجهز الارض'].map(normalizeAr);
 const AGRI_HARVEST = ['يحصد','احصد','حصاد','حصد','محصول يحصد','حصيدة'].map(normalizeAr);
 const AGRI_CROP = ['نقل المحصول','انقل المحصول','ينقل المحصول','نقل محاصيل','محاصيل من المزرعة','محصول إلى السوق'].map(normalizeAr);
-const LABOR_WORDS = ['عامل','عمال','عمالة','شغيل','شغال','شاغل','عامل يومي','عمال يومية','شخص يشتغل معي','احد يشتغل معي','أحد يشتغل معي','يشتغل معي','يشتغل عندي','يعمل معي','عامل للعمل معي'].map(normalizeAr);
-const FARM_CONTEXT = ['الزراعة','زراعة','مزرعة','مزرعتي','مزرعتنا','الحقل','الارض','الأرض','زرع','شغل المزرعة','اعمال المزرعة','أعمال المزرعة'].map(normalizeAr);
-const FARM_HELP_WORDS = ['يساعدني','يعاونني','يعاوني','يعوني','يساعد','مساعدة','معاونة','شغل','اشتغل','يشتغل','يعمل'].map(normalizeAr);
 const stripPrefix = (w: string): string => w.replace(/^(وال|بال|كال|فال|لل|ال)/, '').replace(/^و(?=.{4,})/, '');
 const tokenize = (norm:string) => norm.split(/\s+/).filter(Boolean).flatMap(w => [w, stripPrefix(w)]).filter(w=>w.length>=2);
 const hasAny=(norm:string,words:string[])=>words.some(w=>norm.includes(w));
@@ -56,17 +53,8 @@ function deterministic(text: string, { catalog, locale='ar' }: { catalog: Catalo
   const matches:Array<{svc:ServiceRow;cat:CategoryRow;score:number}> = [];
   const passenger=hasAny(norm,PASSENGER_WORDS); const pharmacy=hasAny(norm,PHARMACY_WORDS); const purchase=hasAny(norm,PURCHASE_WORDS); const delivery=hasAny(norm,DELIVERY_WORDS)||/يوصل|توصيل|يجيب/.test(norm); const pickupDelivery=hasAny(norm,PICKUP_WORDS)&&delivery; const shopping=hasAny(norm,[...SHOPPING_WORDS,'تسوق لي','تسوق عني','تسوق','اشتر لي','اشترِ لي','شراء بالنيابة'].map(normalizeAr));
   const plow=hasAny(norm,AGRI_PLOW), harvest=hasAny(norm,AGRI_HARVEST), crop=hasAny(norm,AGRI_CROP);
-  const labor=hasAny(norm,LABOR_WORDS); const farmContext=hasAny(norm,FARM_CONTEXT); const farmHelp=farmContext&&hasAny(norm,FARM_HELP_WORDS);
-  const constructionContext=hasAny(norm,['بناء','بنا','بناء البيت','مبنى','ترميم'].map(normalizeAr));
-  const loadingContext=hasAny(norm,['تحميل','تنزيل','حمل العفش','نقل اثاث','شيل اغراض'].map(normalizeAr));
-  const cleaningContext=hasAny(norm,['نظافة','تنظيف','تنظيف البيت','تنظيف المنزل'].map(normalizeAr));
   let forcedSlug:string|null=null;
   if(plow) forcedSlug='seasonal-plowing'; else if(harvest) forcedSlug='seasonal-harvest'; else if(crop) forcedSlug='seasonal-crop-transport';
-  else if((labor||farmHelp)&&farmContext) forcedSlug='farm-worker';
-  else if(labor&&constructionContext) forcedSlug='construction-worker';
-  else if(labor&&loadingContext) forcedSlug='loading-worker';
-  else if(labor&&cleaningContext) forcedSlug='cleaning-worker';
-  else if(labor) forcedSlug='daily-worker';
   else if(passenger) forcedSlug=norm.includes('دباب')||norm.includes('موتوسيكل')?'motorcycle-trips':'passenger-transport';
   else if(pharmacy && (purchase||delivery)) forcedSlug='pharmacy-purchase';
   else if(purchase && delivery) forcedSlug='purchase-and-delivery';
@@ -83,11 +71,6 @@ function deterministic(text: string, { catalog, locale='ar' }: { catalog: Catalo
     if(passenger&&['car-with-driver','passenger-transport','motorcycle-trips'].includes(svc.slug))score+=4;
     if(purchase&&delivery&&['purchase-and-delivery','shopping-for-me','pharmacy-purchase','shopping-delivery','motorcycle-trips'].includes(svc.slug))score+=4;
     if(plow&&svc.slug==='seasonal-plowing')score+=5;if(harvest&&svc.slug==='seasonal-harvest')score+=5;if(crop&&svc.slug==='seasonal-crop-transport')score+=5;
-    if((labor||farmHelp)&&farmContext&&svc.slug==='farm-worker')score+=8;
-    if(labor&&!farmContext&&svc.slug==='daily-worker')score+=5;
-    if(labor&&constructionContext&&svc.slug==='construction-worker')score+=6;
-    if(labor&&loadingContext&&svc.slug==='loading-worker')score+=6;
-    if(labor&&cleaningContext&&svc.slug==='cleaning-worker')score+=6;
     if(score>0)matches.push({svc,cat,score});
   }
   matches.sort((a,b)=>b.score-a.score);

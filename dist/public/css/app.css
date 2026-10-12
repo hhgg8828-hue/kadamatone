@@ -626,7 +626,7 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .quote-breakdown p:last-child{border-top:1px solid var(--line);padding-top:7px;color:var(--primary)}
 
 
-/* Release 2.4 — governorate and city coverage selection */
+/* V85.2 — make every admin module visible on mobile; provider quick navigation */
 .admin-tabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;flex-wrap:wrap!important;overflow:visible!important;overscroll-behavior:initial!important;position:static!important;align-items:stretch;gap:8px;padding:10px;margin-bottom:18px}
 .admin-tabs .btn{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35;min-height:42px;padding:9px 8px}
 .provider-quick-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:10px;background:#fff;border:1px solid #dce9df;border-radius:16px;box-shadow:var(--shadow-sm)}
@@ -636,6 +636,28 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 @media(max-width:850px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 @media(max-width:600px){.admin-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;position:static!important;gap:7px;padding:8px}.admin-tabs .btn{font-size:12px;padding:9px 6px}.provider-quick-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}.provider-quick-nav a{font-size:12px;min-height:40px;padding:7px 5px}}
 
+/* V85.3 — provider sections open in an overlay instead of jumping down the page */
+.provider-quick-nav button{display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px 9px;border:1px solid #e1e9e3;border-radius:11px;background:linear-gradient(145deg,#f7fbf8,#fff);color:#245640;text-align:center;text-decoration:none;font:inherit;font-weight:800;font-size:13px;line-height:1.35;cursor:pointer}
+.provider-quick-nav button:hover{background:#edf7f0;border-color:#b9d4c2}
+.provider-panel-modal-card{width:min(760px,100%)!important;max-height:92vh!important;overflow:auto!important}
+.provider-panel-modal-head{padding:2px 4px 10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.provider-panel-modal-head h2{margin:0 0 4px}
+.provider-panel-modal-head p{margin:0}
+.provider-panel-in-modal{margin:0!important;width:100%}
+.provider-panel-section{margin:0 0 14px}
+.provider-panel-section:last-child{margin-bottom:0}
+.provider-verification-dropdown{margin-top:12px;border:1px solid #dce8e0;border-radius:15px;background:#fff;overflow:hidden}
+.provider-verification-dropdown summary{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 15px;cursor:pointer;font-weight:800;color:var(--primary);list-style:none}
+.provider-verification-dropdown summary::-webkit-details-marker{display:none}
+.provider-verification-dropdown summary:after{content:'＋';font-size:18px;line-height:1}
+.provider-verification-dropdown[open] summary:after{content:'−'}
+.provider-verification-dropdown-body{padding:14px;border-top:1px solid #e9f0eb;background:linear-gradient(145deg,#fbfefc,#fff)}
+.provider-verification-dropdown-body .btn{display:inline-flex;align-items:center;justify-content:center}
+.provider-panel-in-modal .provider-notification-workspace{margin:0}
+@media(max-width:600px){.provider-quick-nav button{font-size:12px;min-height:42px;padding:7px 5px}.provider-panel-modal-card{max-height:94vh!important;padding:13px!important}.provider-panel-modal-head h2{font-size:20px}.provider-verification-dropdown summary{padding:12px;font-size:14px}}
+
+
+/* Release 2.13.3 — restore approved 2.10/2.11 customer layout and hierarchical location selector */
 /* Release 2.5 — compact, catalog-backed customer quick access */
 .customer-shell .hero.customer-simple-hero{padding:14px 16px;border-radius:22px;margin-bottom:14px;box-shadow:0 10px 28px rgba(29,76,71,.07)}
 .customer-shell .customer-city-select-compact{display:grid;grid-template-columns:auto minmax(120px,1fr) auto;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:14px;box-shadow:none;background:rgba(255,255,255,.88)}
@@ -669,7 +691,6 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .customer-shell .quick-assist-no-match p{font-size:12px;color:#687a76;margin:5px 0 10px;line-height:1.6}
 .customer-shell .quick-assist-custom-link{margin-top:8px}
 .customer-shell .quick-assist-custom-link .btn{font-size:12px}
-.customer-shell .campaign-strip{margin-top:14px}
 @media(max-width:650px){
  .customer-shell .hero.customer-simple-hero{padding:11px;border-radius:18px}
  .customer-shell .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;gap:6px;padding:7px}
@@ -684,56 +705,9 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
  .customer-shell .quick-assist-result-action{font-size:10px}
 }
 
-/* Release 2.6 — readable customer order details without raw coordinates */
-.order-request-summary{margin:12px 0;padding:12px 14px;border-inline-start:3px solid #176b4d;background:#f7fbf8}
-.order-request-summary>p{margin:7px 0 0;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
-.order-detail-content a.btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none}
 
-/* Release 2.7: guest-safe service detail and focused mobile car-wash location choice. */
-.service-detail-view{display:flex;flex-direction:column;gap:12px}.service-detail-heading{display:flex;align-items:center;gap:13px}.service-detail-heading h2{margin:0}.service-detail-heading p{margin:4px 0 0}.service-detail-icon{width:56px;height:56px;display:grid;place-items:center;border-radius:16px;background:#edf7f0;color:var(--primary);border:1px solid #d7e8dc;flex:none}.service-detail-icon .service-icon-svg{width:31px;height:31px}.service-detail-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;background:#f8fbf8}.service-detail-facts>div{display:flex;flex-direction:column;gap:5px;min-width:0}.service-detail-facts b{font-size:12px;color:#667085}.service-detail-facts span{font-size:14px;font-weight:700;overflow-wrap:anywhere}.service-detail-actions{margin-top:4px}.service-detail-actions .btn{flex:1}.car-wash-location-choice{margin:8px 0 12px;background:#f8fbf8}.car-wash-location-choice>b{display:block;margin-bottom:10px}.car-wash-location-choice .choice-row{display:flex;flex-direction:row;align-items:center;gap:9px;padding:9px 0;cursor:pointer}.car-wash-location-choice input[type=radio]{width:18px;height:18px;accent-color:var(--primary)}.car-wash-location-choice .muted{display:block;margin-top:4px;font-size:12px}
-@media(max-width:600px){.service-detail-facts{grid-template-columns:1fr}.service-detail-actions{flex-direction:column}.service-detail-actions .btn{width:100%}}
-
-/* V89.0 — اختصار نموذج الطلب ومتابعته دون حذف الوظائف */
-.order-advanced-area{margin:8px 0 12px;background:var(--surface-2)}
-.order-advanced-area .field{margin:12px 0 2px}
-.order-price-preview{padding:14px;margin-top:12px}
-.order-price-preview h3{margin:0 0 8px;font-size:16px}
-.order-price-preview>p{margin:6px 0}
-.customer-order-tracking{display:grid;gap:12px}
-.order-tracking-head{padding:4px 2px 8px}
-.order-tracking-head>p{margin:0 0 4px}
-.order-tracking-head h2{margin:0 0 12px}
-.order-current-status{border:1px solid var(--line);border-radius:16px;background:var(--primary-soft);padding:13px 14px}
-.order-current-status p{margin:8px 0 3px;font-weight:800;color:var(--ink)}
-.order-current-status small{display:block}
-.order-tracking-summary{margin:0;padding:14px}
-.order-tracking-summary h3{margin:0 0 8px;font-size:16px}
-.order-tracking-summary>p{margin:7px 0;line-height:1.6}
-.provider-compact-row{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
-.provider-compact-row .muted{margin:4px 0 0}
-.order-primary-actions{display:flex;gap:8px;flex-wrap:wrap}
-.order-primary-actions .btn{flex:1;min-width:100px}
-.order-secondary-details{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:12px 14px}
-.order-secondary-details summary{cursor:pointer;font-weight:800;color:var(--ink)}
-.order-secondary-details[open] summary{margin-bottom:12px}
-.order-secondary-details .order-detail-content p{margin:8px 0;overflow-wrap:anywhere}
-.order-timeline-item{padding:10px 0;border-bottom:1px solid var(--line)}
-.order-timeline-item:last-child{border-bottom:0}
-.order-timeline-item small{display:block;margin-top:4px}
-.order-timeline-item p{margin:5px 0 0}
-@media(max-width:480px){.provider-compact-row{align-items:flex-start;flex-direction:column}.provider-compact-row .row{width:100%}.provider-compact-row .btn{flex:1}.order-primary-actions .btn{font-size:13px;padding-inline:8px}}
-
-/* V2.10 — focused admin navigation and compact customer order updates. */
-.order-info-compact{margin:0;padding:13px 14px}
-.order-info-compact h3{font-size:15px;margin:0 0 10px}
-.order-info-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;align-items:start;font-size:13px}
-.order-info-grid span{color:var(--muted,#667085)}
-.order-info-grid b{overflow-wrap:anywhere;text-align:start}
-.order-tracking-summary h3{margin:0 0 8px;font-size:15px}
-.order-tracking-summary>p{margin:6px 0;line-height:1.55}
-.order-location-compact{padding-top:8px;border-top:1px solid var(--line)}
-.order-latest-update{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
-.order-update-dot{width:10px;height:10px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 4px var(--primary-soft);margin:5px 2px 0 0;flex:none}
-.order-latest-update b{font-size:13px}
-.order-latest-update p{margin:4px 0;font-weight:700}
-.order-latest-update small{display:block}
+.customer-shell .hero.customer-simple-hero{position:relative;padding:12px 14px!important;margin-bottom:12px!important;border-radius:16px!important;background:linear-gradient(145deg,#f8fcfb 0%,#eef7f5 56%,#fbf5e9 100%)!important;box-shadow:0 8px 22px rgba(29,76,71,.07)!important;overflow:hidden}
+.customer-shell .hero.customer-simple-hero:after{display:none!important}
+.customer-shell .quick-assist-card{box-shadow:0 5px 15px rgba(31,76,71,.06)!important}
+.customer-shell .campaign-strip{margin:0 0 14px}
+@media(max-width:650px){.customer-shell .hero.customer-simple-hero{padding:10px!important;border-radius:15px!important}.customer-shell .customer-city-select-compact{grid-template-columns:auto minmax(0,1fr) auto;gap:6px;padding:7px}.customer-shell .customer-city-select-compact small{font-size:10px}.customer-shell .quick-assist-head h1{font-size:21px}}

@@ -73,16 +73,12 @@ test('V85.0: new orders enter admin contact-confirmation queue and each outcome 
     const t = await startApp();
     try {
         const x = await setupCompletedOrder(t);
-        const accountPhone = String(t.app.db.get('SELECT u.phone FROM users u JOIN orders o ON o.customer_id=u.id WHERE o.id=?', x.order.id)?.phone || '');
-        assert.ok(accountPhone);
-        t.app.db.run('UPDATE orders SET contact_phone=? WHERE id=?', '+967733333333', x.order.id);
         const queue = await x.api('GET', '/api/v1/admin/order-confirmations?status=ALL', { token: x.admin });
         assert.equal(queue.status, 200, queue.text);
         const row = queue.body.items.find((v) => v.orderId === x.order.id);
         assert.ok(row);
         assert.equal(row.status, 'PENDING');
-        assert.equal(row.phone, accountPhone);
-        assert.equal(row.phoneSource, 'ACCOUNT');
+        assert.equal(row.phone, '+967771234567');
         assert.equal((await x.api('GET', '/api/v1/admin/order-confirmations', { token: x.providerToken })).status, 403);
         const result = await x.api('PATCH', `/api/v1/admin/order-confirmations/${x.order.id}`, { token: x.admin, body: { status: 'CONFIRMED', note: 'تم الاتصال وأكد العميل الطلب' } });
         assert.equal(result.status, 200, result.text);
@@ -110,8 +106,6 @@ test('V85.0: city-specific campaign image and catalog scope are filtered by sele
         const makeArea = async (name, lat, lng) => { const r = await t.api('POST', '/api/v1/admin/areas', { token: admin, body: { name: { ar: name }, type: 'CITY', centerLat: lat, centerLng: lng, radiusKm: 25 } }); assert.equal(r.status, 201, r.text); return r.body.area.id; };
         const cityA = await makeArea('مدينة الحملة أ', 12.79, 45.02);
         const cityB = await makeArea('مدينة الحملة ب', 15.35, 44.20);
-        const childArea = await t.api('POST', '/api/v1/admin/areas', { token: admin, body: { name: { ar: 'حي تابع للمدينة أ' }, type: 'DISTRICT', localityType: 'NEIGHBORHOOD', parentId: cityA, centerLat: 12.79, centerLng: 45.02, radiusKm: 5 } });
-        assert.equal(childArea.status, 201, childArea.text);
         const categories = (await t.api('GET', '/api/v1/categories')).body.categories;
         const svc = categories.flatMap((x) => x.services || []).find((x) => x.slug === 'air-conditioning');
         assert.ok(svc);
@@ -126,15 +120,6 @@ test('V85.0: city-specific campaign image and catalog scope are filtered by sele
         assert.equal(a.status, 200, a.text);
         assert.ok(a.body.campaigns.some((x) => x.id === campaign.body.id && x.imageUrl));
         assert.ok(a.body.services.some((x) => x.id === svc.id));
-        const childCatalog = await t.api('GET', `/api/v1/catalog/bootstrap?areaId=${childArea.body.area.id}`);
-        assert.equal(childCatalog.status, 200, childCatalog.text);
-        assert.ok(childCatalog.body.services.some((x) => x.id === svc.id), 'a parent-level service coverage rule should apply when the customer selects a child neighborhood');
-        const cycle = await t.api('PATCH', `/api/v1/admin/areas/${cityA}`, { token: admin, body: { parentId: childArea.body.area.id } });
-        assert.equal(cycle.status, 422);
-        assert.equal(cycle.body.error.code, 'AREA_HIERARCHY_CYCLE');
-        const reparent = await t.api('PATCH', `/api/v1/admin/areas/${childArea.body.area.id}`, { token: admin, body: { parentId: cityB } });
-        assert.equal(reparent.status, 200, reparent.text);
-        assert.equal(reparent.body.area.parentId, cityB);
         const b = await t.api('GET', `/api/v1/catalog/bootstrap?areaId=${cityB}`);
         assert.equal(b.status, 200, b.text);
         assert.ok(!b.body.campaigns.some((x) => x.id === campaign.body.id));

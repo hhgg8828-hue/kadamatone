@@ -38,7 +38,7 @@ export function createProviders(app) {
         },
         documents(providerId) {
             return db.all(`SELECT pd.*, f.original_name, f.size FROM provider_documents pd JOIN files f ON f.id = pd.file_id WHERE pd.provider_id = ? AND pd.doc_type <> 'PHOTO_WORK' ORDER BY pd.doc_type`, providerId)
-                .map((d) => ({ id: d.id, docType: d.doc_type, status: d.status, note: d.note, fileUrl: fileUrl(d.file_id), fileName: d.original_name, fileSize: d.size, createdAt: d.created_at }));
+                .map((d) => ({ id: d.id, docType: d.doc_type, identityType: d.identity_type || null, status: d.status, note: d.note, fileUrl: fileUrl(d.file_id), fileName: d.original_name, fileSize: d.size, createdAt: d.created_at }));
         },
         publicProfile(providerId, locale = 'ar') {
             const base = svc.summary(providerId, locale);
@@ -96,7 +96,9 @@ export function registerProviderRoutes(app, r) {
         return { provider: app.providers.summary(pid(ctx), ctx.locale) };
     });
     r.post('/provider/documents', ...isProvider, (ctx) => {
-        const b = parse(s.obj({ docType: s.oneOf(['ID', 'LICENSE', 'COMMERCIAL_REG', 'CERTIFICATE', 'PHOTO_WORK']), fileId: s.str({ min: 8, max: 64 }) }), ctx.body);
+        const b = parse(s.obj({ docType: s.oneOf(['ID', 'LICENSE', 'COMMERCIAL_REG', 'CERTIFICATE', 'PHOTO_WORK']), fileId: s.str({ min: 8, max: 64 }), identityType: s.oneOf(['NATIONAL_ID', 'RESIDENT_ID', 'PASSPORT', 'OTHER'], { optional: true }) }), ctx.body);
+        if (b.docType !== 'ID' && b.identityType)
+            throw E.unprocessable('نوع الهوية يُحدد مع وثيقة الهوية فقط', 'IDENTITY_TYPE_NOT_APPLICABLE');
         const purpose = b.docType === 'PHOTO_WORK' ? 'work_photo' : 'provider_document';
         return db.tx(() => {
             if (!db.get('SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = ?', b.fileId, ctx.user.id, purpose))
@@ -104,7 +106,7 @@ export function registerProviderRoutes(app, r) {
             const now = iso(app.clock.now());
             const existing = db.get(`SELECT id, file_id, status FROM provider_documents WHERE provider_id = ? AND doc_type = ? ORDER BY created_at DESC LIMIT 1`, pid(ctx), b.docType);
             if (b.docType !== 'PHOTO_WORK' && existing) {
-                db.run(`UPDATE provider_documents SET file_id = ?, status = 'PENDING', reviewed_by = NULL, reviewed_at = NULL, note = NULL, created_at = ? WHERE id = ?`, b.fileId, now, existing.id);
+                db.run(`UPDATE provider_documents SET file_id = ?, identity_type = ?, status = 'PENDING', reviewed_by = NULL, reviewed_at = NULL, note = NULL, created_at = ? WHERE id = ?`, b.fileId, b.docType === 'ID' ? (b.identityType || 'NATIONAL_ID') : null, now, existing.id);
                 if (existing.file_id !== b.fileId) {
                     app.storage.remove(existing.file_id);
                     db.run('DELETE FROM files WHERE id = ?', existing.file_id);
@@ -112,7 +114,7 @@ export function registerProviderRoutes(app, r) {
             }
             else {
                 const id = uuid();
-                db.run('INSERT INTO provider_documents(id,provider_id,doc_type,file_id,status,created_at) VALUES (?,?,?,?,?,?)', id, pid(ctx), b.docType, b.fileId, b.docType === 'PHOTO_WORK' ? 'APPROVED' : 'PENDING', now);
+                db.run('INSERT INTO provider_documents(id,provider_id,doc_type,file_id,status,created_at,identity_type) VALUES (?,?,?,?,?,?,?)', id, pid(ctx), b.docType, b.fileId, b.docType === 'PHOTO_WORK' ? 'APPROVED' : 'PENDING', now, b.docType === 'ID' ? (b.identityType || 'NATIONAL_ID') : null);
             }
             const p = db.get('SELECT verification_status, display_name FROM service_providers WHERE id = ?', pid(ctx));
             if (b.docType !== 'PHOTO_WORK') {
@@ -372,7 +374,7 @@ export function registerProviderRoutes(app, r) {
             if (!point)
                 return null;
             const providerAreas = db.all(`SELECT area_id FROM provider_service_areas WHERE provider_id=?`, p.id);
-            if (providerAreas.length && (!targetArea || !providerAreas.some(x => chain.has(x.area_id))))
+            if (providerAreas.length && targetArea && !providerAreas.some(x => chain.has(x.area_id)))
                 return null;
             const distanceKm = round(haversineKm(lat, lng, point.lat, point.lng), 2);
             const areas = providerAreas.map(x => catalog.all().areas.find(a => a.id === x.area_id)).filter(Boolean).map((a) => ({ id: a.id, name: tr(a.name_i18n, ctx.locale), localityType: a.locality_type || a.type }));

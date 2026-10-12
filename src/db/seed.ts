@@ -17,37 +17,6 @@ export async function seedBase(db: Db, config: Config) {
     // قبول الطلب يعتمد على GPS الفعلي، والمطابقة لاحقًا تعتمد على أقرب مقدم خدمة.
     db.run(`INSERT OR IGNORE INTO service_areas(id,parent_id,name_i18n,type,center_lat,center_lng,radius_km,created_at,updated_at)
             VALUES ('system-yemen',NULL,?,'COUNTRY',15.55,48.52,2000,?,?)`, j({ ar: 'اليمن', en: 'Yemen' }), now, now);
-    // دليل المحافظات اليمنية: تُعرض للمستخدم فقط المناطق التي يفعّلها المدير.
-    // إب مفعّلة كبداية؛ بقية المحافظات موجودة في لوحة الإدارة لكنها غير متاحة للعملاء حتى فتح التغطية.
-    // الإحداثيات ونطاقات الدوائر تقريبية للتهيئة الأولية وليست حدودًا إدارية رسمية.
-    const governorates = [
-      ['gov-amanat-alasimah','أمانة العاصمة','Amanat Al Asimah Governorate',15.3694,44.1910,35,0],
-      ['gov-sanaa','صنعاء',"Sana'a Governorate",15.3547,44.2067,90,0],
-      ['gov-aden','عدن','Aden Governorate',12.7855,45.0187,35,0],
-      ['gov-ibb','إب','Ibb Governorate',13.9759,44.1709,65,1],
-      ['gov-taiz','تعز','Taiz Governorate',13.5795,44.0209,70,0],
-      ['gov-dhamar','ذمار','Dhamar Governorate',14.5427,44.4051,55,0],
-      ['gov-hodeidah','الحديدة','Al Hudaydah Governorate',14.7979,42.9540,90,0],
-      ['gov-hajjah','حجة','Hajjah Governorate',15.6943,43.6034,75,0],
-      ['gov-saada','صعدة','Saada Governorate',16.9402,43.7639,90,0],
-      ['gov-amran','عمران','Amran Governorate',15.6594,43.9439,55,0],
-      ['gov-mahwit','المحويت','Al Mahwit Governorate',15.4701,43.5448,45,0],
-      ['gov-raymah','ريمة','Raymah Governorate',14.6274,43.7147,45,0],
-      ['gov-albayda','البيضاء','Al Bayda Governorate',13.9852,45.5727,80,0],
-      ['gov-dhale','الضالع',"Al Dhale'e Governorate",13.6957,44.7314,55,0],
-      ['gov-lahij','لحج','Lahij Governorate',13.0567,44.8817,60,0],
-      ['gov-abyan','أبين','Abyan Governorate',13.6000,45.7000,100,0],
-      ['gov-shabwah','شبوة','Shabwah Governorate',14.5000,47.0000,150,0],
-      ['gov-marib','مأرب','Marib Governorate',15.4625,45.3258,100,0],
-      ['gov-aljawf','الجوف','Al Jawf Governorate',16.5000,45.5000,150,0],
-      ['gov-hadramawt','حضرموت','Hadramawt Governorate',14.5400,49.1200,250,0],
-      ['gov-almahrah','المهرة','Al Mahrah Governorate',16.0000,52.0000,220,0],
-      ['gov-socotra','سقطرى','Socotra Governorate',12.5000,53.9000,80,0],
-    ] as const;
-    for (const [id, ar, en, lat, lng, radius, active] of governorates) {
-      db.run(`INSERT OR IGNORE INTO service_areas(id,parent_id,name_i18n,type,locality_type,center_lat,center_lng,radius_km,is_active,created_at,updated_at)
-              VALUES(?,?,?,'DISTRICT','GOVERNORATE',?,?,?,?,?,?)`, id, 'system-yemen', j({ ar, en }), lat, lng, radius, active, now, now);
-    }
     // الإعدادات الافتراضية تُكتب في القاعدة لتظهر وتُعدَّل من اللوحة (لا تُستبدل إن كانت موجودة)
     for (const [key, m] of Object.entries(SETTINGS)) db.run('INSERT OR IGNORE INTO system_settings(key,value,description,updated_at) VALUES (?,?,?,?)', key, j(m.def), m.desc, now);
     CATEGORIES.forEach((c, ci) => {
@@ -79,11 +48,11 @@ export async function seedBase(db: Db, config: Config) {
       'electricity':['كهربائي','فني كهرباء','الكهرباء طافية','عطل كهرباء'],
       'plumbing':['سباك','مشكلة ماء','تسريب ماء','مواسير'],
       'air-conditioning':['مكيف','مكيف خربان','فريون','سبلت','سبليت'],
-      'daily-worker':['شغيل','عامل يومي','عامل باليوم','حمال','شغال','شاغل','شخص يشتغل معي','احد يشتغل معي','أحد يشتغل معي','يشتغل عندي','يعمل معي','عامل للعمل معي'],
+      'daily-worker':['شغيل','عامل يومي','عامل باليوم','حمال'],
       'seasonal-plowing':['حراث','حراثة','حرث الأرض','جهز الأرض'],
       'seasonal-harvest':['حصيدة','حصد المحصول','وقت الحصاد','عمال حصاد'],
       'seasonal-crop-transport':['نقل المحصول','نقل الحصيدة','من المزرعة للسوق','شاحنة للمحصول'],
-      'farm-worker':['عامل مزرعة','شغيل مزرعة','عامل زراعة','شغال في الزراعة','عامل في الحقل','يساعدني في الزراعة','يعاوني في الزراعة','شغل المزرعة','مساعدة في المزرعة'],
+      'farm-worker':['عامل مزرعة','شغيل مزرعة','عامل زراعة'],
       'water-tank-delivery':['ماء','مياه','وايت','صهريج','تعبئة خزان','توصيل ماء'],
       'solar-maintenance':['طاقة شمسية','لوح شمسي','ألواح','بطارية شمسية','انفرتر','صيانة الطاقة'],
       'internet-router-support':['نت','انترنت','إنترنت','راوتر','واي فاي','شبكة','ضعف النت'],
