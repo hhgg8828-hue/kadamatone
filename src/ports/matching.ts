@@ -70,10 +70,11 @@ export class NearestRatedMatcher implements Matcher {
       if (excluded.has(p.id)) continue;
       if (!isProviderAvailable(db, p.id, when, tz)) continue;
       if (requiredCapability) { const caps=String(p.capability_keys||'').split(',').filter(Boolean); if(caps.length && !caps.includes(requiredCapability)) continue; }
-      if (serviceAreas.size && order.area_id) {
-        const areas = String(p.provider_area_ids||'').split(',').filter(Boolean);
-        if (areas.length && !areas.some((id:string)=>chain.has(id))) continue;
-      }
+      // مقدم الخدمة الذي حدّد نطاق تغطية يجب أن يطابق منطقة الطلب حتى لو كانت
+      // الخدمة نفسها متاحة على مستوى أوسع. المنطقة الفارغة في ملف مقدم الخدمة
+      // تظل غير مقيّدة لأجل التوافق مع الحسابات القديمة غير المُهيّأة بعد.
+      const providerAreas = String(p.provider_area_ids||'').split(',').filter(Boolean);
+      if (providerAreas.length && (!order.area_id || !providerAreas.some((id:string)=>chain.has(id)))) continue;
       const candidatePoint = p.live_lat != null ? {lat:Number(p.live_lat),lng:Number(p.live_lng)} : (p.base_lat != null && p.base_lng != null ? {lat:Number(p.base_lat),lng:Number(p.base_lng)} : null);
       if (loc && !candidatePoint) continue;
       const dist = loc && candidatePoint ? haversineKm(loc.lat, loc.lng, candidatePoint.lat, candidatePoint.lng) : null;

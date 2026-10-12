@@ -12,12 +12,9 @@ test('V85.2: admin modules are displayed in a wrapping grid instead of hidden in
   }
 });
 
-test('V85.3: provider quick navigation opens modal panels instead of jumping down the page', () => {
+test('V85.2: provider dashboard includes quick navigation to operational sections', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  for (const target of ['providerNotificationWorkspace', 'providerNewOrdersSection', 'providerMyOrdersSection', 'providerServicesSection', 'verificationCard', 'providerLocationCard', 'providerVehicleCard', 'providerCapabilitiesCard']) {
-    assert.ok(app.includes(`data-provider-panel="${target}"`), `provider modal button ${target} must exist`);
+  for (const target of ['#providerNotificationPanel', '#offers', '#myorders', '#providerServicesSection', '#verificationCard', '#providerLocationCard', '#providerVehicleCard', '#providerCapabilitiesCard']) {
+    assert.ok(app.includes(`href="${target}"`), `provider quick link ${target} must exist`);
   }
-  assert.match(app, /function openProviderPanel\(targetId:string,title:string\)/);
-  assert.match(app, /openProviderPanel\('providerNewOrdersSection','الطلبات الجديدة'\)/);
-  assert.match(app, /openProviderPanel\('verificationCard','توثيق الحساب'\)/);
 });

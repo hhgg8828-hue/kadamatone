@@ -26,7 +26,7 @@ export interface ProviderPublicProfile {
 
 export interface Providers {
   summary(providerId: string, locale?: Locale): ProviderSummary;
-  documents(providerId: string): Array<{ id: string; docType: string; identityType: string | null; status: string; note: string | null; fileUrl: string | null; fileName: string | null; fileSize: number; createdAt: string }>;
+  documents(providerId: string): Array<{ id: string; docType: string; status: string; note: string | null; fileUrl: string | null; fileName: string | null; fileSize: number; createdAt: string }>;
   publicProfile(providerId: string, locale?: Locale): ProviderPublicProfile;
   earnings(providerId: string): { currency: string; commissionPercent: number; completedOrders: number; gross: number; commission: number; net: number; pendingValue: number; pendingOrders: number; byMonth: Array<{ month: string; orders: number; gross: number; commission: number; net: number }>; note: string };
 }
@@ -64,8 +64,8 @@ export function createProviders(app: App): Providers {
       };
     },
     documents(providerId) {
-      return db.all<{ id: string; doc_type: string; identity_type: string | null; status: string; note: string | null; file_id: string; original_name: string | null; size: number; created_at: string }>(`SELECT pd.*, f.original_name, f.size FROM provider_documents pd JOIN files f ON f.id = pd.file_id WHERE pd.provider_id = ? AND pd.doc_type <> 'PHOTO_WORK' ORDER BY pd.doc_type`, providerId)
-        .map((d) => ({ id: d.id, docType: d.doc_type, identityType: d.identity_type || null, status: d.status, note: d.note, fileUrl: fileUrl(d.file_id), fileName: d.original_name, fileSize: d.size, createdAt: d.created_at }));
+      return db.all<{ id: string; doc_type: string; status: string; note: string | null; file_id: string; original_name: string | null; size: number; created_at: string }>(`SELECT pd.*, f.original_name, f.size FROM provider_documents pd JOIN files f ON f.id = pd.file_id WHERE pd.provider_id = ? AND pd.doc_type <> 'PHOTO_WORK' ORDER BY pd.doc_type`, providerId)
+        .map((d) => ({ id: d.id, docType: d.doc_type, status: d.status, note: d.note, fileUrl: fileUrl(d.file_id), fileName: d.original_name, fileSize: d.size, createdAt: d.created_at }));
     },
     publicProfile(providerId, locale: Locale = 'ar') {
       const base = svc.summary(providerId, locale);
@@ -127,8 +127,7 @@ export function registerProviderRoutes(app: App, r: Router): void {
   });
 
   r.post('/provider/documents', ...isProvider, (ctx: Ctx) => {
-    const b = parse<{ docType: 'ID' | 'LICENSE' | 'COMMERCIAL_REG' | 'CERTIFICATE' | 'PHOTO_WORK'; fileId: string; identityType?: 'NATIONAL_ID' | 'RESIDENT_ID' | 'PASSPORT' | 'OTHER' }>(s.obj({ docType: s.oneOf(['ID', 'LICENSE', 'COMMERCIAL_REG', 'CERTIFICATE', 'PHOTO_WORK']), fileId: s.str({ min: 8, max: 64 }), identityType: s.oneOf(['NATIONAL_ID','RESIDENT_ID','PASSPORT','OTHER'], { optional: true }) }), ctx.body);
-    if (b.docType !== 'ID' && b.identityType) throw E.unprocessable('نوع الهوية يُحدد مع وثيقة الهوية فقط', 'IDENTITY_TYPE_NOT_APPLICABLE');
+    const b = parse<{ docType: 'ID' | 'LICENSE' | 'COMMERCIAL_REG' | 'CERTIFICATE' | 'PHOTO_WORK'; fileId: string }>(s.obj({ docType: s.oneOf(['ID', 'LICENSE', 'COMMERCIAL_REG', 'CERTIFICATE', 'PHOTO_WORK']), fileId: s.str({ min: 8, max: 64 }) }), ctx.body);
     const purpose = b.docType === 'PHOTO_WORK' ? 'work_photo' : 'provider_document';
     return db.tx(() => {
       if (!db.get('SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = ?', b.fileId, ctx.user!.id, purpose)) throw E.unprocessable('الملف غير صالح لهذا النوع', 'INVALID_FILE');
@@ -138,12 +137,12 @@ export function registerProviderRoutes(app: App, r: Router): void {
         pid(ctx), b.docType
       );
       if (b.docType !== 'PHOTO_WORK' && existing) {
-        db.run(`UPDATE provider_documents SET file_id = ?, identity_type = ?, status = 'PENDING', reviewed_by = NULL, reviewed_at = NULL, note = NULL, created_at = ? WHERE id = ?`,
-          b.fileId, b.docType === 'ID' ? (b.identityType || 'NATIONAL_ID') : null, now, existing.id);
+        db.run(`UPDATE provider_documents SET file_id = ?, status = 'PENDING', reviewed_by = NULL, reviewed_at = NULL, note = NULL, created_at = ? WHERE id = ?`,
+          b.fileId, now, existing.id);
         if (existing.file_id !== b.fileId) { app.storage.remove(existing.file_id); db.run('DELETE FROM files WHERE id = ?', existing.file_id); }
       } else {
         const id = uuid();
-        db.run('INSERT INTO provider_documents(id,provider_id,doc_type,file_id,status,created_at,identity_type) VALUES (?,?,?,?,?,?,?)', id, pid(ctx), b.docType, b.fileId, b.docType === 'PHOTO_WORK' ? 'APPROVED' : 'PENDING', now, b.docType === 'ID' ? (b.identityType || 'NATIONAL_ID') : null);
+        db.run('INSERT INTO provider_documents(id,provider_id,doc_type,file_id,status,created_at) VALUES (?,?,?,?,?,?)', id, pid(ctx), b.docType, b.fileId, b.docType === 'PHOTO_WORK' ? 'APPROVED' : 'PENDING', now);
       }
       const p = db.get<{ verification_status: VerificationStatus; display_name: string }>('SELECT verification_status, display_name FROM service_providers WHERE id = ?', pid(ctx))!;
       if (b.docType !== 'PHOTO_WORK') {
@@ -370,7 +369,7 @@ export function registerProviderRoutes(app: App, r: Router): void {
       const point = live ? {lat:Number(live.lat),lng:Number(live.lng),source:'live'} : (p.base_lat!==null&&p.base_lng!==null ? {lat:Number(p.base_lat),lng:Number(p.base_lng),source:'base'} : null);
       if (!point) return null;
       const providerAreas = db.all<{area_id:string}>(`SELECT area_id FROM provider_service_areas WHERE provider_id=?`, p.id);
-      if (providerAreas.length && targetArea && !providerAreas.some(x=>chain.has(x.area_id))) return null;
+      if (providerAreas.length && (!targetArea || !providerAreas.some(x=>chain.has(x.area_id)))) return null;
       const distanceKm = round(haversineKm(lat,lng,point.lat,point.lng),2);
       const areas = providerAreas.map(x=>catalog.all().areas.find(a=>a.id===x.area_id)).filter(Boolean).map((a:any)=>({id:a.id,name:tr(a.name_i18n,ctx.locale),localityType:a.locality_type||a.type}));
       const rating = Number(p.rating_avg||0);

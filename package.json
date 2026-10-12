@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.13.2",
-  "description": "خدمات (Khadamat) — 2.13.2 restores the approved compact customer quick-access layout",
+  "version": "2.11.0",
+  "description": "خدمات — الإصدار 2.11: إزالة تفاصيل الحالة الداخلية من متابعة العميل",
   "private": true,
   "type": "module",
   "engines": {
