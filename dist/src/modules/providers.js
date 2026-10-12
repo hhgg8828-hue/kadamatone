@@ -372,7 +372,7 @@ export function registerProviderRoutes(app, r) {
             if (!point)
                 return null;
             const providerAreas = db.all(`SELECT area_id FROM provider_service_areas WHERE provider_id=?`, p.id);
-            if (providerAreas.length && targetArea && !providerAreas.some(x => chain.has(x.area_id)))
+            if (providerAreas.length && (!targetArea || !providerAreas.some(x => chain.has(x.area_id))))
                 return null;
             const distanceKm = round(haversineKm(lat, lng, point.lat, point.lng), 2);
             const areas = providerAreas.map(x => catalog.all().areas.find(a => a.id === x.area_id)).filter(Boolean).map((a) => ({ id: a.id, name: tr(a.name_i18n, ctx.locale), localityType: a.locality_type || a.type }));

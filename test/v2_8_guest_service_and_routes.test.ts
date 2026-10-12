@@ -36,6 +36,14 @@ test('customer area picker supports the full active hierarchy and preserves spec
   assert.match(frontend, /api\('\/provider\/areas'/);
 });
 
+test('provider login canonicalizes to /provider and area/confirmation UI fixes are present', () => {
+  assert.match(frontend, /function roleHome\(role:string\)\{return role==='PROVIDER'\?'\/provider'/);
+  assert.match(frontend, /providerData\.areas\|\|providerData\.serviceAreas/);
+  assert.match(frontend, /function areaPathLabel\(/);
+  assert.match(frontend, /هاتف العميل المسجل/);
+  assert.match(frontend, /tel:\$\{esc\(phoneHref\(x\.phone\)\)\}/);
+});
+
 test('HTML shells are not cached and deployment checks require admin/provider shells', () => {
   assert.match(httpSource, /rel === '\/admin' \|\| rel === '\/admin\/'/);
   assert.match(httpSource, /rel === '\/provider' \|\| rel === '\/provider\/'/);
@@ -44,7 +52,7 @@ test('HTML shells are not cached and deployment checks require admin/provider sh
   assert.match(server, /'provider\.html', 'admin\.html', 'js\/app\.js', 'sw\.js'/);
 });
 
-test('direct /admin and /provider paths and refreshes serve the correct installed interface shells', async () => {
+test('direct /admin, /provider, and /customer paths and refreshes serve the correct interface shells', async () => {
   const t = await startApp();
   try {
     for (const [route, expected] of [['/admin', 'data-page="admin"'], ['/admin/', 'data-page="admin"'], ['/admin.html', 'data-page="admin"'], ['/provider', 'data-page="provider"'], ['/provider/', 'data-page="provider"'], ['/provider.html', 'data-page="provider"'], ['/customer', 'data-page="customer"'], ['/customer.html', 'data-page="customer"']] as const) {
@@ -57,7 +65,7 @@ test('direct /admin and /provider paths and refreshes serve the correct installe
       assert.equal(refreshed.status, 200, `${route} refresh should return HTTP 200`);
       assert.ok(refreshed.text.includes(expected));
     }
-    const assets = await t.api('GET', '/js/app.js?v=2.7');
+    const assets = await t.api('GET', '/js/app.js?v=2.8');
     assert.equal(assets.status, 200);
     assert.match(assets.headers.get('content-type') || '', /javascript/);
     assert.ok(assets.text.length > 1000);

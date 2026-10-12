@@ -369,7 +369,7 @@ export function registerProviderRoutes(app: App, r: Router): void {
       const point = live ? {lat:Number(live.lat),lng:Number(live.lng),source:'live'} : (p.base_lat!==null&&p.base_lng!==null ? {lat:Number(p.base_lat),lng:Number(p.base_lng),source:'base'} : null);
       if (!point) return null;
       const providerAreas = db.all<{area_id:string}>(`SELECT area_id FROM provider_service_areas WHERE provider_id=?`, p.id);
-      if (providerAreas.length && targetArea && !providerAreas.some(x=>chain.has(x.area_id))) return null;
+      if (providerAreas.length && (!targetArea || !providerAreas.some(x=>chain.has(x.area_id)))) return null;
       const distanceKm = round(haversineKm(lat,lng,point.lat,point.lng),2);
       const areas = providerAreas.map(x=>catalog.all().areas.find(a=>a.id===x.area_id)).filter(Boolean).map((a:any)=>({id:a.id,name:tr(a.name_i18n,ctx.locale),localityType:a.locality_type||a.type}));
       const rating = Number(p.rating_avg||0);
