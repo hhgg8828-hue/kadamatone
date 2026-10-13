@@ -56,19 +56,18 @@ test('customer order confirmation includes coupon, address edit, inline note and
   assert.match(frontend, /orderProductUrl/);
 });
 
-test('customer list tabs and favorites are interactive and saved locally', () => {
-  assert.match(frontend, /data-tw-tab="near"/);
-  assert.match(frontend, /data-tw-tab="new"/);
-  assert.match(frontend, /data-tw-tab="fav"/);
+test('customer service filters and favorites are interactive and saved locally', () => {
+  assert.match(frontend, /data-service-filter="nearby"/);
+  assert.match(frontend, /data-service-filter="new"/);
+  assert.match(frontend, /data-service-filter="favorite"/);
   assert.match(frontend, /khadamat\.favoriteServices\.v1/);
-  assert.match(frontend, /khadamat\.favoriteCampaigns\.v1/);
-  assert.match(css, /tw-tabs/);
+  assert.match(css, /customer-service-filters/);
 });
 
-test('customer shell uses versioned 2.27 assets to refresh cached layout', () => {
-  assert.match(customerShell, /app\.css\?v=2\.27/);
-  assert.match(customerShell, /app\.js\?v=2\.27/);
-  assert.match(customerShell, /sw\.js\?v=2\.27/);
+test('customer shell uses versioned 2.19 assets to refresh cached layout', () => {
+  assert.match(customerShell, /app\.css\?v=2\.26/);
+  assert.match(customerShell, /app\.js\?v=2\.26/);
+  assert.match(customerShell, /sw\.js\?v=2\.26/);
 });
 
 

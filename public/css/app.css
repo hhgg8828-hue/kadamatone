@@ -1010,123 +1010,111 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .order-confirmation-inline .text-link,.order-confirmation-inline button.text-link{border:0;background:transparent;box-shadow:none;color:var(--primary,#176b4d);padding:4px 3px;min-height:0;font-size:13px;font-weight:700;text-decoration:none}
 @media(max-width:420px){.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:60px;min-height:64px}.customer-shell .campaign-strip-wrap{padding-right:72px}.customer-shell .all-offers-button{width:62px;right:3px;font-size:10px}}
 
-/* 2.26 — concise modern customer order form */
-.customer-shell .modern-order-form{display:grid;gap:12px}
-.customer-shell .modern-order-head h2{margin:0 0 4px;font-size:20px}
-.customer-shell .modern-order-head p{margin:0;font-size:12px}
-.customer-shell .modern-order-form .field{margin:0 0 10px}
-.customer-shell .modern-order-form .description-field textarea{min-height:92px}
-.customer-shell .modern-order-form .location-field{padding:12px;border:1px solid var(--line,#e5e9e6);border-radius:14px;background:var(--surface,#fff)}
-.customer-shell .modern-order-form .location-field>label{display:block;font-weight:800;margin-bottom:8px}
-.customer-shell .modern-order-form #savedAddressCard{padding:0;border:0;background:transparent;box-shadow:none}
-.customer-shell .modern-order-form #locationStatus,.customer-shell .modern-order-form #savedAddressStatus{font-size:12px}
-.customer-shell .modern-order-form .optional-order-details{margin:0;padding:10px 12px;border:1px solid var(--line,#e5e9e6);border-radius:12px}
-.customer-shell .modern-order-form .optional-order-details>summary{font-weight:700;font-size:13px;cursor:pointer}
-.customer-shell .modern-order-form .submit-order-btn{width:100%;margin-top:2px}
+/* V2.26 — reference-led customer storefront layout (brand remains Khadamat green). */
+.customer-shell{background:#f8f8f6}
+.customer-shell .app-topbar{position:sticky;top:0;z-index:120;display:flex;min-height:58px;margin:0 -2px 10px;padding:8px 10px;border:0;border-radius:0 0 13px 13px;background:rgba(255,255,255,.97);box-shadow:0 3px 14px rgba(24,67,49,.10);backdrop-filter:blur(14px)}
+.customer-shell .brand-lockup{gap:8px}.customer-shell .brand-mark{width:34px;height:34px;border-radius:10px}.customer-shell .brand-lockup strong{font-size:18px}.customer-shell .top-actions{gap:4px}.customer-shell .top-actions .btn{padding:6px 8px;font-size:10px;border-radius:9px}
+.customer-shell .hero.customer-simple-hero{border-radius:12px;margin:0 0 10px;padding:9px 10px;background:#fff;border:1px solid #e5ebe6;color:#213a2e;box-shadow:0 2px 8px rgba(23,74,54,.04)}
+.customer-shell .hero.customer-simple-hero:after{display:none}
+.customer-shell .customer-city-select-compact{display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 8px;margin:0;padding:7px 8px;border-radius:10px;background:#fff;border:1px solid #e6ebe6;box-shadow:none;color:#243a30}
+.customer-shell .customer-city-select-compact label{grid-column:1/-1;margin:0;font-size:11px;font-weight:800;color:#5a6a60}
+.customer-shell .customer-city-select-compact select{min-width:0;width:100%;height:36px;padding:5px 8px;border:1px solid #dce5de;border-radius:8px;font-size:12px;background:#fff;color:#273e32}
+.customer-shell .customer-city-select-compact .btn{min-height:36px;padding:5px 10px;background:#edf6ef;color:#176b4d;border:1px solid #d6e8da;box-shadow:none}
+.customer-shell .customer-city-select-compact small{display:none}
+.customer-shell .khadamat-news-ticker{margin:0 0 10px;padding:7px 9px;border-radius:9px;gap:8px;box-shadow:none}
+.customer-shell .news-ticker-label{padding:5px 7px;border-radius:7px;font-size:10px}
+.customer-shell .news-ticker-window{font-size:11px}
+.customer-shell .customer-offers{position:relative;margin:0 0 10px;padding:8px 8px 6px;border:1px solid #e5e9e3;border-radius:11px;background:#fff;box-shadow:0 2px 8px rgba(23,74,54,.035)}
+.customer-shell .customer-offers .section-heading{margin:0 0 6px}.customer-shell .customer-offers .section-heading h2{font-size:14px;color:#2a4336}.customer-shell .customer-section-mark{display:none}
+.customer-shell .campaign-strip{display:flex;gap:8px;margin:0;padding:0 0 5px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.customer-shell .campaign-strip::-webkit-scrollbar{display:none}
+.customer-shell .campaign-card{flex:0 0 76%;max-width:310px;border-radius:9px;box-shadow:none;border-color:#e6e9e4}
+.customer-shell .campaign-card .campaign-image{aspect-ratio:2.65/1;max-height:116px;object-fit:cover}
+.customer-shell .campaign-card .campaign-image-placeholder{aspect-ratio:2.65/1;max-height:116px}
+.customer-shell .campaign-card-copy{padding:7px 9px;gap:3px}.customer-shell .campaign-card-copy b{font-size:12px}.customer-shell .campaign-card-copy p{font-size:10px}.customer-shell .campaign-cta{padding:5px 8px;font-size:10px}
+.customer-shell .campaign-strip-wrap{padding-right:66px}
+.customer-shell .all-offers-button{right:3px;width:59px;min-height:36px;border-radius:8px;border-color:#c9dfce;background:rgba(231,244,233,.94);color:#176b4d;font-size:10px;box-shadow:none}
+.customer-shell .customer-category-showcase-top{margin:0 0 10px;padding:0;background:transparent;border:0;box-shadow:none}
+.customer-shell .customer-category-heading{margin:0 0 5px}.customer-shell .customer-category-heading h2{font-size:14px;color:#31483a}
+.customer-shell .customer-category-showcase-top .customer-category-rail{display:flex;gap:7px;padding:2px 1px 6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;direction:rtl}
+.customer-shell .customer-category-showcase-top .customer-category-rail::-webkit-scrollbar{display:none}
+.customer-shell .customer-category-showcase-top .customer-category-tile{flex:0 0 61px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:4px 2px;border:0;border-radius:8px;background:transparent;box-shadow:none}
+.customer-shell .customer-category-showcase-top .customer-category-art{width:43px;height:43px;flex:0 0 43px;border-radius:50%;border:1px solid #e5e8e3;background:#fff;color:#176b4d}
+.customer-shell .customer-category-showcase-top .customer-category-art .service-icon-svg{width:23px;height:23px;min-width:23px;min-height:23px}
+.customer-shell .customer-category-showcase-top .customer-category-tile b{font-size:9px;line-height:1.25;color:#46584c;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.customer-shell .customer-category-showcase-top .all-categories-tile{flex:0 0 61px;min-height:70px;border:1px solid #e5e8e3;border-radius:8px;background:#fff;box-shadow:none}
+.customer-shell .customer-category-showcase-top .all-categories-check{width:24px;height:24px;border-radius:6px;background:#edf6ef;color:#176b4d;font-size:18px}
+.customer-shell .quick-assist-home{margin:0 0 10px;padding:10px 11px;border-radius:11px;background:#edf6ef;border:1px solid #d7e8da;box-shadow:none}
+.customer-shell .quick-assist-home .quick-assist-head h1{margin:0;color:#176b4d!important;font-size:16px;text-shadow:none}
+.customer-shell .quick-assist-home .quick-assist-head p{margin:2px 0 7px;color:#5f7566!important;font-size:11px;line-height:1.45}
+.customer-shell .quick-assist-home .quick-assist-card{padding:7px;border:1px solid #dce8dd;border-radius:9px;box-shadow:none;background:#fff}
+.customer-shell .quick-assist-home .quick-assist-input-row{gap:6px}.customer-shell .quick-assist-home .quick-assist-input-row textarea{min-height:36px;font-size:12px}.customer-shell .quick-assist-home .quick-assist-voice{min-height:34px;padding:5px 9px;font-size:11px;box-shadow:none}
+.customer-shell .manual-service-fallback{margin:0 0 12px;padding:10px;border-radius:10px;box-shadow:none}.customer-shell .manual-service-fallback>b{font-size:13px}.customer-shell .manual-service-fallback>p{margin:2px 0 7px;font-size:11px}
+.customer-shell .section-nav{display:flex;gap:0;margin:0 0 10px;border-bottom:1px solid #e2e6e0;overflow-x:auto}
+.customer-shell .section-tab{flex:1;padding:9px 10px;font-size:12px;white-space:nowrap}
+.customer-shell #servicesSection>.section-heading:first-child{margin:0 0 8px}.customer-shell #servicesSection>.section-heading:first-child h2{font-size:16px}.customer-shell #servicesSection>.section-heading:first-child p{font-size:11px}
+.customer-shell .customer-service-filters{display:flex;gap:7px;align-items:center;margin:0 0 8px;padding:0 0 7px;border-bottom:1px solid #e5e8e3;overflow-x:auto;scrollbar-width:none}
+.customer-shell .customer-service-filters::-webkit-scrollbar{display:none}
+.customer-shell .customer-service-filters button{flex:0 0 auto;min-height:31px;padding:5px 12px;border:1px solid #e5e8e3;border-radius:999px;background:#fff;color:#647267;font-size:11px;font-weight:800}
+.customer-shell .customer-service-filters button.active{background:#eaf5ed;border-color:#b8d6bf;color:#176b4d}
+.customer-shell .customer-service-list{display:grid;gap:0;border:1px solid #e7e9e4;border-radius:10px;background:#fff;overflow:hidden}
+.customer-shell .customer-service-row{position:relative;min-width:0;border-bottom:1px solid #eceee9;background:#fff}
+.customer-shell .customer-service-row:last-child{border-bottom:0}
+.customer-shell .customer-service-main{display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:10px 36px 10px 10px;border:0;background:transparent;text-align:right;color:#293d31;font:inherit;cursor:pointer}
+.customer-shell .customer-service-icon{display:grid;place-items:center;flex:0 0 43px;width:43px;height:43px;border:1px solid #eceee9;border-radius:9px;background:#f7f9f6;color:#176b4d}
+.customer-shell .customer-service-icon .service-icon-svg{width:27px;height:27px}
+.customer-shell .customer-service-copy{display:grid;gap:2px;flex:1;min-width:0}
+.customer-shell .customer-service-copy>b{font-size:12px;line-height:1.45;font-weight:800}
+.customer-shell .customer-service-copy>small{font-size:10px;color:#7a877d;line-height:1.4}
+.customer-shell .customer-service-description{font-size:10px;color:#647267;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.customer-shell .customer-service-price{font-size:10px;color:#176b4d;font-weight:800}
+.customer-shell .customer-service-arrow{flex:none;font-size:24px;color:#9aa69c;line-height:1}
+.customer-shell .customer-service-favorite{position:absolute;z-index:1;right:8px;top:50%;transform:translateY(-50%);width:26px;height:28px;padding:0;border:0;background:transparent;color:#9ca8a0;font-size:22px;line-height:1;cursor:pointer}
+.customer-shell .customer-service-favorite.is-favorite{color:#d76b83}
+.customer-shell .customer-service-empty{padding:24px 14px;text-align:center;color:#778278;font-size:12px}
+.customer-shell .customer-bottom-nav{border-radius:11px 11px 0 0}
+@media(min-width:600px){.customer-shell .customer-service-list{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-shell .customer-service-row:nth-child(odd){border-left:1px solid #eceee9}.customer-shell .customer-service-row:nth-last-child(-n+2){border-bottom:0}}
+@media(max-width:420px){.customer-shell .app-topbar{margin-left:-11px;margin-right:-11px}.customer-shell .brand-lockup strong{font-size:17px}.customer-shell .campaign-strip-wrap{padding-right:62px}.customer-shell .campaign-card{flex-basis:83%}.customer-shell .customer-category-showcase-top .customer-category-tile,.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:58px}.customer-shell .customer-category-showcase-top .customer-category-art{width:40px;height:40px;flex-basis:40px}}
 
-/* 2.26 — dedicated all-offers page */
-.customer-shell .all-offers-page{padding:12px 0 28px}
-.customer-shell .all-offers-page-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
-.customer-shell .all-offers-page-head h1{font-size:21px;margin:0 0 5px}
-.customer-shell .all-offers-page-head p{font-size:12px;margin:0}
-.customer-shell .all-offers-page .all-offers-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.customer-shell .all-offers-page .all-offer-item{min-width:0;text-align:right;display:flex;flex-direction:column;gap:7px;padding:9px}
-.customer-shell .all-offers-page .all-offer-item img,.customer-shell .all-offers-page .all-offer-placeholder{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:9px}
-.customer-shell .all-offers-page .all-offer-placeholder{display:grid;place-items:center;background:#f6f4f7;font-size:25px;color:#a64b72}
-.customer-shell .all-offers-page .all-offer-item b{font-size:13px}
-.customer-shell .all-offers-page .all-offer-item small{font-size:11px;color:var(--muted,#68736d)}
-
-/* ===== V2.27 — تخطيط الشاشة الرئيسية مطابق لتطبيق توصيل ون (ألوان خدمات) ===== */
-.customer-shell{padding:0 0 96px;width:min(760px,100%);background:#fff}
-.customer-shell .tw-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 26px;background:linear-gradient(135deg,#0f5a41,#176b4d);color:#fff}
-.customer-shell .tw-brand{display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-decoration:none;line-height:1.25}
-.customer-shell .tw-brand strong{font-size:22px;font-weight:800}
-.customer-shell .tw-brand small{display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.18);font-size:12px;cursor:pointer}
-.customer-shell .tw-header-actions{display:flex;align-items:center;gap:8px}
-.customer-shell .tw-icon-btn{position:relative;width:38px;height:38px;border:0;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;font-size:18px;line-height:1;cursor:pointer;display:grid;place-items:center}
-.customer-shell .tw-login-btn{border:0;border-radius:999px;padding:8px 16px;background:#fff;color:#176b4d;font:inherit;font-weight:800;cursor:pointer}
-.customer-shell .tw-ticker-row,.customer-shell .tw-quick-access,.customer-shell .tw-area-row,.customer-shell .customer-category-showcase,.customer-shell .customer-offers,.customer-shell #servicesSection,.customer-shell #ordersSection,.customer-shell #accountSection,.customer-shell #customerPriority,.customer-shell #personalRecommendations{position:relative;background:#fff;padding-inline:14px}
-.customer-shell .tw-ticker-row{margin-top:-16px;border-radius:22px 22px 0 0;padding-top:12px}
-.customer-shell .khadamat-news-ticker{margin:0;border-radius:12px;background:#fff8e8;border:0;font-size:13px}
-.customer-shell .tw-quick-access{padding-top:10px}
-.customer-shell .tw-quick-title{font-weight:800;font-size:14px;color:#176b4d;margin-bottom:6px}
-.customer-shell .tw-quick-access .quick-assist-card{margin:0;padding:10px;border-radius:16px;border:1.5px solid #cfe4d8;background:#f4faf7;box-shadow:none}
-.customer-shell .tw-area-row .customer-city-select{margin:0;border:0;box-shadow:none;background:transparent;padding:6px 0}
-.customer-shell .customer-category-showcase{padding-top:6px}
-.customer-shell .customer-category-showcase .section-heading{display:none}
-.customer-shell .customer-category-rail{display:flex;gap:10px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none}
-.customer-shell .customer-category-rail::-webkit-scrollbar{display:none}
-.customer-shell .customer-category-tile{flex:0 0 74px;min-height:78px;padding:6px 4px;border-radius:14px;border:1px solid #e4e9f2;background:#fff;box-shadow:0 2px 6px rgba(16,24,40,.06);font-size:11.5px}
-.customer-shell .tw-section-head h2{margin:8px 0;font-size:16px;color:#176b4d}
-.customer-shell .campaign-strip-wrap{position:relative}
-.customer-shell .campaign-strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}
-.customer-shell .campaign-card{flex:0 0 82%;scroll-snap-align:start;border-radius:18px;overflow:hidden}
-.customer-shell .all-offers-button{position:absolute;inset-inline-start:8px;top:8px;z-index:2;border:0;border-radius:999px;padding:5px 12px;background:#f3b63f;color:#3a2a00;font:inherit;font-weight:800;font-size:12px;cursor:pointer}
-.customer-shell .section-nav,.customer-shell .tw-legacy-search{display:none!important}
-.customer-shell .tw-tabs{display:flex;border-bottom:1px solid #e4e9f2;margin:6px 0 4px}
-.customer-shell .tw-tabs button{flex:1;border:0;background:transparent;padding:12px 4px;font:inherit;font-weight:700;color:#667085;border-bottom:3px solid transparent;cursor:pointer}
-.customer-shell .tw-tabs button.active{color:#176b4d;border-bottom-color:#176b4d}
-.customer-shell .tw-list{display:flex;flex-direction:column}
-.customer-shell .tw-row{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid #eef1f6;cursor:pointer}
-.customer-shell .tw-row-art{flex:0 0 58px;height:58px;border-radius:14px;background:#eaf6ef;display:grid;place-items:center;overflow:hidden}
-.customer-shell .tw-row-art svg{width:40px;height:40px}
-.customer-shell .tw-row-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.customer-shell .tw-row-copy b{font-size:15px}.customer-shell .tw-row-copy small{color:#667085}
-.customer-shell .tw-open-badge{display:inline-block;padding:1px 10px;border-radius:8px;background:#f3b63f;color:#3a2a00;font-size:11px;font-weight:800}
-.customer-shell .tw-heart{border:0;background:transparent;font-size:24px;color:#d92d20;cursor:pointer;padding:6px}
-.customer-shell .tw-account-title{text-align:center;font-weight:800;font-size:18px;color:#176b4d;padding:14px 0}
-.customer-shell .tw-account-list{display:flex;flex-direction:column;gap:10px;padding-bottom:12px}
-.customer-shell .tw-account-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:1px solid #e4e9f2;border-radius:14px;background:#fff;box-shadow:0 2px 6px rgba(16,24,40,.05);font:inherit;text-align:start;cursor:pointer}
-.customer-shell .tw-account-row b{flex:1;font-size:15px}
-.customer-shell .tw-account-icon{width:38px;height:38px;border-radius:12px;background:#eaf6ef;color:#176b4d;display:grid;place-items:center;font-size:18px}
-.customer-shell .tw-account-row i{font-style:normal;color:#98a2b3;font-size:20px}
-.customer-shell .customer-bottom-nav{border-radius:0;width:min(100%,760px);background:#fff;border-top:1px solid #e4e9f2;box-shadow:0 -4px 16px rgba(16,24,40,.08)}
-.customer-shell .customer-bottom-nav button.active{background:transparent;color:#176b4d}
-.customer-shell .customer-bottom-nav button.active small{border-bottom:3px solid #176b4d;padding-bottom:2px}
-.customer-shell .tw-list.quick-services-strip{margin-bottom:0;overflow:visible}
-
-/* ===== V2.27 — بطاقات الطلبات، تتبع الطلب، وشاشة تأكيد الطلب بنمط توصيل ون ===== */
-.tw-order-card{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:18px;border:1px solid #e4e9f2;background:#fff;box-shadow:0 3px 10px rgba(16,24,40,.07);margin-bottom:12px}
-.tw-order-top{display:flex;align-items:center;gap:12px}
-.tw-order-art{flex:0 0 62px;height:62px;border-radius:14px;background:#eaf6ef;display:grid;place-items:center;overflow:hidden}
-.tw-order-art svg{width:42px;height:42px}
-.tw-order-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.tw-order-copy b{font-size:16px}
-.tw-order-stars{color:#f3b63f;letter-spacing:2px;font-size:14px}
-.tw-order-status{align-self:flex-start;border-radius:999px;padding:3px 12px;font-size:12px;font-weight:800;background:#eaf6ef;color:#176b4d}
-.tw-order-status.status-cancelled,.tw-order-status.status-rejected,.tw-order-status.status-expired{background:#fff0ee;color:#d92d20}
-.tw-order-status.status-completed{background:#eafaf2;color:#079455}
-.tw-order-desc{margin:0;color:#475467;font-size:13.5px}
-.tw-order-provider{margin:0}
-.tw-order-total{display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#176b4d}
-.tw-order-total span{color:#344054}
-.tw-reorder-btn{width:100%;background:#f3b63f!important;color:#3a2a00!important;border:0;border-radius:14px;padding:12px;font-weight:800;font-size:15px}
-.tw-tracker{display:flex;justify-content:space-between;gap:6px;padding:16px 10px;margin:12px 0;position:relative}
-.tw-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:12px;color:#98a2b3;position:relative}
-.tw-step:not(:last-child):after{content:"";position:absolute;top:14px;inset-inline-start:calc(50% + 18px);inset-inline-end:calc(-50% + 18px);height:3px;background:#e4e9f2}
-.tw-step.done:not(:last-child):after{background:#176b4d}
-.tw-step-dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#e4e9f2;color:#667085;font-weight:800;position:relative;z-index:1}
-.tw-step.done .tw-step-dot{background:#176b4d;color:#fff}
-.tw-step.current b{color:#176b4d}
-.tw-tracker-cancelled{width:100%;text-align:center;font-weight:800;color:#d92d20}
-/* شاشة كاملة لتأكيد الطلب وتتبع الطلب */
-.modal .card:has(.order-confirmation-step),.modal .card:has(.customer-order-tracking){position:fixed;inset:0;max-width:none;width:100%;height:100%;border-radius:0;overflow-y:auto;padding:0 14px 120px;margin:0;background:#fff}
-.order-confirmation-step .tw-conf-head{display:flex;align-items:center;justify-content:center;position:sticky;top:0;z-index:5;margin:0 -14px 12px;padding:14px;background:linear-gradient(135deg,#0f5a41,#176b4d);color:#fff}
-.order-confirmation-step .tw-conf-head h2{margin:0;font-size:18px;color:#fff}
-.order-confirmation-step .tw-conf-back{position:absolute;inset-inline-end:12px;border:0;background:transparent;color:#fff;font-size:24px;cursor:pointer}
-.order-confirmation-step .card{border-radius:16px;border:1px solid #e4e9f2;box-shadow:0 2px 8px rgba(16,24,40,.05);margin-bottom:12px}
-.tw-conf-row{display:flex!important;align-items:center;gap:12px}
-.tw-conf-row b{flex:1}
-.tw-conf-icon{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#eaf6ef;font-size:18px;vertical-align:middle}
-.order-confirmation-step h3{display:flex;align-items:center;gap:10px;margin:0 0 8px}
-.tw-suggest-head{font-weight:800;color:#176b4d;border-inline-start:4px solid #176b4d;padding-inline-start:8px;margin:14px 0 8px}
-.tw-suggest-rail{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
-.tw-suggest-card{flex:0 0 108px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border:1px solid #e4e9f2;border-radius:14px;background:#fff;font:inherit;font-size:12px;cursor:pointer}
-.tw-invoice{display:flex;flex-direction:column;gap:8px}
-.tw-invoice>div{display:flex;justify-content:space-between}
-.tw-invoice-total{background:#f3b63f;border-radius:12px;padding:10px 12px;font-weight:800;color:#3a2a00}
-.tw-conf-actions{position:fixed;inset-inline:0;bottom:0;z-index:10;display:grid!important;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid #e4e9f2;box-shadow:0 -6px 18px rgba(16,24,40,.1)}
-.tw-conf-actions .btn{border-radius:14px;padding:13px;font-weight:800}
-/* نوافذ سفلية على الجوال (مثل نوافذ توصيل ون) */
-@media(max-width:700px){.modal:not(:has(.order-confirmation-step)):not(:has(.customer-order-tracking)){align-items:flex-end}.modal:not(:has(.order-confirmation-step)):not(:has(.customer-order-tracking))>.card{width:100%;max-width:none;border-radius:22px 22px 0 0;max-height:88vh;overflow-y:auto;margin:0}}
-.tw-order-hint{text-align:center}
+/* V2.26 order screens: compact, reference-led full-height mobile sheet. */
+.customer-shell .modal:has(#orderForm)>.card{width:min(760px,100%);max-height:calc(100dvh - 16px);overflow-y:auto;border-radius:16px;padding:12px;background:#f8faf8;border:1px solid #dfe8e1;box-shadow:0 18px 54px rgba(19,56,38,.18)}
+.customer-shell .modal:has(#orderForm)>.card>.row:first-child{position:sticky;top:-12px;z-index:20;margin:-12px -12px 10px;padding:9px 12px;background:#176b4d;color:#fff;border-radius:15px 15px 0 0;border-bottom:1px solid #0f5a3f}
+.customer-shell .modal:has(#orderForm)>.card>.row:first-child .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.45);padding:5px 9px}
+.customer-shell .order-form-heading{padding:2px 2px 8px;border-bottom:1px solid #e4e9e3;margin-bottom:9px}
+.customer-shell .order-form-heading h2{margin:0;font-size:19px;color:#1d4c35}
+.customer-shell .order-form-heading p{margin:2px 0 0;font-size:11px}
+.customer-shell #orderForm{display:grid;gap:9px}
+.customer-shell #orderForm>.field{margin:0;padding:0 1px}
+.customer-shell #orderForm .field>label{font-size:12px;color:#334a3b}
+.customer-shell #orderForm input:not([type=file]),.customer-shell #orderForm textarea,.customer-shell #orderForm select{border-color:#dfe7df;border-radius:9px;padding:9px 10px;font-size:13px}
+.customer-shell #orderForm textarea{min-height:76px}
+.customer-shell #orderForm .optional-order-details{margin:0;padding:9px 10px;border:1px solid #e0e7df;border-radius:10px;background:#fff}
+.customer-shell #orderForm .optional-order-details summary{font-size:12px;color:#506454}
+.customer-shell #orderForm .location-field{padding:10px;border:1px solid #e0e7df;border-radius:10px;background:#fff}
+.customer-shell #orderForm .location-field>label{display:block;margin-bottom:7px;font-weight:900}
+.customer-shell #orderForm #savedAddressCard{padding:8px;margin:0 0 7px;border:1px solid #e5eae3;border-radius:9px;box-shadow:none}
+.customer-shell #orderForm #savedAddressStatus,.customer-shell #orderForm #locationStatus{font-size:10px;line-height:1.45}
+.customer-shell #orderForm .location-row{gap:7px;align-items:center}
+.customer-shell #orderForm .location-row .btn{flex:0 0 auto;padding:7px 9px;font-size:11px;box-shadow:none}
+.customer-shell #orderForm .location-human-fields{margin-top:7px}
+.customer-shell #orderForm .order-price-preview{margin:0;padding:10px;border:1px solid #dfe8df;border-radius:10px;background:#f1f7f1;box-shadow:none}
+.customer-shell #orderForm .order-price-preview h3{margin:0 0 5px;font-size:13px}
+.customer-shell #orderForm .order-price-preview p{margin:4px 0;font-size:11px}
+.customer-shell #orderForm .submit-order-btn{position:sticky;bottom:0;z-index:10;width:100%;min-height:45px;border-radius:10px;box-shadow:0 -4px 14px rgba(255,255,255,.92)}
+.customer-shell .order-confirmation-step{gap:8px;margin-top:0;padding-bottom:4px}
+.customer-shell .order-confirmation-heading{position:sticky;top:30px;z-index:5;padding:8px 2px;background:#f8faf8;border-bottom:1px solid #e2e8e1}
+.customer-shell .order-confirmation-heading h2{font-size:18px;color:#1b553a}
+.customer-shell .order-confirmation-step>.card{padding:11px;margin:0;border-radius:10px;border:1px solid #e2e8e1;background:#fff;box-shadow:none}
+.customer-shell .order-confirmation-step .order-confirmation-summary>b{font-size:13px;color:#2d4937}
+.customer-shell .order-confirmation-step .order-confirmation-summary>p{margin:4px 0;font-size:12px;line-height:1.55}
+.customer-shell .order-confirmation-step .order-confirmation-inline{margin:2px 0;gap:8px}
+.customer-shell .order-confirmation-step .order-confirmation-inline>b{font-size:12px}
+.customer-shell .order-confirmation-step .order-confirmation-inline>span{font-size:11px;max-width:58%;overflow-wrap:anywhere}
+.customer-shell .order-confirmation-step .order-confirmation-address,.customer-shell .order-confirmation-step .order-confirmation-notes{display:grid;gap:5px}
+.customer-shell .order-confirmation-step .order-confirmation-extra .field,.customer-shell .order-confirmation-step .order-confirmation-notes .field{margin:6px 0 0}
+.customer-shell .order-confirmation-step .order-time-choice h3,.customer-shell .order-confirmation-step .payment-methods h3{margin:0 0 6px;font-size:13px}
+.customer-shell .order-confirmation-step .choice-row{padding:6px 0;font-size:12px}
+.customer-shell .order-confirmation-step .payment-choice{border:0;border-radius:0;padding:5px 0}
+.customer-shell .order-confirmation-step .order-confirmation-actions{position:sticky;bottom:-12px;z-index:12;margin:0 -12px -12px;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(248,250,248,.97);border-top:1px solid #e1e8e0;backdrop-filter:blur(8px)}
+.customer-shell .order-confirmation-step .order-confirmation-actions .btn{flex:1;min-height:42px;border-radius:9px}
+@media(max-width:520px){.customer-shell .modal:has(#orderForm){padding:0;place-items:stretch}.customer-shell .modal:has(#orderForm)>.card{width:100%;height:100dvh;max-height:100dvh;border-radius:0;padding:10px}.customer-shell .modal:has(#orderForm)>.card>.row:first-child{top:-10px;margin:-10px -10px 8px;border-radius:0}.customer-shell .order-confirmation-step .order-confirmation-actions{bottom:-10px;margin:0 -10px -10px;padding-inline:10px}}
