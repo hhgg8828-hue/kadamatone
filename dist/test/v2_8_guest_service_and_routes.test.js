@@ -15,12 +15,13 @@ test('guest service selection opens service details before requesting authentica
     assert.match(frontend, /if\(!state\.user\)\{openServiceDetails\(serviceId,initial\);return\}/);
     assert.match(frontend, /يمكنك الاطلاع على الخدمة أولًا/);
 });
-test('mobile car wash keeps only the essential current/other location choice and requires a confirmed location', () => {
+test('mobile car wash uses the modern compact form without redundant wash-type questions', () => {
     assert.match(frontend, /'mobile-car-wash':\['أحتاج غسيل السيارة في موقعي'/);
-    assert.match(frontend, /<b>مكان غسيل السيارة<\/b>/);
-    assert.ok(!/هل تريد غسيل السيارة في موقعك الحالي أم في موقع آخر\؟/.test(frontend));
-    assert.match(frontend, /name="carWashLocationChoice" value="current" checked/);
-    assert.match(frontend, /name="carWashLocationChoice" value="other"/);
+    assert.match(frontend, /class="modern-order-form"/);
+    assert.match(frontend, /عنوان تنفيذ الخدمة/);
+    assert.equal(/هل تريد غسيل السيارة في موقعك الحالي أم في موقع آخر\؟/.test(frontend), false);
+    assert.equal(/name="carWashLocationChoice" value="current" checked/.test(frontend), false);
+    assert.equal(/name="carWashLocationChoice" value="other"/.test(frontend), false);
     assert.match(frontend, /if\(s\.slug==='mobile-car-wash'\)/);
     assert.match(frontend, /حدّد موقعك الحالي عبر GPS وأكّده قبل إرسال طلب غسيل السيارة/);
     assert.match(frontend, /f\.required\?'<option value="">اختر الخيار<\/option>'/);

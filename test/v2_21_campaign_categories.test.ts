@@ -18,7 +18,7 @@ test('Tapping a category offer image or CTA opens its service category directly'
   assert.ok(app.includes('id="campaignDetailAction"'), 'non-category offers retain their details action');
 });
 
-test('Offer imagery is compact and release asset cache versions match V2.23', () => {
+test('Offer imagery is compact and release asset cache versions match V2.26', () => {
   const css = fs.readFileSync('public/css/app.css', 'utf8');
   assert.ok(css.includes('.customer-shell .campaign-card .campaign-image{aspect-ratio:16/9;object-fit:cover}') || css.includes('.customer-shell .campaign-card .campaign-image{height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:10px;grid-row:auto}'));
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
@@ -29,13 +29,13 @@ test('Offer imagery is compact and release asset cache versions match V2.23', ()
   assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-27'));
 });
 
-test('Customer home follows the reference order: news ticker, offers, then categories', () => {
+test('Customer home follows the reference order: ticker, then compact categories, then offers', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  const tickerAt = app.indexOf('class="khadamat-news-ticker"');
-  const offersAt = app.indexOf('<section class="customer-offers"');
   const categoryAt = app.indexOf('customer-category-showcase customer-category-showcase-top');
-  assert.ok(tickerAt >= 0 && offersAt > tickerAt, 'news ticker must precede offers');
-  assert.ok(categoryAt > offersAt, 'categories must follow offers');
+  const offersAt = app.indexOf('<section class="customer-offers"', categoryAt);
+  const tickerAt = app.indexOf('class="tw-ticker-row"');
+  assert.ok(categoryAt >= 0 && offersAt > categoryAt, 'categories must be rendered before offers');
+  assert.ok(tickerAt >= 0 && tickerAt < categoryAt, 'news ticker is rendered first, above the categories');
   assert.ok(app.includes('id="allCategoriesBtn"'));
   assert.ok(app.includes('id="allOffersBtn"'));
   assert.ok(app.includes('customer-city-select card customer-city-select-compact'));

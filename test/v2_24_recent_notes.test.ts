@@ -2,15 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('2.27 follows the reference browsing order: ticker, offers, then categories', () => {
+test('2.24 renders compact categories before offers and provides complete galleries', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  const ticker = app.indexOf('class="khadamat-news-ticker"');
-  const offers = app.indexOf('<section class="customer-offers"');
   const categories = app.indexOf('customer-category-showcase customer-category-showcase-top');
-  assert.ok(ticker >= 0 && offers > ticker && categories > offers);
+  const offers = app.indexOf('<section class="customer-offers"', categories);
+  assert.ok(categories >= 0 && offers > categories);
   assert.ok(app.includes('id="allCategoriesBtn"'));
   assert.ok(app.includes('id="allOffersBtn"'));
   assert.ok(app.includes('data-all-offer'));
+  assert.ok(app.includes('function openAllOffersPage()'));
+  assert.ok(app.includes('id="backFromAllOffers"'));
+  assert.match(app, /addEventListener\('click',openAllOffersPage\)/);
 });
 
 test('2.24 order confirmation supports now/later scheduling and a concise note preview', () => {

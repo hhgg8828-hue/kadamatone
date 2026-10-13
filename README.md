@@ -1,5 +1,14 @@
 # خدمات (Khadamat)
 
+## نشر سريع: GitHub ثم Railway
+1. ارفع محتويات هذا المجلد إلى مستودع GitHub (ملف `.gitignore` يستبعد `node_modules` و`dist` وقواعد البيانات).
+2. في Railway: New Project ← Deploy from GitHub repo ← اختر المستودع.
+3. من تبويب Variables أضف المتغيرات الموجودة في `.env.example`.
+4. من تبويب Settings ← Volumes أضف Volume واجعل مساره `/data`.
+5. من Settings ← Networking اضغط Generate Domain، ثم افتح الرابط ثم `/customer` لواجهة العميل.
+- الإدارة: `/admin` ببريد `admin@khadamat.local` وكلمة المرور التي وضعتها في `ADMIN_PASSWORD`.
+
+
 **كل خدمة تحتاجها... في مكان واحد.**
 
 

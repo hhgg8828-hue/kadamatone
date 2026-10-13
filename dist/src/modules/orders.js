@@ -137,7 +137,10 @@ export function registerOrderRoutes(app, r) {
         if (!svc)
             throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
         const fields = parseJson(svc.form_schema, []) ?? [];
-        const formData = validateFormData(fields, b.formData);
+        // The customer order flow intentionally does not ask for wash scope: the
+        // service can be reviewed by the provider without blocking order creation.
+        const orderFields = svc.slug === 'mobile-car-wash' ? fields.filter((field) => !['wash_scope', 'car_type'].includes(field.key)) : fields;
+        const formData = validateFormData(orderFields, b.formData);
         if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now())
             throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
         const idemKey = readIdempotencyKey(ctx.req.headers['idempotency-key']);

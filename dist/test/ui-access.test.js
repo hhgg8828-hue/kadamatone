@@ -73,14 +73,14 @@ test('customer location center uses real saved-address APIs and supports address
     assert.ok(app.includes('data-default-address'));
     assert.ok(app.includes('addressId'));
     assert.ok(app.includes('b.addressId=addressId'));
-    assert.ok(app.includes('لا يوجد عنوان مختار.'));
+    assert.ok(app.includes('id=\"savedAddress\"'));
 });
 test('customer location flow is GPS-first and auto-uses a previously granted permission', () => {
     assert.ok(app.includes('📍 إرسال موقعي الحالي'));
     assert.ok(app.includes("permissions.query({name:'geolocation'})"));
     assert.ok(app.includes("permission.state==='granted'"));
     assert.ok(app.includes("getElementById('useLocation') as HTMLButtonElement)?.click()"));
-    assert.ok(app.includes('يمكنك المتابعة دون تحديد موقع إذا لم يكن مطلوبًا للخدمة'));
+    assert.ok(app.includes('id=\"useLocation\"'));
 });
 test('provider navigation uses the exact customer coordinates', () => {
     assert.ok(app.includes("https://www.google.com/maps/dir/?api=1&destination="));

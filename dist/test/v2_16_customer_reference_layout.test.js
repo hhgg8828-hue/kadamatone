@@ -49,14 +49,15 @@ test('customer order confirmation includes coupon, address edit, inline note and
     assert.match(frontend, /pharmacyProductName/);
     assert.match(frontend, /orderProductUrl/);
 });
-test('customer offer filters and favorites are interactive and saved locally', () => {
-    assert.match(frontend, /data-offer-filter="nearby"/);
-    assert.match(frontend, /data-offer-filter="new"/);
-    assert.match(frontend, /data-offer-filter="favorite"/);
+test('customer list tabs and favorites are interactive and saved locally', () => {
+    assert.match(frontend, /data-tw-tab="near"/);
+    assert.match(frontend, /data-tw-tab="new"/);
+    assert.match(frontend, /data-tw-tab="fav"/);
+    assert.match(frontend, /khadamat\.favoriteServices\.v1/);
     assert.match(frontend, /khadamat\.favoriteCampaigns\.v1/);
-    assert.match(css, /customer-offer-filters/);
+    assert.match(css, /tw-tabs/);
 });
-test('customer shell uses versioned 2.19 assets to refresh cached layout', () => {
+test('customer shell uses versioned 2.27 assets to refresh cached layout', () => {
     assert.match(customerShell, /app\.css\?v=2\.27/);
     assert.match(customerShell, /app\.js\?v=2\.27/);
     assert.match(customerShell, /sw\.js\?v=2\.27/);

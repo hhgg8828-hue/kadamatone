@@ -23,7 +23,7 @@ test('customer categories use a square all-categories tile and offers button sit
     assert.match(css, /\.customer-category-showcase-top \.all-categories-tile/);
     assert.match(css, /\.customer-shell \.all-offers-button\{position:absolute/);
 });
-test('asset URLs and service worker cache are bumped for 2.25', () => {
+test('asset URLs and service worker cache are bumped for 2.26', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
         assert.ok(html.includes('app.js?v=2.27'), file);
