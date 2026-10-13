@@ -997,3 +997,41 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 
 .customer-shell > .customer-city-select-compact small{display:none}
 .account-menu-list{margin-top:14px;display:grid;gap:10px}.account-menu-list>h3{margin:0}.account-menu-list details{border:1px solid var(--border,#dce8e1);border-radius:12px;padding:10px}.account-menu-list summary{cursor:pointer;font-weight:800}.account-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}.account-menu-grid .btn{min-width:0;white-space:normal}.account-app-footer{display:flex;flex-direction:column;align-items:center;gap:5px;padding:18px 8px 4px;text-align:center;color:var(--muted)}.account-app-logo{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:#eaf6ef;color:#176b4d;font-size:24px;font-weight:900}.account-app-footer b{color:var(--text,#20342b)}.account-app-footer small{font-size:11px}
+
+/* v2.25 campaign and customer UI corrections */
+.customer-shell .customer-category-heading{display:flex;justify-content:flex-start;align-items:center;margin-bottom:7px}
+.customer-shell .customer-category-showcase-top .customer-category-rail{direction:rtl;touch-action:pan-x pan-y;overscroll-behavior-x:contain}
+.customer-shell .customer-category-showcase-top .all-categories-tile{flex:0 0 64px;min-height:66px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px solid #e3e8e4;border-radius:10px;background:#fff;box-shadow:0 2px 7px rgba(23,74,54,.06);padding:5px 3px}
+.customer-shell .customer-category-showcase-top .all-categories-check{display:grid;place-items:center;width:27px;height:27px;border-radius:7px;background:#e8f5ee;color:#176b4d;font-size:21px;font-weight:900;line-height:1}
+.customer-shell .customer-category-showcase-top .all-categories-tile b{font-size:9px;line-height:1.25;white-space:normal;text-align:center;display:block;overflow:visible}
+.customer-shell .campaign-strip-wrap{position:relative;min-width:0;padding-right:78px}
+.customer-shell .campaign-strip-wrap .campaign-strip{padding-right:1px;overscroll-behavior-x:contain;touch-action:pan-x pan-y}
+.customer-shell .all-offers-button{position:absolute;z-index:4;right:5px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:66px;min-width:0;min-height:42px;padding:7px 6px;border:1px solid rgba(222,126,164,.32);border-radius:12px;background:rgba(255,231,240,.82);color:#a64b72;font-size:11px;font-weight:800;line-height:1.4;white-space:normal;box-shadow:0 3px 10px rgba(90,35,58,.06);backdrop-filter:blur(3px)}
+.order-confirmation-inline .text-link,.order-confirmation-inline button.text-link{border:0;background:transparent;box-shadow:none;color:var(--primary,#176b4d);padding:4px 3px;min-height:0;font-size:13px;font-weight:700;text-decoration:none}
+@media(max-width:420px){.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:60px;min-height:64px}.customer-shell .campaign-strip-wrap{padding-right:72px}.customer-shell .all-offers-button{width:62px;right:3px;font-size:10px}}
+
+/* 2.26 — concise modern customer order form */
+.customer-shell .modern-order-form{display:grid;gap:12px}
+.customer-shell .modern-order-head h2{margin:0 0 4px;font-size:20px}
+.customer-shell .modern-order-head p{margin:0;font-size:12px}
+.customer-shell .modern-order-form .field{margin:0 0 10px}
+.customer-shell .modern-order-form .description-field textarea{min-height:92px}
+.customer-shell .modern-order-form .location-field{padding:12px;border:1px solid var(--line,#e5e9e6);border-radius:14px;background:var(--surface,#fff)}
+.customer-shell .modern-order-form .location-field>label{display:block;font-weight:800;margin-bottom:8px}
+.customer-shell .modern-order-form #savedAddressCard{padding:0;border:0;background:transparent;box-shadow:none}
+.customer-shell .modern-order-form #locationStatus,.customer-shell .modern-order-form #savedAddressStatus{font-size:12px}
+.customer-shell .modern-order-form .optional-order-details{margin:0;padding:10px 12px;border:1px solid var(--line,#e5e9e6);border-radius:12px}
+.customer-shell .modern-order-form .optional-order-details>summary{font-weight:700;font-size:13px;cursor:pointer}
+.customer-shell .modern-order-form .submit-order-btn{width:100%;margin-top:2px}
+
+/* 2.26 — dedicated all-offers page */
+.customer-shell .all-offers-page{padding:12px 0 28px}
+.customer-shell .all-offers-page-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.customer-shell .all-offers-page-head h1{font-size:21px;margin:0 0 5px}
+.customer-shell .all-offers-page-head p{font-size:12px;margin:0}
+.customer-shell .all-offers-page .all-offers-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.customer-shell .all-offers-page .all-offer-item{min-width:0;text-align:right;display:flex;flex-direction:column;gap:7px;padding:9px}
+.customer-shell .all-offers-page .all-offer-item img,.customer-shell .all-offers-page .all-offer-placeholder{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:9px}
+.customer-shell .all-offers-page .all-offer-placeholder{display:grid;place-items:center;background:#f6f4f7;font-size:25px;color:#a64b72}
+.customer-shell .all-offers-page .all-offer-item b{font-size:13px}
+.customer-shell .all-offers-page .all-offer-item small{font-size:11px;color:var(--muted,#68736d)}

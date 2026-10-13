@@ -15,11 +15,13 @@ test('guest service selection opens service details before requesting authentica
     assert.match(frontend, /if\(!state\.user\)\{openServiceDetails\(serviceId,initial\);return\}/);
     assert.match(frontend, /يمكنك الاطلاع على الخدمة أولًا/);
 });
-test('mobile car wash requires an explicit wash type and a confirmed execution location', () => {
+test('mobile car wash uses the modern compact form without redundant wash-type questions', () => {
     assert.match(frontend, /'mobile-car-wash':\['أحتاج غسيل السيارة في موقعي'/);
-    assert.match(frontend, /هل تريد غسيل السيارة في موقعك الحالي أم في موقع آخر\؟/);
-    assert.match(frontend, /name="carWashLocationChoice" value="current" checked/);
-    assert.match(frontend, /name="carWashLocationChoice" value="other"/);
+    assert.match(frontend, /class="modern-order-form"/);
+    assert.match(frontend, /عنوان تنفيذ الخدمة/);
+    assert.equal(/هل تريد غسيل السيارة في موقعك الحالي أم في موقع آخر\؟/.test(frontend), false);
+    assert.equal(/name="carWashLocationChoice" value="current" checked/.test(frontend), false);
+    assert.equal(/name="carWashLocationChoice" value="other"/.test(frontend), false);
     assert.match(frontend, /if\(s\.slug==='mobile-car-wash'\)/);
     assert.match(frontend, /حدّد موقعك الحالي عبر GPS وأكّده قبل إرسال طلب غسيل السيارة/);
     assert.match(frontend, /f\.required\?'<option value="">اختر الخيار<\/option>'/);
@@ -58,7 +60,7 @@ test('direct /admin, /provider, and /customer paths and refreshes serve the corr
             assert.equal(refreshed.status, 200, `${route} refresh should return HTTP 200`);
             assert.ok(refreshed.text.includes(expected));
         }
-        const assets = await t.api('GET', '/js/app.js?v=2.24');
+        const assets = await t.api('GET', '/js/app.js?v=2.26');
         assert.equal(assets.status, 200);
         assert.match(assets.headers.get('content-type') || '', /javascript/);
         assert.ok(assets.text.length > 1000);
