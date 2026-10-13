@@ -22,8 +22,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 
 test('provider page and frontend assets use the current version', () => {
   assert.ok(provider.includes('data-page="provider"'));
-  assert.ok(provider.includes('app.js?v=2.26')); 
-  assert.ok(index.includes('app.js?v=2.26')); 
+  assert.ok(provider.includes('app.js?v=2.27')); 
+  assert.ok(index.includes('app.js?v=2.27')); 
 });
 
 
@@ -87,7 +87,7 @@ test('customer location center uses real saved-address APIs and supports address
   assert.ok(app.includes('data-default-address'));
   assert.ok(app.includes('addressId'));
   assert.ok(app.includes('b.addressId=addressId'));
-  assert.ok(app.includes('اختر عنوانًا محفوظًا أو حدّد موقعًا جديدًا.'));
+  assert.ok(app.includes('لا يوجد عنوان مختار.'));
 });
 
 
@@ -96,7 +96,7 @@ test('customer location flow is GPS-first and auto-uses a previously granted per
   assert.ok(app.includes("permissions.query({name:'geolocation'})"));
   assert.ok(app.includes("permission.state==='granted'"));
   assert.ok(app.includes("getElementById('useLocation') as HTMLButtonElement)?.click()"));
-  assert.ok(app.includes('لا تحتاج لمعرفة الخريطة'));
+  assert.ok(app.includes('يمكنك المتابعة دون تحديد موقع إذا لم يكن مطلوبًا للخدمة'));
 });
 
 test('provider navigation uses the exact customer coordinates', () => {

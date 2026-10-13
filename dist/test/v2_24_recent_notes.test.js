@@ -1,17 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-test('2.24 renders compact categories before offers and provides complete galleries', () => {
+test('2.27 follows the reference browsing order: ticker, offers, then categories', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
+    const ticker = app.indexOf('class="khadamat-news-ticker"');
+    const offers = app.indexOf('<section class="customer-offers"');
     const categories = app.indexOf('customer-category-showcase customer-category-showcase-top');
-    const offers = app.indexOf('<section class="customer-offers"', categories);
-    assert.ok(categories >= 0 && offers > categories);
+    assert.ok(ticker >= 0 && offers > ticker && categories > offers);
     assert.ok(app.includes('id="allCategoriesBtn"'));
     assert.ok(app.includes('id="allOffersBtn"'));
     assert.ok(app.includes('data-all-offer'));
-    assert.ok(app.includes('function openAllOffersPage()'));
-    assert.ok(app.includes('id="backFromAllOffers"'));
-    assert.match(app, /addEventListener\('click',openAllOffersPage\)/);
 });
 test('2.24 order confirmation supports now/later scheduling and a concise note preview', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
@@ -33,7 +31,7 @@ test('2.24 campaign category actions are accepted by create/update API and savin
 test('2.24 assets use a new cache version and back navigation asks before leaving', () => {
     const sw = fs.readFileSync('public/sw.js', 'utf8');
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    assert.ok(sw.includes('khadamat-shell-v2-26'));
+    assert.ok(sw.includes('khadamat-shell-v2-27'));
     assert.ok(app.includes('هل ترغب في الخروج؟'));
 });
 //# sourceMappingURL=v2_24_recent_notes.test.js.map

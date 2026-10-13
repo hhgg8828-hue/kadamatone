@@ -23,13 +23,13 @@ test('customer categories use a square all-categories tile and offers button sit
     assert.match(css, /\.customer-category-showcase-top \.all-categories-tile/);
     assert.match(css, /\.customer-shell \.all-offers-button\{position:absolute/);
 });
-test('asset URLs and service worker cache are bumped for 2.26', () => {
+test('asset URLs and service worker cache are bumped for 2.25', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
-        assert.ok(html.includes('app.js?v=2.26'), file);
-        assert.ok(html.includes('app.css?v=2.26'), file);
+        assert.ok(html.includes('app.js?v=2.27'), file);
+        assert.ok(html.includes('app.css?v=2.27'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-26'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-27'));
 });
 test('campaign schema migration preserves valid writes for category campaigns with multiple category slugs', async () => {
     const { openDb } = await import('../src/db/database.js');

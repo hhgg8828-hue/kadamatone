@@ -1010,28 +1010,66 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .order-confirmation-inline .text-link,.order-confirmation-inline button.text-link{border:0;background:transparent;box-shadow:none;color:var(--primary,#176b4d);padding:4px 3px;min-height:0;font-size:13px;font-weight:700;text-decoration:none}
 @media(max-width:420px){.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:60px;min-height:64px}.customer-shell .campaign-strip-wrap{padding-right:72px}.customer-shell .all-offers-button{width:62px;right:3px;font-size:10px}}
 
-/* 2.26 — concise modern customer order form */
-.customer-shell .modern-order-form{display:grid;gap:12px}
-.customer-shell .modern-order-head h2{margin:0 0 4px;font-size:20px}
-.customer-shell .modern-order-head p{margin:0;font-size:12px}
-.customer-shell .modern-order-form .field{margin:0 0 10px}
-.customer-shell .modern-order-form .description-field textarea{min-height:92px}
-.customer-shell .modern-order-form .location-field{padding:12px;border:1px solid var(--line,#e5e9e6);border-radius:14px;background:var(--surface,#fff)}
-.customer-shell .modern-order-form .location-field>label{display:block;font-weight:800;margin-bottom:8px}
-.customer-shell .modern-order-form #savedAddressCard{padding:0;border:0;background:transparent;box-shadow:none}
-.customer-shell .modern-order-form #locationStatus,.customer-shell .modern-order-form #savedAddressStatus{font-size:12px}
-.customer-shell .modern-order-form .optional-order-details{margin:0;padding:10px 12px;border:1px solid var(--line,#e5e9e6);border-radius:12px}
-.customer-shell .modern-order-form .optional-order-details>summary{font-weight:700;font-size:13px;cursor:pointer}
-.customer-shell .modern-order-form .submit-order-btn{width:100%;margin-top:2px}
+/* Khadamat 2.27 — reference-inspired customer browsing flow, retaining Khadamat green branding. */
+.customer-shell .app-topbar{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid rgba(220,232,224,.9);box-shadow:0 3px 14px rgba(28,76,53,.055)}
+.customer-shell .khadamat-news-ticker{margin:8px 0 10px;min-height:34px;border-radius:10px;overflow:hidden}
+.customer-shell .customer-offers{margin-top:8px}
+.customer-shell .customer-service-browser{margin:18px 0 26px;min-width:0}
+.customer-shell .customer-service-browser>.section-heading{margin-bottom:8px}
+.customer-shell .customer-service-browser>.section-heading h2{font-size:18px;margin:0 0 3px}
+.customer-shell .customer-service-filters{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:3px 1px 9px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.customer-shell .customer-service-filters::-webkit-scrollbar{display:none}
+.customer-shell .customer-service-filters button{flex:0 0 auto;min-height:34px;padding:7px 15px;border:1px solid #dfe8e1;border-radius:999px;background:#fff;color:#56645b;font:inherit;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.customer-shell .customer-service-filters button.active{border-color:#176b4d;background:#176b4d;color:#fff;box-shadow:0 3px 9px rgba(23,107,77,.16)}
+.customer-shell .customer-catalog-list{display:grid;gap:8px}
+.customer-shell .customer-catalog-card{position:relative;display:flex;align-items:stretch;min-width:0;padding:8px 42px 8px 8px;border:1px solid #e4ebe5;border-radius:14px;background:#fff;box-shadow:0 2px 9px rgba(24,65,43,.035);transition:border-color .15s,transform .15s}
+.customer-shell .customer-catalog-card:active{transform:scale(.995)}
+.customer-shell .customer-catalog-main{display:flex;align-items:center;gap:11px;width:100%;min-width:0;padding:0;border:0;background:transparent;text-align:right;color:inherit;cursor:pointer}
+.customer-shell .customer-catalog-art{display:grid;place-items:center;flex:0 0 64px;width:64px;height:64px;border-radius:12px;background:linear-gradient(145deg,#f1f8f3,#e7f2ea);color:#176b4d;overflow:hidden}
+.customer-shell .customer-catalog-art svg{width:43px;height:43px;max-width:100%;max-height:100%}
+.customer-shell .customer-catalog-copy{display:grid;gap:3px;min-width:0;flex:1}
+.customer-shell .customer-catalog-copy>b{font-size:14px;line-height:1.45;color:#24392e}
+.customer-shell .customer-catalog-copy>small{font-size:11px;color:#718076}
+.customer-shell .customer-catalog-copy>span{font-size:11px;line-height:1.5;color:#637168;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.customer-shell .customer-catalog-copy>strong{margin-top:2px;font-size:11px;color:#176b4d}
+.customer-shell .customer-catalog-favorite{position:absolute;top:50%;right:8px;transform:translateY(-50%);display:grid;place-items:center;width:29px;height:29px;border:1px solid #e2e9e3;border-radius:9px;background:#fff;color:#748077;font-size:19px;line-height:1;cursor:pointer}
+.customer-shell .customer-catalog-favorite.is-favorite{border-color:#b9dcc7;background:#eaf6ee;color:#176b4d}
+.customer-shell #customerCatalogEmpty{padding:14px;text-align:center}
+@media(max-width:420px){.customer-shell .customer-catalog-art{flex-basis:56px;width:56px;height:56px}.customer-shell .customer-catalog-card{padding-right:39px}.customer-shell .customer-catalog-copy>b{font-size:13px}}
 
-/* 2.26 — dedicated all-offers page */
-.customer-shell .all-offers-page{padding:12px 0 28px}
-.customer-shell .all-offers-page-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
-.customer-shell .all-offers-page-head h1{font-size:21px;margin:0 0 5px}
-.customer-shell .all-offers-page-head p{font-size:12px;margin:0}
-.customer-shell .all-offers-page .all-offers-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.customer-shell .all-offers-page .all-offer-item{min-width:0;text-align:right;display:flex;flex-direction:column;gap:7px;padding:9px}
-.customer-shell .all-offers-page .all-offer-item img,.customer-shell .all-offers-page .all-offer-placeholder{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:9px}
-.customer-shell .all-offers-page .all-offer-placeholder{display:grid;place-items:center;background:#f6f4f7;font-size:25px;color:#a64b72}
-.customer-shell .all-offers-page .all-offer-item b{font-size:13px}
-.customer-shell .all-offers-page .all-offer-item small{font-size:11px;color:var(--muted,#68736d)}
+/* V2.27 modern service-order entry; this replaces the previous visible order-form layout. */
+.modern-order-flow{display:grid;gap:12px}
+.modern-order-heading{display:flex;align-items:center;gap:12px;padding:3px 1px 7px}
+.modern-order-icon{display:grid;place-items:center;flex:0 0 54px;width:54px;height:54px;border-radius:15px;background:#eaf5ed;color:#176b4d}
+.modern-order-icon svg{width:36px;height:36px}
+.modern-order-eyebrow{margin:0 0 2px;font-size:11px;font-weight:800;color:#176b4d}
+.modern-order-heading h2{margin:0;font-size:20px}
+.modern-order-heading .muted{margin:3px 0 0;font-size:12px;line-height:1.5}
+.modern-order-service-summary{display:grid;gap:3px;padding:12px 14px;border:1px solid #dcebe0;border-radius:13px;background:linear-gradient(120deg,#f4faf5,#fff)}
+.modern-order-service-summary span,.modern-order-service-summary small{font-size:11px;color:#68796e}
+.modern-order-service-summary b{font-size:14px;color:#203c2d}
+.modern-order-flow #orderForm{display:grid;gap:11px}
+.modern-order-flow .field{margin:0}
+.modern-order-flow .field>label{font-size:13px;font-weight:800}
+.modern-order-flow #orderDescription{min-height:82px;border-radius:12px}
+.modern-order-location{display:grid;gap:8px;padding:12px;border:1px solid #e0e9e2;border-radius:14px;background:#fbfdfb}
+.modern-order-section-head{justify-content:space-between;align-items:center;gap:10px}
+.modern-order-section-head>div{display:grid;gap:3px}
+.modern-order-section-head b{font-size:13px}
+.modern-order-section-head small{font-size:11px;color:#738076;line-height:1.4}
+.modern-order-section-head .btn{white-space:nowrap}
+.modern-saved-address select{width:100%;min-height:42px;border-radius:10px}
+.modern-saved-address p{font-size:11px;margin:5px 0 0}
+.modern-location-status{font-size:11px;line-height:1.45}
+.modern-order-flow .location-permission-intro{line-height:1.6}
+.modern-order-flow .optional-order-details{margin:0;border:1px solid #e5ebe6;border-radius:11px;padding:9px 11px;background:#fff}
+.modern-order-flow .optional-order-details summary{font-size:12px;font-weight:700;color:#53665a;cursor:pointer}
+.modern-order-flow .optional-order-details[open]>*:not(summary){margin-top:10px}
+.modern-order-flow .modern-order-summary{display:grid;gap:5px;padding:11px 13px;border-radius:12px;background:#f7faf7;border:1px solid #e2ebe3}
+.modern-order-flow .modern-order-summary>b{font-size:13px}
+.modern-order-flow .modern-order-summary small{font-size:11px;color:#68796e;line-height:1.5}
+.modern-order-flow #orderItemSummary p{margin:3px 0;font-size:12px}
+.modern-order-flow .submit-order-btn{width:100%;min-height:46px;border-radius:12px;font-weight:900}
+.modern-order-flow .order-price-preview{display:none}
+.modern-order-flow .description-suggestions{margin-top:7px}
+@media(max-width:420px){.modern-order-heading h2{font-size:18px}.modern-order-icon{flex-basis:48px;width:48px;height:48px}.modern-order-location{padding:10px}}
