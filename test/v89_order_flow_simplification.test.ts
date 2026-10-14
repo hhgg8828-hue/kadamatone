@@ -7,11 +7,16 @@ test('Order form stays concise and removes redundant beneficiary and manual-area
   const form = app.slice(app.indexOf('async function openOrderForm(serviceId:string'), app.indexOf('async function openOrderComplaint'));
   assert.ok(!form.includes('<div class="field"><label>الطلب لشخص آخر؟ (اختياري)</label><select id="beneficiarySelect">'));
   assert.ok(!form.includes('<details class="optional-order-details order-advanced-area"><summary>منطقة الطلب (اختياري)</summary>'));
-  assert.ok(form.includes('<details class="optional-order-details modern-order-optional"><summary>ملاحظات أو صورة (اختياري)</summary>'));
+  assert.ok(!form.includes('ملاحظات أو صورة (اختياري)'));
+  assert.ok(!form.includes('id="customImage"'));
+  assert.ok(form.includes('const needsGenericDescription=!hasDedicatedDescription&&'));
+  assert.ok(form.includes('id="submitOrderBtn" type="submit">متابعة</button>'));
+  assert.ok(form.includes('id="orderCheckoutFields" class="hide-section"'));
+  assert.ok(form.includes('id="reviewAddressEditor"'));
   assert.ok(form.includes('id="orderDescription" name="description" maxlength="1000"'));
   assert.ok(form.includes('class="modern-order-flow"'));
   assert.ok(!form.includes('الموقع الذي سيتم تحديده هو'));
-  assert.ok(form.includes('id="submitOrderBtn" type="submit">تنفيذ الطلب</button>'));
+  assert.ok(form.includes('id="reviewConfirmOrder">تنفيذ الطلب</button>'));
 });
 
 test('Release 2.11 hides internal status events from customer tracking in order tracking', () => {

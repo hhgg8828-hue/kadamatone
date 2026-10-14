@@ -7,6 +7,7 @@ import { auth } from './auth.middleware.js';
 export const TEMPLATES = {
     ORDER_RECEIVED: { ar: ['تم استلام طلبك', 'طلبك رقم {code} قيد البحث عن مقدم خدمة مناسب.'], en: ['Order received', 'Your order {code} is being matched with a provider.'] },
     ORDER_CONFIRMATION_RESULT: { ar: ['تحديث تأكيد الطلب', 'تم تحديث متابعة طلبك {code}: {result}.'], en: ['Order confirmation update', 'The confirmation status for order {code} is now: {result}.'] },
+    NEW_ORDER_CONFIRMATION_ADMIN: { ar: ['طلب جديد يحتاج تأكيدًا', 'وصل الطلب {code}. افتح تأكيد الطلبات واتصل بالعميل لتأكيد التفاصيل.'], en: ['New order needs confirmation', 'Order {code} arrived. Open order confirmations and call the customer to verify the details.'] },
     NEW_OFFER: { ar: ['لديك طلب جديد', 'طلب «{service}» جديد في {area}. اقبله قبل غيرك.'], en: ['You have a new request', 'New “{service}” request in {area}.'] },
     ORDER_ACCEPTED: { ar: ['تم قبول طلبك من مقدم الخدمة', 'قبل {provider} تنفيذ طلبك رقم {code}.'], en: ['Your order was accepted', '{provider} accepted order {code}.'] },
     PROVIDER_ON_THE_WAY: { ar: ['مقدم الخدمة في الطريق', 'مقدم الخدمة في طريقه إليك لتنفيذ الطلب {code}.'], en: ['Provider is on the way', 'Your provider is heading to you (order {code}).'] },

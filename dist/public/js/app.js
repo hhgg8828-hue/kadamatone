@@ -461,6 +461,8 @@ async function refreshProviderNotificationSurface() { if (page !== 'provider' ||
 catch { } }
 function notificationAction(n) {
     const d = n.data || {};
+    if (n.type === 'NEW_ORDER_CONFIRMATION_ADMIN' && page === 'admin' && d.orderId)
+        return `<div class="notification-action"><span>📞 اتصل بالعميل يدويًا لتأكيد الطلب، ثم سجّل نتيجة المكالمة في لوحة الإدارة.</span><div class="notification-actions"><button class="btn notification-open-confirmations" type="button">فتح قائمة تأكيد الطلبات</button></div></div>`;
     if (n.type === 'NEW_QUOTE' && d.orderId && d.quoteId) {
         if (d.quoteStatus && d.quoteStatus !== 'SUBMITTED')
             return `<div class="notification-action notification-action-done"><b>تم التعامل مع عرض السعر</b><span class="status">${esc(d.quoteStatusAr || d.quoteStatus)}</span><div class="notification-actions"><button class="btn secondary notification-view-quotes" data-order-id="${esc(d.orderId)}" type="button">عرض التفاصيل</button></div></div>`;
@@ -504,6 +506,15 @@ finally {
     notificationModalRefreshing = false;
 } }
 function bindNotificationActions() {
+    document.querySelectorAll('.notification-open-confirmations').forEach(x => x.addEventListener('click', async () => { const row = x.closest('[data-notification]'); const nid = row?.dataset.notification || ''; if (nid)
+        await api('/notifications/' + encodeURIComponent(nid) + '/read', { method: 'POST', body: '{}' }).catch(() => { }); if (page === 'admin') {
+        history.replaceState(null, '', '/admin?tab=confirmations');
+        closeModal();
+        await admin();
+    }
+    else {
+        location.href = '/admin?tab=confirmations';
+    } }));
     document.querySelectorAll('[data-notification]').forEach(x => x.addEventListener('click', async (e) => { if (e.target.closest('button'))
         return; try {
         await api('/notifications/' + encodeURIComponent(x.dataset.notification || '') + '/read', { method: 'POST', body: '{}' });
@@ -2117,18 +2128,19 @@ async function openOrderForm(serviceId, initial = null) {
         const initialValue = initial?.description && primaryDescription ? String(initial.description) : '';
         return `<div class="field dynamic-order-field"><label>${esc(f.labelText || f.label?.ar || f.key)}${f.required ? ' *' : ''}</label>${f.type === 'textarea' ? `<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || 'اكتب المعلومة الضرورية فقط')}">${esc(initialValue)}</textarea>` : f.type === 'select' ? `<select name="${esc(f.key)}" ${f.required ? 'required' : ''}>${f.required ? '<option value="">اختر الخيار</option>' : ''}${(f.options || []).map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>` : `<input name="${esc(f.key)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${f.required ? 'required' : ''} placeholder="${esc(f.placeholder || '')}">`}</div>`;
     };
-    const fields = requiredFields.map(renderField).join('');
-    // الكمية عنصر أساسي في طلبات المنتجات/الأدوية، لذا تبقى ظاهرة ولا تُدفن داخل التفاصيل المطوية.
-    const quantityFields = optionalFields.filter((f) => /^(quantity|qty|count)$/i.test(String(f.key)) || /الكمية|عدد القطع/i.test(String(f.labelText || f.label?.ar || '')));
-    const otherOptionalFields = optionalFields.filter((f) => !quantityFields.includes(f));
+    // شاشة البداية تعرض الحقول الضرورية فقط: الحقول المطلوبة، وصف الخدمة إذا كانت تحتاجه، والكمية عند ارتباطها بمنتج.
+    const isDescriptionField = (f) => /^(request|items|medicine|item|description|details|service_details)$/i.test(String(f.key)) || /ما المطلوب|اسم الدواء|الغرض المطلوب|ما الذي تريد|تفاصيل الطلب|وصف الطلب/i.test(String(f.labelText || f.label?.ar || ''));
+    const hasDedicatedDescription = (s.formSchema || []).some(isDescriptionField);
+    const descriptionFields = optionalFields.filter(isDescriptionField);
+    const fields = [...requiredFields, ...descriptionFields].map(renderField).join('');
+    const quantityFields = optionalFields.filter((f) => !descriptionFields.includes(f) && (/^(quantity|qty|count)$/i.test(String(f.key)) || /الكمية|عدد القطع/i.test(String(f.labelText || f.label?.ar || ''))));
     const quantityFieldsHtml = quantityFields.map(renderField).join('');
-    const optionalFieldsHtml = otherOptionalFields.length ? `<details class="optional-order-details"><summary>تفاصيل إضافية (فقط إذا كانت مهمة)</summary><div class="optional-order-fields">${otherOptionalFields.map(renderField).join('')}</div></details>` : '';
     const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
     const suggestionHtml = descSuggestions.length ? `<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x => `<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : '';
-    // لا نكرر سؤال الوصف إذا كانت الخدمة تملك حقلًا مخصصًا يؤدي الغرض نفسه (مثل «ما المطلوب؟» أو «اسم الدواء»).
-    const hasDedicatedDescription = (s.formSchema || []).some((f) => /^(request|items|medicine|item|description|details|service_details)$/i.test(String(f.key)) || /ما المطلوب|اسم الدواء|الغرض المطلوب|ما الذي تريد|تفاصيل الطلب|وصف الطلب/i.test(String(f.labelText || f.label?.ar || '')));
-    const descriptionFieldHtml = hasDedicatedDescription ? '' : `<div class="field description-field"><label for="orderDescription">تفاصيل الطلب <span class="muted">(عند الحاجة)</span></label><textarea id="orderDescription" name="description" maxlength="1000" placeholder="اكتب التفاصيل الضرورية فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>`;
-    showModal(`<div class="modern-order-flow"><header class="modern-order-heading"><div class="modern-order-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div><p class="modern-order-eyebrow">طلب خدمة</p><h2>${esc(s.name)}</h2><p class="muted">أدخل التفاصيل المطلوبة لهذه الخدمة فقط.</p></div></header><div class="modern-order-service-summary"><span>الخدمة المختارة</span><b>${esc(s.name)}</b><small>${s.pricingType === 'FIXED' && s.basePrice != null ? `السعر الأساسي ${esc(s.basePrice)} ${esc(currencyLabel())}` : 'السعر النهائي حسب تفاصيل الخدمة وعرض مقدم الخدمة'}</small></div><form id="orderForm">${descriptionFieldHtml}${fields}${quantityFieldsHtml}${optionalFieldsHtml}<section class="modern-order-location"><div class="row modern-order-section-head"><div><b>عنوان تنفيذ الخدمة</b><small>اختر عنوانًا محفوظًا أو حدّد موقعًا عند الحاجة.</small></div><button class="btn secondary small" id="useLocation" type="button">📍 تحديد موقعي</button></div><div id="savedAddressCard" class="modern-saved-address ${s.slug === 'mobile-car-wash' ? 'hide-section' : ''}"><select id="savedAddress" aria-label="العنوان المحفوظ"><option value="">استخدام موقع جديد أو عنوان آخر</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><p id="savedAddressStatus" class="muted">لا يوجد عنوان مختار.</p></div><div id="locationStatus" class="modern-location-status muted" role="status">${s.slug === 'mobile-car-wash' ? 'حدد موقع تنفيذ الغسيل.' : 'اختر العنوان عند الحاجة.'}</div><div id="locationPreview" class="hide-section"></div><details class="optional-order-details modern-address-extra"><summary>تفاصيل العنوان (اختياري)</summary><div class="field"><label for="localityText">الحي أو أقرب معلم</label><input id="localityText" name="localityText" maxlength="300" placeholder="الحي أو اسم معلم قريب"></div></details><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></section><div class="field"><label for="contactPhone">رقم التواصل</label><input id="contactPhone" name="contactPhone" type="tel" inputmode="tel" value="${esc(state.user.phone || '')}" required></div><details class="optional-order-details modern-order-optional"><summary>ملاحظات أو صورة (اختياري)</summary><div class="field"><label>ملاحظات الطلب</label><textarea name="notes" maxlength="500" placeholder="أضف ملاحظة عند الحاجة فقط"></textarea></div><div class="field"><label>صورة توضيحية (اختيارية)</label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة فقط إذا كانت تساعد على فهم الخدمة.</small></div></details><select id="orderAreaId" class="hide-section" aria-hidden="true" tabindex="-1"><option value="">تحديد تلقائي</option></select><div class="modern-order-summary"><b>ملخص الطلب</b><div id="orderItemSummary"></div><small>${s.pricingType === 'FIXED' && s.basePrice != null ? `السعر الأساسي: ${esc(s.basePrice)} ${esc(currencyLabel())}` : 'السعر النهائي يُحدد حسب تفاصيل الخدمة.'} · الدفع نقدًا</small></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">تنفيذ الطلب</button><p id="msg" role="status"></p></form></div>`);
+    // لا يظهر مربع كتابة عام لكل الخدمات؛ يظهر فقط إذا أرسل المساعد وصفًا مسبقًا أو كانت الخدمة المفتوحة بلا مخطط حقول وتحتاج عرض سعر.
+    const needsGenericDescription = !hasDedicatedDescription && (!!String(initial?.description || '').trim() || s.pricingType === 'QUOTE');
+    const descriptionFieldHtml = hasDedicatedDescription || !needsGenericDescription ? '' : `<div class="field description-field"><label for="orderDescription">تفاصيل الطلب</label><textarea id="orderDescription" name="description" maxlength="1000" placeholder="اكتب ما يحتاج مقدم الخدمة إلى معرفته فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>`;
+    showModal(`<div class="modern-order-flow"><header class="modern-order-heading"><div class="modern-order-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div><p class="modern-order-eyebrow">طلب خدمة</p><h2>${esc(s.name)}</h2><p class="muted">أدخل التفاصيل المطلوبة لهذه الخدمة فقط.</p></div></header><div class="modern-order-service-summary"><span>الخدمة المختارة</span><b>${esc(s.name)}</b><small>${s.pricingType === 'FIXED' && s.basePrice != null ? `السعر الأساسي ${esc(s.basePrice)} ${esc(currencyLabel())}` : 'السعر النهائي حسب تفاصيل الخدمة وعرض مقدم الخدمة'}</small></div><form id="orderForm" novalidate>${descriptionFieldHtml}${fields}${quantityFieldsHtml}<div id="orderCheckoutFields" class="hide-section"><section class="modern-order-location"><div class="row modern-order-section-head"><div><b>عنوان تنفيذ الخدمة</b><small>اختر عنوانًا محفوظًا أو حدّد موقعًا عند الحاجة.</small></div><button class="btn secondary small" id="useLocation" type="button">📍 تحديد موقعي</button></div><div id="savedAddressCard" class="modern-saved-address ${s.slug === 'mobile-car-wash' ? 'hide-section' : ''}"><select id="savedAddress" aria-label="العنوان المحفوظ"><option value="">استخدام موقع جديد أو عنوان آخر</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><p id="savedAddressStatus" class="muted">لا يوجد عنوان مختار.</p></div><div id="locationStatus" class="modern-location-status muted" role="status">${s.slug === 'mobile-car-wash' ? 'حدد موقع تنفيذ الغسيل.' : 'اختر العنوان عند الحاجة.'}</div><div id="locationPreview" class="hide-section"></div><details class="optional-order-details modern-address-extra"><summary>تفاصيل العنوان (اختياري)</summary><div class="field"><label for="localityText">الحي أو أقرب معلم</label><input id="localityText" name="localityText" maxlength="300" placeholder="الحي أو اسم معلم قريب"></div></details><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></section><div class="field"><label for="contactPhone">رقم التواصل</label><input id="contactPhone" name="contactPhone" type="tel" inputmode="tel" value="${esc(state.user.phone || '')}" required></div><textarea name="notes" class="hide-section" aria-hidden="true" tabindex="-1"></textarea><select id="orderAreaId" class="hide-section" aria-hidden="true" tabindex="-1"><option value="">تحديد تلقائي</option></select></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">متابعة</button><p id="msg" role="status"></p></form></div>`);
     const orderDetailRows = (fd) => {
         const rows = [`<tr><th scope="row">الخدمة</th><td>${esc(s.name)}</td></tr>`];
         const desc = String(fd.get('description') || '').trim();
@@ -2144,11 +2156,6 @@ async function openOrderForm(serviceId, initial = null) {
         });
         return rows;
     };
-    const updateOrderItemSummary = () => { const el = document.getElementById('orderItemSummary'), form = document.getElementById('orderForm'); if (!el || !form)
-        return; const rows = orderDetailRows(new FormData(form)); el.innerHTML = `<div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>البيان</th><th>التفاصيل</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`; };
-    document.getElementById('orderForm')?.addEventListener('input', updateOrderItemSummary);
-    document.getElementById('orderForm')?.addEventListener('change', updateOrderItemSummary);
-    updateOrderItemSummary();
     document.getElementById('nearbyProvidersBtn')?.addEventListener('click', () => { const la = Number(document.getElementById('lat')?.value); const ln = Number(document.getElementById('lng')?.value); openNearbyProviders(serviceId, Number.isFinite(la) ? la : undefined, Number.isFinite(ln) ? ln : undefined); });
     try {
         const areas = (await api('/areas')).areas || [];
@@ -2377,20 +2384,6 @@ async function openOrderForm(serviceId, initial = null) {
             }
         }, 1000);
     });
-    // تجربة تلقائية هادئة: إذا كان المستخدم قد سمح للموقع سابقًا، نلتقطه تلقائيًا
-    // بدون إظهار نافذة صلاحية جديدة. إذا لم يمنح الإذن، يبقى الزر واضحًا وبسيطًا.
-    try {
-        const permissions = navigator.permissions;
-        if (permissions?.query) {
-            const permission = await permissions.query({ name: 'geolocation' });
-            if (permission.state === 'granted') {
-                document.getElementById('useLocation')?.click();
-            }
-        }
-    }
-    catch {
-        // بعض المتصفحات لا تدعم Permissions API؛ الزر اليدوي هو البديل الطبيعي.
-    }
     let orderConfirmed = false;
     let confirmedScheduledAt = '';
     document.getElementById('orderForm').addEventListener('submit', async (e) => {
@@ -2402,93 +2395,62 @@ async function openOrderForm(serviceId, initial = null) {
                 existing.classList.remove('hide-section');
                 return;
             }
+            const missingDetail = Array.from(orderForm.querySelectorAll(':required')).find(el => !el.closest('#orderCheckoutFields') && !el.checkValidity());
+            if (missingDetail) {
+                missingDetail.reportValidity();
+                return;
+            }
             const fdReview = new FormData(orderForm);
-            const contact = String(fdReview.get('contactPhone') || '').trim();
-            const savedAddressSelect = document.getElementById('savedAddress');
-            const reviewAddressText = savedAddressSelect?.value ? (savedAddressSelect.selectedOptions?.[0]?.textContent || 'العنوان المحفوظ') : (Number(document.getElementById('lat')?.value) && Number(document.getElementById('lng')?.value) ? 'موقعي الحالي' : 'لم يُحدد عنوان');
             const review = document.createElement('section');
             review.id = 'orderConfirmationStep';
             review.className = 'order-confirmation-step';
-            review.innerHTML = `<div class="order-confirmation-heading"><h2>تأكيد الطلب</h2><p class="muted">راجع بيانات التنفيذ ثم أكّد طلبك.</p></div>
-<div class="tawseel-checkout-row"><span class="tawseel-checkout-icon">♧</span><div class="tawseel-checkout-main"><b>هل لديك قسيمة تخفيض؟</b><div id="couponSummary" class="muted">أضف رمز القسيمة إن وجد</div><div id="couponEntry" class="field hide-section"><input id="orderCouponCode" maxlength="60" placeholder="أدخل كود القسيمة" aria-label="كود القسيمة"></div></div><button type="button" class="text-link" id="toggleCoupon">إضافة</button></div>
-<div class="tawseel-checkout-row"><span class="tawseel-checkout-icon">⌖</span><div class="tawseel-checkout-main"><b>عنوان التنفيذ</b><div id="reviewAddressLabel" class="muted">${esc(reviewAddressText)}</div></div><button type="button" class="text-link" id="reviewChangeAddress">تغيير</button></div>
-<div class="tawseel-checkout-row"><span class="tawseel-checkout-icon">▤</span><div class="tawseel-checkout-main"><b>ملاحظات الطلب</b><div id="reviewNotePreview" class="muted">${esc(String(fdReview.get('notes') || '').trim() || 'لا توجد ملاحظة')}</div><div id="orderNoteEntry" class="field hide-section"><textarea id="reviewOrderNote" maxlength="500" placeholder="اكتب ملاحظتك هنا">${esc(String(fdReview.get('notes') || '').trim())}</textarea></div></div><button type="button" class="text-link" id="toggleOrderNote">${String(fdReview.get('notes') || '').trim() ? 'تعديل' : 'إضافة'}</button></div>
-<div class="tawseel-checkout-row"><span class="tawseel-checkout-icon">◷</span><div class="tawseel-checkout-main"><b>تحديد وقت الطلب</b><div id="reviewScheduleLabel" class="muted">${confirmedScheduledAt ? esc(new Date(confirmedScheduledAt).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' })) : 'الآن'}</div></div><button type="button" class="text-link" id="reviewScheduleBtn">${confirmedScheduledAt ? 'تغيير' : 'في وقت لاحق'}</button></div>
-<div class="tawseel-checkout-row tawseel-payment-row"><span class="tawseel-checkout-icon">♧</span><div class="tawseel-checkout-main"><b>الدفع</b><div class="muted">الدفع عند الاستلام</div></div><label class="tawseel-radio-label" aria-label="الدفع عند الاستلام"><input type="radio" name="reviewPaymentMethod" value="CASH" checked></label></div>
-<div class="tawseel-checkout-footer"><div class="tawseel-checkout-total"><b>الإجمالي الكلي</b><strong>${s.pricingType === 'FIXED' && s.basePrice != null ? `${esc(s.basePrice)} ${esc(currencyLabel())}` : 'يُحدد حسب تفاصيل الخدمة'}</strong></div><div class="tawseel-checkout-actions"><button type="button" class="btn secondary" id="reviewBackToEdit">تعديل الطلب</button><button type="button" class="btn" id="reviewConfirmOrder">تنفيذ الطلب</button></div></div>
-<div class="tawseel-schedule-overlay hide-section" id="tawseelScheduleOverlay" role="dialog" aria-modal="true" aria-labelledby="tawseelScheduleTitle"><section class="tawseel-schedule-sheet"><div class="tawseel-schedule-grip"></div><h2 id="tawseelScheduleTitle">جدولة الأوقات</h2><div class="tawseel-schedule-steps"><span class="active" data-schedule-step-indicator="1">1 اليوم</span><span data-schedule-step-indicator="2">2 الوقت</span><span data-schedule-step-indicator="3">3 تأكيد الجدولة</span></div><div class="tawseel-schedule-step" data-schedule-step="1"><label for="reviewScheduleDate">اختر اليوم</label><input id="reviewScheduleDate" type="date"></div><div class="tawseel-schedule-step hide-section" data-schedule-step="2"><label for="reviewScheduleTime">وقت التنفيذ</label><input id="reviewScheduleTime" type="time"><p class="muted">اختر الوقت المناسب لتنفيذ الطلب.</p></div><div class="tawseel-schedule-step hide-section" data-schedule-step="3"><b>تأكيد موعد الطلب</b><p id="reviewScheduleSummary" class="muted"></p></div><p id="reviewScheduleError" class="error hide-section"></p><div class="tawseel-schedule-actions"><button type="button" class="btn secondary" id="reviewScheduleCancel">إلغاء</button><button type="button" class="btn" id="reviewScheduleNext">التالي</button></div></section></div>`;
+            review.innerHTML = `<div class="order-confirmation-heading"><h2>تفاصيل الطلب</h2><p class="muted">راجع طلبك وأكّد التنفيذ.</p></div><div class="card order-confirmation-extra"><div class="row order-confirmation-inline"><b>هل لديك قسيمة تخفيض؟</b><button type="button" class="text-link" id="toggleCoupon">إضافة</button></div><div id="couponEntry" class="field hide-section"><label for="orderCouponCode">كود القسيمة</label><input id="orderCouponCode" maxlength="60" placeholder="أدخل كود القسيمة"></div></div><div class="card order-confirmation-summary"><h3>ملخص الطلب</h3><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>البيان</th><th>التفاصيل</th></tr></thead><tbody>${orderDetailRows(fdReview).join('')}</tbody></table></div></div><div id="reviewAddressEditor"></div><div class="card order-confirmation-extra"><div class="row order-confirmation-inline"><b>ملاحظات الطلب</b><button type="button" class="text-link" id="toggleOrderNote">إضافة</button></div><p id="reviewNotePreview" class="muted">لا توجد ملاحظة</p><div id="orderNoteEntry" class="field hide-section"><textarea id="reviewOrderNote" maxlength="500" placeholder="اكتب ملاحظتك هنا"></textarea></div></div><div class="card order-time-choice"><h3>وقت الطلب</h3><label class="choice-row"><input type="radio" name="reviewOrderTime" value="now" checked> الآن</label><label class="choice-row"><input type="radio" name="reviewOrderTime" value="later"> وقت لاحق</label><div id="laterOrderTimeBox" class="field hide-section"><label for="reviewScheduledAt">اختر الوقت المناسب</label><input id="reviewScheduledAt" type="datetime-local"></div><p id="reviewTimeError" class="error hide-section"></p></div><div class="card payment-methods"><h3>طريقة الدفع</h3><label class="payment-choice"><input type="radio" name="reviewPaymentMethod" value="CASH" checked><span><b>الدفع عند الاستلام</b></span></label></div><div class="row order-confirmation-actions"><button type="button" class="btn secondary" id="reviewBackToEdit">رجوع</button><button type="button" class="btn" id="reviewConfirmOrder">تنفيذ الطلب</button></div>`;
             const originalChildren = Array.from(orderForm.children);
             originalChildren.forEach(el => el.classList.add('order-review-hidden'));
             orderForm.appendChild(review);
+            const checkoutFields = document.getElementById('orderCheckoutFields');
+            if (checkoutFields) {
+                checkoutFields.classList.remove('hide-section', 'order-review-hidden');
+                document.getElementById('reviewAddressEditor')?.appendChild(checkoutFields);
+            }
             const toggle = (id) => { const el = document.getElementById(id); el?.classList.toggle('hide-section'); };
-            document.getElementById('toggleCoupon')?.addEventListener('click', () => { toggle('couponEntry'); document.getElementById('orderCouponCode')?.focus(); });
-            document.getElementById('orderCouponCode')?.addEventListener('input', (ev) => { const summary = document.getElementById('couponSummary'); if (summary)
-                summary.textContent = String(ev.target.value || '').trim() || 'أضف رمز القسيمة إن وجد'; });
+            document.getElementById('toggleCoupon')?.addEventListener('click', () => toggle('couponEntry'));
             document.getElementById('toggleOrderNote')?.addEventListener('click', () => toggle('orderNoteEntry'));
+            document.querySelectorAll('input[name=reviewOrderTime]').forEach(el => el.addEventListener('change', () => { document.getElementById('laterOrderTimeBox')?.classList.toggle('hide-section', el.value !== 'later' || !el.checked); }));
             document.getElementById('reviewOrderNote')?.addEventListener('input', () => { const note = document.getElementById('reviewOrderNote').value.trim(); const preview = document.getElementById('reviewNotePreview'); if (preview)
                 preview.textContent = note || 'لا توجد ملاحظة'; });
-            const scheduleOverlay = document.getElementById('tawseelScheduleOverlay');
-            const scheduleDate = document.getElementById('reviewScheduleDate');
-            const scheduleTime = document.getElementById('reviewScheduleTime');
-            const scheduleError = document.getElementById('reviewScheduleError');
-            const localDateString = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            const scheduleNow = new Date();
-            const scheduleDefault = new Date(Date.now() + 60 * 60 * 1000);
-            if (scheduleDate) {
-                scheduleDate.min = localDateString(scheduleNow);
-                scheduleDate.value = localDateString(scheduleDefault);
-            }
-            if (scheduleTime)
-                scheduleTime.value = `${String(scheduleDefault.getHours()).padStart(2, '0')}:${String(scheduleDefault.getMinutes()).padStart(2, '0')}`;
-            let scheduleStep = 1;
-            const showScheduleStep = (step) => { scheduleStep = step; document.querySelectorAll('[data-schedule-step]').forEach(el => el.classList.toggle('hide-section', Number(el.dataset.scheduleStep) !== step)); document.querySelectorAll('[data-schedule-step-indicator]').forEach(el => el.classList.toggle('active', Number(el.dataset.scheduleStepIndicator) <= step)); const next = document.getElementById('reviewScheduleNext'); if (next)
-                next.textContent = step === 3 ? 'تأكيد' : 'التالي'; const cancel = document.getElementById('reviewScheduleCancel'); if (cancel)
-                cancel.textContent = step === 1 ? 'إلغاء' : 'رجوع'; if (scheduleError)
-                scheduleError.classList.add('hide-section'); };
-            document.getElementById('reviewScheduleBtn')?.addEventListener('click', () => { showScheduleStep(1); scheduleOverlay?.classList.remove('hide-section'); });
-            document.getElementById('reviewScheduleCancel')?.addEventListener('click', () => { if (scheduleStep > 1)
-                showScheduleStep(scheduleStep - 1);
-            else
-                scheduleOverlay?.classList.add('hide-section'); });
-            document.getElementById('reviewScheduleNext')?.addEventListener('click', () => { const date = String(scheduleDate?.value || ''); const time = String(scheduleTime?.value || ''); if (scheduleStep === 1) {
-                if (!date) {
-                    if (scheduleError) {
-                        scheduleError.textContent = 'اختر اليوم المناسب.';
-                        scheduleError.classList.remove('hide-section');
-                    }
-                    return;
-                }
-                showScheduleStep(2);
-                return;
-            } if (scheduleStep === 2) {
-                const candidate = new Date(`${date}T${time}`);
-                if (!time || !Number.isFinite(candidate.getTime()) || candidate.getTime() <= Date.now()) {
-                    if (scheduleError) {
-                        scheduleError.textContent = 'اختر وقتًا مستقبليًا صحيحًا.';
-                        scheduleError.classList.remove('hide-section');
-                    }
-                    return;
-                }
-                const summary = document.getElementById('reviewScheduleSummary');
-                if (summary)
-                    summary.textContent = candidate.toLocaleString('ar', { dateStyle: 'full', timeStyle: 'short' });
-                showScheduleStep(3);
-                return;
-            } const candidate = new Date(`${date}T${time}`); if (!Number.isFinite(candidate.getTime()) || candidate.getTime() <= Date.now()) {
-                showScheduleStep(2);
-                if (scheduleError) {
-                    scheduleError.textContent = 'اختر وقتًا مستقبليًا صحيحًا.';
-                    scheduleError.classList.remove('hide-section');
-                }
-                return;
-            } confirmedScheduledAt = candidate.toISOString(); const label = document.getElementById('reviewScheduleLabel'); if (label)
-                label.textContent = candidate.toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }); const button = document.getElementById('reviewScheduleBtn'); if (button)
-                button.textContent = 'تغيير'; scheduleOverlay?.classList.add('hide-section'); });
-            const restore = () => { review.remove(); originalChildren.forEach(el => el.classList.remove('order-review-hidden')); };
+            const restore = () => { if (checkoutFields) {
+                orderForm.insertBefore(checkoutFields, orderForm.querySelector('#submitOrderBtn'));
+                checkoutFields.classList.add('hide-section');
+            } review.remove(); originalChildren.forEach(el => el.classList.remove('order-review-hidden')); };
             document.getElementById('reviewBackToEdit')?.addEventListener('click', () => { restore(); document.querySelector('#orderForm input[required], #orderForm textarea[required]')?.focus(); });
-            document.getElementById('reviewChangeAddress')?.addEventListener('click', () => { restore(); document.getElementById('savedAddressCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
-            document.getElementById('reviewConfirmOrder')?.addEventListener('click', () => { const note = String(document.getElementById('reviewOrderNote')?.value || '').trim(); const coupon = String(document.getElementById('orderCouponCode')?.value || '').trim(); const notesEl = orderForm.querySelector('textarea[name="notes"]'); if (notesEl)
-                notesEl.value = [String(notesEl.value || '').trim(), note ? `ملاحظة العميل: ${note}` : '', coupon ? `كود قسيمة التخفيض للمراجعة: ${coupon}` : ''].filter(Boolean).join('\n'); restore(); orderConfirmed = true; orderForm.requestSubmit(); });
+            // If location permission was granted previously, begin GPS only after the checkout panel is visible.
+            try {
+                const permissions = navigator.permissions;
+                if (permissions?.query) {
+                    const permission = await permissions.query({ name: 'geolocation' });
+                    if (permission.state === 'granted')
+                        document.getElementById('useLocation')?.click();
+                }
+            }
+            catch { }
+            document.getElementById('reviewConfirmOrder')?.addEventListener('click', () => { if (!orderForm.checkValidity()) {
+                orderForm.reportValidity();
+                return;
+            } const later = document.querySelector('input[name="reviewOrderTime"]:checked')?.value === 'later'; const scheduledInput = document.getElementById('reviewScheduledAt'); const timeError = document.getElementById('reviewTimeError'); confirmedScheduledAt = ''; if (later) {
+                const chosen = String(scheduledInput?.value || '');
+                const chosenDate = chosen ? new Date(chosen) : null;
+                if (!chosenDate || !Number.isFinite(chosenDate.getTime()) || chosenDate.getTime() <= Date.now()) {
+                    if (timeError) {
+                        timeError.textContent = 'اختر وقتًا لاحقًا صحيحًا.';
+                        timeError.classList.remove('hide-section');
+                    }
+                    return;
+                }
+                confirmedScheduledAt = chosenDate.toISOString();
+            } const note = String(document.getElementById('reviewOrderNote')?.value || '').trim(); const coupon = String(document.getElementById('orderCouponCode')?.value || '').trim(); const notesEl = orderForm.querySelector('textarea[name="notes"]'); if (notesEl) {
+                notesEl.value = [String(notesEl.value || '').trim(), note ? `ملاحظة العميل: ${note}` : '', coupon ? `كود قسيمة التخفيض للمراجعة: ${coupon}` : ''].filter(Boolean).join('\n');
+            } restore(); orderConfirmed = true; orderForm.requestSubmit(); });
             return;
         }
         const fd = new FormData(e.currentTarget);

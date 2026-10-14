@@ -4,12 +4,11 @@ import fs from 'node:fs';
 test('V2.28 customer homepage follows the supplied reference sequence and preserves Khadamat quick access', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const ticker = app.indexOf('class="khadamat-news-ticker reference-news-ticker"');
-    const banner = app.indexOf('class="customer-promo-banner"');
     const categories = app.indexOf('customer-category-showcase customer-category-showcase-top');
     const quick = app.indexOf('class="quick-assist-reference"');
     const offers = app.indexOf('<section class="customer-offers"');
     const services = app.indexOf('class="reference-service-section"');
-    assert.ok(ticker > 0 && banner > ticker && categories > banner && quick > categories && offers > quick && services > offers);
+    assert.ok(ticker > 0 && quick > ticker && categories > quick && offers > categories && services > offers);
     assert.ok(app.includes('id="quickAssistForm"'));
     assert.ok(app.includes('id="allOffersBtn"'));
     assert.ok(app.includes('id="allCategoriesBtn"'));
@@ -34,7 +33,7 @@ test('V2.28 bottom navigation opens home, orders, subscriptions, and account', (
 });
 test('V2.28 keeps the concise order confirmation and executes only after confirmation', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    assert.ok(app.includes('id="submitOrderBtn" type="submit">تنفيذ الطلب</button>'));
+    assert.ok(app.includes('id="submitOrderBtn" type="submit">متابعة</button>'));
     assert.ok(app.includes("review.id='orderConfirmationStep'"));
     assert.ok(app.includes('هل لديك قسيمة تخفيض؟'));
     assert.ok(app.includes('name="reviewOrderTime" value="now" checked'));
@@ -46,10 +45,10 @@ test('V2.28 keeps the concise order confirmation and executes only after confirm
 test('V2.28 asset versions and service worker cache stay aligned', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
-        assert.ok(html.includes('app.js?v=2.29'), file);
-        assert.ok(html.includes('app.css?v=2.29'), file);
+        assert.ok(html.includes('app.js?v=2.34'), file);
+        assert.ok(html.includes('app.css?v=2.34'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-29'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-34'));
 });
 test('V2.28 account menu mirrors the reference account screen and routes each main section', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');

@@ -42,12 +42,12 @@ test('customer account exposes request area, expandable phone, optional contact 
 test('customer order confirmation includes coupon, address edit, inline note and quantity floor of one', () => {
     assert.match(frontend, /orderConfirmationStep/);
     assert.match(frontend, /هل لديك قسيمة تخفيض/);
-    assert.match(frontend, /reviewChangeAddress/);
+    assert.match(frontend, /reviewAddressEditor/);
     assert.match(frontend, /reviewOrderNote/);
     assert.match(frontend, /Math\.max\(1,Math\.floor\(Number\(qty\.value\|\|1\)\)\|\|1\)/);
     assert.match(frontend, /الدفع عند الاستلام/);
     assert.match(frontend, /pharmacyProductName/);
-    assert.match(frontend, /orderProductUrl/);
+    assert.equal(/orderProductUrl/.test(frontend), false);
 });
 test('customer offer filters and favorites are interactive and saved locally', () => {
     assert.match(frontend, /data-service-filter="nearby"/);
@@ -58,9 +58,9 @@ test('customer offer filters and favorites are interactive and saved locally', (
     assert.match(frontend, /khadamat\.favoriteCampaigns\.v1/);
 });
 test('customer shell uses versioned 2.19 assets to refresh cached layout', () => {
-    assert.match(customerShell, /app\.css\?v=2\.29/);
-    assert.match(customerShell, /app\.js\?v=2\.29/);
-    assert.match(customerShell, /sw\.js\?v=2\.29/);
+    assert.match(customerShell, /app\.css\?v=2\.34/);
+    assert.match(customerShell, /app\.js\?v=2\.34/);
+    assert.match(customerShell, /sw\.js\?v=2\.34/);
 });
 test('admin category editor can store an uploaded-image URL without a database migration', async () => {
     const t = await startApp();

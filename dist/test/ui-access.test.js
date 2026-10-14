@@ -18,8 +18,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 });
 test('provider page and frontend assets use the current version', () => {
     assert.ok(provider.includes('data-page="provider"'));
-    assert.ok(provider.includes('app.js?v=2.29'));
-    assert.ok(index.includes('app.js?v=2.29'));
+    assert.ok(provider.includes('app.js?v=2.34'));
+    assert.ok(index.includes('app.js?v=2.34'));
 });
 test('provider order action is not nested inside the clickable order detail button', () => {
     assert.match(app, /class=\"order-card-main\"/);
@@ -81,7 +81,7 @@ test('customer location flow is GPS-first and auto-uses a previously granted per
     assert.ok(app.includes('📍 إرسال موقعي الحالي'));
     assert.ok(app.includes("permissions.query({name:'geolocation'})"));
     assert.ok(app.includes("permission.state==='granted'"));
-    assert.ok(app.includes("getElementById('useLocation') as HTMLButtonElement)?.click()"));
+    assert.ok(app.includes("if(permission.state==='granted')(document.getElementById('useLocation') as HTMLButtonElement|null)?.click()"));
     assert.ok(app.includes('اختر العنوان عند الحاجة.'));
     assert.ok(app.includes('id="customerAreaToggle"'));
 });

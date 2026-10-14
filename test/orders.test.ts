@@ -65,6 +65,15 @@ describe('دورة الطلب الكاملة (Core Flow) — سعر ثابت', (
     assert.match(order.code, /^KH-\d{4}-\d{6}$/);
     assert.equal(order.formData.ac_type, 'split');
 
+    // تأكيد الاتصال: يصل إشعار إلى الإدارة مع رابط مباشر لقائمة متابعة اتصال العميل.
+    const adminForConfirmation = await loginAdmin(api);
+    const adminNotifications = await api('GET', '/api/v1/notifications?limit=100', { token: adminForConfirmation });
+    assert.equal(adminNotifications.status, 200);
+    assert.ok((adminNotifications.body.notifications as any[]).some((n:any) => n.type === 'NEW_ORDER_CONFIRMATION_ADMIN' && n.data?.orderId === order.id), 'يجب تنبيه الإدارة بطلب جديد يحتاج اتصال تأكيد');
+    const confirmationQueue = await api('GET', '/api/v1/admin/order-confirmations?status=PENDING', { token: adminForConfirmation });
+    assert.equal(confirmationQueue.status, 200);
+    assert.ok((confirmationQueue.body.items as any[]).some((x:any) => x.orderId === order.id && !!x.phone), 'يجب أن يظهر الطلب ورقم هاتف العميل في قائمة الاتصال');
+
     // مفتاح التكرار: إعادة إرسال نفس الطلب (نفس الجسم) بنفس المفتاح لا تُنشئ نسخة ثانية — محاكاة إعادة محاولة العميل بعد انقطاع شبكة
     const dupBody = { serviceId: ac.id, description: 'المكيف لا يبرد إطلاقًا', contactPhone: '+967771112233', location: { lat: 12.79, lng: 45.02, source: 'gps' }, formData: { ac_type: 'split', brand: 'LG' }, priority: 'URGENT' };
     const dup = await api('POST', '/api/v1/orders', { token: custTok, body: dupBody, headers: { 'Idempotency-Key': 'order-1-test' } });

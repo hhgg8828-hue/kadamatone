@@ -269,6 +269,9 @@ export function registerOrderRoutes(app, r) {
             let o = db.get('SELECT * FROM orders WHERE id = ?', id);
             o = orders.applyTransition(o, 'SEARCHING', 'SYSTEM', ctx, { reason: 'auto' });
             app.notifications.notify(ctx.user.id, 'ORDER_RECEIVED', { code: o.code });
+            // Notify the active administration team so a person can call and verify the request,
+            // matching the manual post-order confirmation flow. The phone call itself is not automated.
+            app.notifications.notifyAdmins('NEW_ORDER_CONFIRMATION_ADMIN', { code: o.code }, { orderId: o.id, orderCode: o.code, action: 'confirm_order' });
             app.assignment.assignWave(o.id);
             o = db.get('SELECT * FROM orders WHERE id = ?', id);
             ctx.status = 201;

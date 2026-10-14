@@ -1,14 +1,14 @@
 {
   "name": "khadamat",
-  "version": "2.34.0",
-  "description": "خدمات — الإصدار 2.34: تبسيط شاشة تأكيد الطلب لتتبع تدفق توصيل ون وجدولة الموعد على خطوات",
+  "version": "2.35.0",
+  "description": "خدمات — الإصدار 2.34: تبسيط تنفيذ الطلب وفق تدفق توصيل وان",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22.18"
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/postbuild.mjs && tsc -p web.tsconfig.json",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && tsc -p web.tsconfig.json && node scripts/postbuild.mjs",
     "start": "node dist/src/server.js",
     "dev": "node --watch dist/src/server.js",
     "migrate": "node dist/src/db/cli.js migrate",

@@ -7,7 +7,7 @@ const css = fs.readFileSync('public/css/app.css', 'utf8');
 const html = fs.readFileSync('public/customer.html', 'utf8');
 const sw = fs.readFileSync('public/sw.js', 'utf8');
 
-test('V2.30 selected area includes a location pin and bilingual area name', () => {
+test('V2.34 selected area includes a location pin and bilingual area name', () => {
   assert.ok(app.includes('function areaNameEnglish(area:any)'));
   assert.ok(app.includes("'إب':'Ibb'"));
   assert.ok(app.includes("'صنعاء':'Sana’a'"));
@@ -17,7 +17,7 @@ test('V2.30 selected area includes a location pin and bilingual area name', () =
   assert.ok(css.includes('.customer-shell .customer-area-names i'));
 });
 
-test('V2.30 offers carousel spans the available width and all-offers button is transparent overlay', () => {
+test('V2.34 offers carousel spans the available width and all-offers button is transparent overlay', () => {
   assert.ok(app.includes('اكتشف الخدمات المتاحة في منطقتك'));
   assert.ok(css.includes('.customer-shell .campaign-strip-wrap{position:relative;padding:0!important'));
   assert.ok(css.includes('background:rgba(255,255,255,.22)!important;color:#176b4d!important'));
@@ -25,8 +25,8 @@ test('V2.30 offers carousel spans the available width and all-offers button is t
   assert.ok(css.includes('margin:0 -12px'));
 });
 
-test('V2.30 customer cache and asset URLs are version-aligned', () => {
-  assert.ok(html.includes('app.js?v=2.30'));
-  assert.ok(html.includes('app.css?v=2.30'));
-  assert.ok(sw.includes('khadamat-shell-v2-30'));
+test('V2.34 customer cache and asset URLs are version-aligned', () => {
+  assert.ok(html.includes('app.js?v=2.34'));
+  assert.ok(html.includes('app.css?v=2.34'));
+  assert.ok(sw.includes('khadamat-shell-v2-34'));
 });

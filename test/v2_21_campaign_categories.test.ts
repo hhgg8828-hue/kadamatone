@@ -23,20 +23,20 @@ test('Offer imagery is compact and release asset cache versions match current re
   assert.ok(css.includes('.customer-shell .campaign-card .campaign-image{aspect-ratio:16/9;object-fit:cover}') || css.includes('.customer-shell .campaign-card .campaign-image{height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:10px;grid-row:auto}'));
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.31'), file);
-    assert.ok(html.includes('app.css?v=2.31'), file);
+    assert.ok(html.includes('app.js?v=2.34'), file);
+    assert.ok(html.includes('app.css?v=2.34'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-31'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-34'));
 });
 
-test('Customer home follows the reference order: ticker, banner, categories, then offers', () => {
+test('Customer home follows the latest order: ticker, quick access, categories, offers, then services', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
   const tickerAt = app.indexOf('class="khadamat-news-ticker reference-news-ticker"');
-  const bannerAt = app.indexOf('class="customer-promo-banner"');
   const categoryAt = app.indexOf('customer-category-showcase customer-category-showcase-top');
   const quickAt = app.indexOf('class="quick-assist-reference"');
   const offersAt = app.indexOf('<section class="customer-offers"');
-  assert.ok(tickerAt >= 0 && bannerAt > tickerAt && categoryAt > bannerAt && quickAt > categoryAt && offersAt > quickAt);
+  const servicesAt = app.indexOf('class="reference-service-section"');
+  assert.ok(tickerAt >= 0 && quickAt > tickerAt && categoryAt > quickAt && offersAt > categoryAt && servicesAt > offersAt);
   assert.ok(app.includes('id="allCategoriesBtn"'));
   assert.ok(app.includes('id="allOffersBtn"'));
   assert.ok(app.includes('id="customerAreaToggle"'));

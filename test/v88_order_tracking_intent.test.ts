@@ -53,7 +53,7 @@ test('Release 2.6 keeps specific labor categories ahead of generic daily labor',
 test('Release 2.6 uses the current cache identifiers in all app shells', () => {
   for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('v=2.29'), file);
+    assert.ok(html.includes('v=2.34'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-29'));
+  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-34'));
 });

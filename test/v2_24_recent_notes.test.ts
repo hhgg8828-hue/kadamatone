@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('2.28 follows the reference browsing order: ticker, banner, categories, quick access, offers', () => {
+test('2.34 follows the latest browsing order: ticker, quick access, categories, offers, services', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
   const ticker = app.indexOf('class="khadamat-news-ticker reference-news-ticker"');
-  const banner = app.indexOf('class="customer-promo-banner"');
   const categories = app.indexOf('customer-category-showcase customer-category-showcase-top');
   const quick = app.indexOf('class="quick-assist-reference"');
   const offers = app.indexOf('<section class="customer-offers"');
-  assert.ok(ticker >= 0 && banner > ticker && categories > banner && quick > categories && offers > quick);
+  const services = app.indexOf('class="reference-service-section"');
+  assert.ok(ticker >= 0 && quick > ticker && categories > quick && offers > categories && services > offers);
   assert.ok(app.includes('id="allCategoriesBtn"'));
   assert.ok(app.includes('id="allOffersBtn"'));
   assert.ok(app.includes('data-all-offer'));
@@ -22,7 +22,7 @@ test('2.24 order confirmation supports now/later scheduling and a concise note p
   assert.ok(app.includes('id="reviewScheduledAt"'));
   assert.ok(app.includes('const scheduledAt=confirmedScheduledAt'));
   assert.ok(app.includes('لا توجد ملاحظة'));
-  assert.ok(app.includes('id="reviewChangeAddress"'));
+  assert.ok(app.includes('id="reviewAddressEditor"'));
 });
 
 test('2.24 campaign category actions are accepted by create/update API and saving is guarded against double submit', () => {
@@ -37,6 +37,6 @@ test('2.24 campaign category actions are accepted by create/update API and savin
 test('2.24 assets use a new cache version and back navigation asks before leaving', () => {
   const sw = fs.readFileSync('public/sw.js', 'utf8');
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  assert.ok(sw.includes('khadamat-shell-v2-29'));
+  assert.ok(sw.includes('khadamat-shell-v2-34'));
   assert.ok(app.includes('هل ترغب في الخروج؟'));
 });
