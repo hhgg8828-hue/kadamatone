@@ -219,7 +219,7 @@ export function registerCatalogRoutes(app: App, r: App['router']): void {
   const { catalog } = app;
   r.get('/categories', (ctx: Ctx) => ({ categories: catalog.tree(ctx.query['lang'] === 'en' ? 'en' : ctx.locale) }));
   // Public checkout recommendations are sourced only from active admin-managed records.
-  r.get('/order-stores', () => ({ items: app.db.all<any>("SELECT id,store_name storeName,description,delivery_fee deliveryFee,minimum_order minimumOrder,image_url imageUrl,sort_order sortOrder FROM order_store_recommendations WHERE is_active=1 ORDER BY sort_order ASC, created_at DESC") }));
+  r.get('/order-stores', () => ({ items: app.db.all<any>("SELECT id,store_name storeName,category_name categoryName,description,delivery_fee deliveryFee,minimum_order minimumOrder,image_url imageUrl,sort_order sortOrder FROM order_store_recommendations WHERE is_active=1 ORDER BY sort_order ASC, created_at DESC") }));
   r.get('/catalog/bootstrap', (ctx: Ctx) => {
     const locale = ctx.query['lang'] === 'en' ? 'en' : ctx.locale; const data = catalog.all();
     const now = iso(app.clock.now()); const requestedAreaId=String(ctx.query['areaId']||'');

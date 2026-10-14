@@ -44,19 +44,40 @@ function applyAccessibilityPreferences() {
 }
 function setAccessibilityPreference(key, enabled) { localStorage.setItem(A11Y_KEYS[key], enabled ? '1' : '0'); applyAccessibilityPreferences(); }
 applyAccessibilityPreferences();
-// Backward-compatible label retained for prior tests: هل ترغب في الخروج؟
-// Confirm before leaving from Android/browser Back on every customer, provider, and admin page.
+// Back navigation: close the current in-app dialog/page first; only ask to exit at the root.
 if (!window.__khadamatBackGuardInstalled) {
     window.__khadamatBackGuardInstalled = true;
-    try {
+    let suppressNextPop = false;
+    const armBackGuard = () => { try {
         history.pushState({ khadamatBackGuard: true }, '', location.href);
+    }
+    catch { } };
+    try {
+        armBackGuard();
         window.addEventListener('popstate', () => {
-            const leave = window.confirm('هل أنت متأكد أنك تريد الخروج من التطبيق؟');
-            if (!leave) {
-                history.pushState({ khadamatBackGuard: true }, '', location.href);
+            if (suppressNextPop) {
+                suppressNextPop = false;
+                armBackGuard();
                 return;
             }
-            // A confirmed back action is allowed to leave this page; do not re-arm the guard.
+            const modal = document.getElementById('modal');
+            if (modal) {
+                closeModal();
+                armBackGuard();
+                return;
+            }
+            // On the customer shell, return from secondary tabs to the home/services root
+            // before offering to leave the app. Never treat an in-app section as the root.
+            if (page === 'customer' && document.getElementById('ordersSection') && !document.getElementById('ordersSection').classList.contains('hide-section')) {
+                switchCustomerSection('services');
+                armBackGuard();
+                return;
+            }
+            const leave = window.confirm('هل أنت متأكد أنك تريد الخروج من التطبيق؟');
+            if (!leave) {
+                armBackGuard();
+                return;
+            }
             window.__khadamatBackGuardInstalled = false;
         });
     }
@@ -1124,6 +1145,21 @@ async function customer() {
     const previousScrollY = window.scrollY;
     try {
         const [addressPayload, areaPayload] = await Promise.all([api('/me/addresses').catch(() => ({ addresses: [] })), api('/areas').catch(() => ({ areas: [] }))]);
+        try {
+            const current = JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
+            if (Number.isFinite(Number(current?.lat)) && Number.isFinite(Number(current?.lng))) {
+                const closeAddress = (addressPayload.addresses || []).some((a) => Math.abs(Number(a.location?.lat) - Number(current.lat)) < 0.0005 && Math.abs(Number(a.location?.lng) - Number(current.lng)) < 0.0005);
+                if (!closeAddress) {
+                    const saved = await api('/me/addresses', { method: 'POST', body: JSON.stringify({
+                            label: 'موقعي الحالي',
+                            isDefault: !(addressPayload.addresses || []).some((a) => a.isDefault),
+                            location: { lat: Number(current.lat), lng: Number(current.lng), accuracy: Number(current.accuracy || 0), source: current.source === 'map' ? 'map' : 'gps', areaId: current.areaId || undefined, addressText: 'الموقع الذي حدده الهاتف أو الخريطة' }
+                        }) });
+                    addressPayload.addresses = [...(addressPayload.addresses || []), saved.address];
+                }
+            }
+        }
+        catch { }
         state.areas = areaPayload.areas || [];
         const resolveCity = (areaId) => { let cur = state.areas.find((a) => a.id === areaId); let guard = 0; while (cur && !['GOVERNORATE', 'CITY'].includes(cur.localityType || cur.type) && guard++ < 8) {
             const parentId = cur.parentId;
@@ -1544,16 +1580,25 @@ async function openCustomerLocationSetup(auto) {
             const cities = (state.areas || []).filter((a) => ['GOVERNORATE', 'CITY'].includes(a.localityType || a.type) && Number.isFinite(Number(a.centerLat)) && Number.isFinite(Number(a.centerLng)));
             const distance = (a) => { const rad = (v) => v * Math.PI / 180; const dLat = rad(pos.coords.latitude - Number(a.centerLat)), dLng = rad(pos.coords.longitude - Number(a.centerLng)); const x = Math.sin(dLat / 2) ** 2 + Math.cos(rad(pos.coords.latitude)) * Math.cos(rad(Number(a.centerLat))) * Math.sin(dLng / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); };
             const match = cities.map((a) => ({ area: a, distance: distance(a) })).filter((x) => x.distance <= Number(x.area.radiusKm || 25)).sort((a, b) => a.distance - b.distance)[0];
+            const currentLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: 'gps', capturedAt: new Date().toISOString(), areaId: match?.area?.id };
+            localStorage.setItem('khadamat.currentLocation.v1', JSON.stringify(currentLoc));
             if (!match) {
                 btn.disabled = false;
                 if (status)
-                    status.textContent = 'تم الحصول على موقعك، لكن لا توجد مدينة معرفة في النظام ضمن نطاق هذا الموقع. اختر المدينة يدويًا أو اطلب من الإدارة تحديث مناطق التغطية.';
+                    status.textContent = 'تم حفظ موقعك على هذا الجهاز، لكن لا توجد مدينة معرفة ضمن نطاقه. اختر المدينة يدويًا أو اطلب من الإدارة تحديث مناطق التغطية.';
                 return;
             }
             state.selectedAreaId = match.area.id;
             localStorage.setItem('khadamat.selectedAreaId', match.area.id);
+            try {
+                const existing = await api('/me/addresses');
+                if (!(existing.addresses || []).some((a) => a.isDefault)) {
+                    await api('/me/addresses', { method: 'POST', body: JSON.stringify({ label: 'موقعي الحالي', isDefault: true, location: { lat: currentLoc.lat, lng: currentLoc.lng, accuracy: currentLoc.accuracy, source: 'gps', areaId: match.area.id, addressText: 'الموقع الذي حدده الهاتف' } }) });
+                }
+            }
+            catch { }
             closeModal();
-            toast('تم تحديد المدينة', `تم اختيار ${match.area.name}. يمكنك تحديد موقع الخدمة بدقة عند إنشاء الطلب.`);
+            toast('تم حفظ الموقع', `تم اختيار ${match.area.name} وحفظ موقعك ضمن العناوين المحفوظة.`);
             await customer();
         }, err => { btn.disabled = false; if (status)
             status.textContent = err.code === 1 ? 'لم تمنح إذن الموقع. يمكنك اختيار المدينة يدويًا، ولن يتوقف استخدام التطبيق.' : 'تعذر تحديد الموقع الآن. تحقق من إعدادات الموقع أو اختر المدينة يدويًا.'; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
@@ -2007,15 +2052,16 @@ async function openMotorcycleTripForm(service, savedAddresses) {
     <div class="field"><label>الغرض من المشوار</label><select id="tripPurpose" required>${Object.entries(purposeLabels).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="tripPurposeOtherWrap" class="field hide-section"><label for="tripPurposeOther">وضح الغرض الآخر (اختياري)</label><textarea id="tripPurposeOther" maxlength=500 placeholder="اكتب الغرض إذا رغبت"></textarea></div><div id="purchaseDetailsCard" class="card hide-section" style="margin-bottom:10px"><h3>تفاصيل الشراء (اختيارية)</h3><p class="muted">املأ ما تحتاجه فقط؛ يمكنك تركها فارغة.</p><div class="grid"><input id="purchaseMaxPrice" type="number" min="0" placeholder="الحد الأقصى للسعر (اختياري)"><input id="purchaseQuantity" type="number" min="1" placeholder="الكمية (اختياري)"><input id="purchaseAlternatives" maxlength="500" placeholder="بديل مقبول (اختياري)"><label><input id="purchaseApproval" type="checkbox"> أريد الموافقة إذا تغير السعر أو المنتج</label></div></div>
     <div class="trip-address-pair"><button type="button" class="trip-address-choice" id="chooseTripOrigin"><small>من عنوان</small><b id="tripOriginChoiceLabel">اختر نقطة الاستلام</b></button><button type="button" class="trip-address-swap" id="swapTripAddresses" aria-label="تبديل العنوانين">⇄</button><button type="button" class="trip-address-choice" id="chooseTripDestination"><small>إلى عنوان</small><b id="tripDestinationChoiceLabel">اختر وجهة التوصيل</b></button></div>
     <div class="trip-location-card hide-section"><div class="row trip-location-head"><b>📍 نقطة الانطلاق</b><button type="button" class="btn secondary small" id="tripOriginGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripOriginMapBtn">فتح الخريطة</button></div><select id="tripOriginSaved"><option value="">تحديد نقطة جديدة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripOriginMap" class="trip-map hide"></div><p id="tripOriginText" class="muted">اختر موقع الاستلام من الخريطة أو من عناوينك المحفوظة.</p><textarea id="tripOriginNote" maxlength="300" placeholder="وصف إضافي: أنا في منطقة كذا، جوار كذا، شارع كذا"></textarea><input id="tripOriginLat" type="hidden"><input id="tripOriginLng" type="hidden"></div>
-    <div class="trip-location-card hide-section"><div class="row trip-location-head"><b>🎯 الوجهة</b><button type="button" class="btn secondary small" id="tripDestinationGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripDestinationMapBtn">فتح الخريطة</button></div><select id="tripDestinationSaved"><option value="">تحديد الوجهة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripDestinationMap" class="trip-map hide"></div><p id="tripDestinationText" class="muted">اختر موقع الوصول من الخريطة أو من عناوينك المحفوظة.</p><textarea id="tripDestinationNote" maxlength="300" placeholder="وصف إضافي لمكان الوصول: جوار كذا، شارع كذا..."></textarea><input id="tripDestinationLat" type="hidden"><input id="tripDestinationLng" type="hidden"></div><div class="card" style="margin-top:10px"><div class="row" style="justify-content:space-between"><b>نقاط توقف إضافية</b><button type="button" class="btn secondary small" id="addTripStop">+ إضافة توقف</button></div><div id="tripStops"></div><small class="muted">يمكن إضافة حتى 5 نقاط توقف. استخدم مواقعك المحفوظة أو اتركها فارغة.</small></div>
-    <div class="trip-meter card"><div class="trip-meter-label">عداد المشوار</div><div class="trip-meter-main"><span id="tripDistance">—</span><small>كم</small></div><div class="trip-meter-fare"><span id="tripFare">—</span><small>${esc(currencyLabel())}</small></div><p id="tripEstimateNote" class="muted">حدد الوجهة إذا أردت تقدير المسافة والأجرة الآن. بدون وجهة سيُرسل الطلب ويُستكمل تحديدها لاحقًا.</p></div>
+    <div class="trip-location-card hide-section"><div class="row trip-location-head"><b>🎯 الوجهة</b><button type="button" class="btn secondary small" id="tripDestinationGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripDestinationMapBtn">فتح الخريطة</button></div><select id="tripDestinationSaved"><option value="">تحديد الوجهة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripDestinationMap" class="trip-map hide"></div><p id="tripDestinationText" class="muted">اختر موقع الوصول من الخريطة أو من عناوينك المحفوظة.</p><textarea id="tripDestinationNote" maxlength="300" placeholder="وصف إضافي لمكان الوصول: جوار كذا، شارع كذا..."></textarea><input id="tripDestinationLat" type="hidden"><input id="tripDestinationLng" type="hidden"></div>
     <details class="trip-items-disclosure"><summary>أضف أغراضك هنا <span aria-hidden="true">⌄</span></summary><textarea id="tripDescription" maxlength="1000" placeholder="اكتب الأغراض أو تفاصيل المشوار (اختياري)"></textarea></details><div class="field"><label>وقت تنفيذ الطلب</label><div class="trip-schedule-fields"><div class="field"><label for="tripScheduledDate">التاريخ</label><input id="tripScheduledDate" type="date"></div><div class="field"><label for="tripScheduledTime">الوقت</label><select id="tripScheduledTime"><option value="now">الآن</option><option value="06:00">6:00</option><option value="07:00">7:00</option><option value="08:00">8:00</option><option value="09:00">9:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option></select></div></div><input id="tripScheduledAt" type="hidden"><input type="radio" name="tripScheduleMode" value="now" checked hidden aria-hidden="true"><input type="radio" name="tripScheduleMode" value="later" hidden aria-hidden="true"><small class="muted" id="tripScheduleHint">سيبدأ التنفيذ الآن.</small></div><div class="field"><label for="tripPhone">رقم التواصل</label><input id="tripPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label for="tripNotes">ملاحظات الطلب</label><textarea id="tripNotes" maxlength="500" placeholder="اكتب ملاحظاتك هنا (اختياري)"></textarea></div><p id="tripMsg"></p><button class="btn submit-order-btn" id="tripSubmit" type="submit" disabled>إرسال طلب المشوار</button></form></div>`);
     const L = null;
     const maps = {};
     let requestEstimate = null;
     let mapLoading = { origin: false, destination: false };
     const setPoint = (kind, lat, lng, source, addressText) => { const m = maps[kind]; if (m?.marker)
-        m.marker.setLatLng([lat, lng]); const k = kind === 'origin' ? 'Origin' : 'Destination'; document.getElementById(`trip${k}Lat`).value = String(lat); document.getElementById(`trip${k}Lng`).value = String(lng); const label = addressText || `الموقع المحدد: ${lat.toFixed(5)}، ${lng.toFixed(5)}`; document.getElementById(`trip${k}Text`).textContent = label; const choice = document.getElementById(kind === 'origin' ? 'tripOriginChoiceLabel' : 'tripDestinationChoiceLabel'); if (choice)
+        m.marker.setLatLng([lat, lng]); if (kind === 'origin') {
+        localStorage.setItem('khadamat.currentLocation.v1', JSON.stringify({ lat, lng, source: source === 'map' ? 'map' : source === 'gps' ? 'gps' : 'saved', capturedAt: new Date().toISOString() }));
+    } const k = kind === 'origin' ? 'Origin' : 'Destination'; document.getElementById(`trip${k}Lat`).value = String(lat); document.getElementById(`trip${k}Lng`).value = String(lng); const label = addressText || `الموقع المحدد: ${lat.toFixed(5)}، ${lng.toFixed(5)}`; document.getElementById(`trip${k}Text`).textContent = label; const choice = document.getElementById(kind === 'origin' ? 'tripOriginChoiceLabel' : 'tripDestinationChoiceLabel'); if (choice)
         choice.textContent = label; requestEstimate?.(); };
     const ensureTripMap = async (kind) => { if (maps[kind])
         return true; if (mapLoading[kind])
@@ -2026,9 +2072,16 @@ async function openMotorcycleTripForm(service, savedAddresses) {
             return false;
         el.closest('.trip-location-card')?.classList.remove('hide-section');
         el.classList.remove('hide');
-        const map = L.map(el, { scrollWheelZoom: false }).setView([15.55, 48.52], 7);
+        let initialPoint = [15.55, 48.52];
+        try {
+            const saved = JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
+            if (Number.isFinite(Number(saved?.lat)) && Number.isFinite(Number(saved?.lng)))
+                initialPoint = [Number(saved.lat), Number(saved.lng)];
+        }
+        catch { }
+        const map = L.map(el, { scrollWheelZoom: false }).setView(initialPoint, initialPoint[0] === 15.55 && initialPoint[1] === 48.52 ? 7 : 16);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
-        const marker = L.marker([15.55, 48.52], { draggable: true });
+        const marker = L.marker(initialPoint, { draggable: true });
         maps[kind] = { map, marker };
         marker.on('dragend', () => setPoint(kind, marker.getLatLng().lat, marker.getLatLng().lng, 'map'));
         map.on('click', (e) => setPoint(kind, e.latlng.lat, e.latlng.lng, 'map'));
@@ -2105,58 +2158,63 @@ async function openMotorcycleTripForm(service, savedAddresses) {
     let estimateTimer;
     let lastEstimateKey = '';
     let lastEstimate = null;
-    const updateEstimate = async () => { const ol = Number(document.getElementById('tripOriginLat').value), og = Number(document.getElementById('tripOriginLng').value), dl = Number(document.getElementById('tripDestinationLat').value), dg = Number(document.getElementById('tripDestinationLng').value); if (![ol, og].every(Number.isFinite)) {
-        document.getElementById('tripSubmit').disabled = true;
-        return;
-    } if (![dl, dg].every(Number.isFinite)) {
-        estimate = null;
-        lastEstimate = null;
-        lastEstimateKey = '';
-        document.getElementById('tripDistance').textContent = '—';
-        document.getElementById('tripFare').textContent = 'يحدد لاحقًا';
-        document.getElementById('tripEstimateNote').textContent = 'لا توجد وجهة بعد. يمكنك إرسال الطلب الآن وتحديد الوجهة لاحقًا.';
-        document.getElementById('tripSubmit').disabled = false;
-        return;
-    } const stops = stopIds.map(id => document.getElementById(id)?.value).filter(Boolean).map(id => { const a = savedAddresses.find((x) => x.id === id); return a ? { lat: Number(a.location.lat), lng: Number(a.location.lng) } : null; }).filter(Boolean); const key = JSON.stringify({ ol, og, dl, dg, stops }); clearTimeout(estimateTimer); if (key === lastEstimateKey && lastEstimate) {
-        estimate = lastEstimate;
-        document.getElementById('tripDistance').textContent = Number(estimate.distanceKm).toFixed(1);
-        document.getElementById('tripFare').textContent = Number(estimate.fare).toLocaleString('ar-YE');
-        document.getElementById('tripSubmit').disabled = false;
-        return;
-    } document.getElementById('tripEstimateNote').textContent = 'جارٍ حساب المسافة والأجرة...'; estimateTimer = window.setTimeout(async () => { try {
-        estimate = await api('/trips/estimate', { method: 'POST', body: JSON.stringify({ origin: { lat: ol, lng: og }, destination: { lat: dl, lng: dg }, stops }) });
-        lastEstimateKey = key;
-        lastEstimate = estimate;
-        document.getElementById('tripDistance').textContent = Number(estimate.distanceKm).toFixed(1);
-        document.getElementById('tripFare').textContent = Number(estimate.fare).toLocaleString('ar-YE');
-        document.getElementById('tripEstimateNote').textContent = 'تم تحديث تقدير المسافة والأجرة.';
-        document.getElementById('tripSubmit').disabled = false;
-    }
-    catch (e) {
-        document.getElementById('tripEstimateNote').textContent = e.message;
-        document.getElementById('tripSubmit').disabled = true;
-    } }, 120); };
-    requestEstimate = updateEstimate;
-    let stopCount = 0;
-    const stopIds = [];
-    document.getElementById('addTripStop')?.addEventListener('click', () => { if (stopCount >= 5)
-        return; stopCount++; const id = 'tripStop' + stopCount; stopIds.push(id); const box = document.getElementById('tripStops'); box.insertAdjacentHTML('beforeend', `<div class="row" style="margin-top:8px"><select id="${id}"><option value="">اختر موقعًا محفوظًا للتوقف</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('')}</select><button type="button" class="btn secondary small" data-remove-stop="${id}">حذف</button></div>`); box.querySelector(`[data-remove-stop="${id}"]`)?.addEventListener('click', () => { document.getElementById(id)?.parentElement?.remove(); }); });
-    document.getElementById('tripForm').addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('tripSubmit'), msg = document.getElementById('tripMsg'); const body = { origin: { lat: Number(document.getElementById('tripOriginLat').value), lng: Number(document.getElementById('tripOriginLng').value), addressText: document.getElementById('tripOriginNote').value.trim(), source: 'map' }, destination: ([Number(document.getElementById('tripDestinationLat').value), Number(document.getElementById('tripDestinationLng').value)].every(Number.isFinite) ? { lat: Number(document.getElementById('tripDestinationLat').value), lng: Number(document.getElementById('tripDestinationLng').value), addressText: document.getElementById('tripDestinationNote').value.trim(), source: 'map' } : undefined), purpose: document.getElementById('tripPurpose').value, purposeNote: document.getElementById('tripPurposeOther').value.trim(), ...(['ITEM_PURCHASE', 'MEDICINE', 'STORE_SHOPPING'].includes(document.getElementById('tripPurpose').value) ? { purchaseMaxPrice: Number(document.getElementById('purchaseMaxPrice').value) || undefined, purchaseQuantity: Number(document.getElementById('purchaseQuantity').value) || undefined, purchaseAlternatives: document.getElementById('purchaseAlternatives').value.trim() || undefined, purchaseRequiresApproval: document.getElementById('purchaseApproval').checked } : {}), stops: stopIds.map(id => document.getElementById(id)?.value).filter(Boolean).map(id => { const a = savedAddresses.find((x) => x.id === id); return a ? { lat: Number(a.location.lat), lng: Number(a.location.lng), addressText: a.label, source: 'map' } : null; }).filter(Boolean), description: document.getElementById('tripDescription').value.trim() || 'مشوار بالدباب', contactPhone: document.getElementById('tripPhone').value.trim(), ...(tripTimeInput.value !== 'now' ? { scheduledAt: String(document.getElementById('tripScheduledAt').value || '') ? new Date(String(document.getElementById('tripScheduledAt').value)).toISOString() : new Date(`${tripDateInput.value}T${tripTimeInput.value}`).toISOString() } : {}), notes: document.getElementById('tripNotes').value.trim() }; if (body.scheduledAt && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
-        msg.textContent = 'اختر تاريخًا ووقتًا في المستقبل.';
-        msg.className = 'error';
-        return;
-    } btn.disabled = true; btn.textContent = 'جارٍ إرسال الطلب...'; try {
-        const j = await api('/trips', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
-        closeModal();
-        await customer();
-        await openOrder(j.order.id);
-    }
-    catch (x) {
-        msg.textContent = x.message;
-        msg.className = 'error';
-        btn.disabled = false;
-        btn.textContent = 'إرسال طلب المشوار';
-    } });
+    const updateEstimate = async () => { const ol = Number(document.getElementById('tripOriginLat').value), og = Number(document.getElementById('tripOriginLng').value), dl = Number(document.getElementById('tripDestinationLat').value), dg = Number(document.getElementById('tripDestinationLng').value); const hasOrigin = Number.isFinite(ol) && Number.isFinite(og) && Math.abs(ol) <= 90 && Math.abs(og) <= 180; const hasDestination = Number.isFinite(dl) && Number.isFinite(dg) && Math.abs(dl) <= 90 && Math.abs(dg) <= 180; document.getElementById('tripSubmit').disabled = !(hasOrigin && hasDestination); };
+    requestEstimate = () => { const ol = Number(document.getElementById('tripOriginLat').value), og = Number(document.getElementById('tripOriginLng').value); document.getElementById('tripSubmit').disabled = !(Number.isFinite(ol) && Number.isFinite(og)); };
+    document.getElementById('tripForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('tripSubmit'), msg = document.getElementById('tripMsg');
+        const body = { origin: { lat: Number(document.getElementById('tripOriginLat').value), lng: Number(document.getElementById('tripOriginLng').value), addressText: document.getElementById('tripOriginNote').value.trim(), source: 'map' }, destination: ([Number(document.getElementById('tripDestinationLat').value), Number(document.getElementById('tripDestinationLng').value)].every(Number.isFinite) ? { lat: Number(document.getElementById('tripDestinationLat').value), lng: Number(document.getElementById('tripDestinationLng').value), addressText: document.getElementById('tripDestinationNote').value.trim(), source: 'map' } : undefined), purpose: document.getElementById('tripPurpose').value, purposeNote: document.getElementById('tripPurposeOther').value.trim(), ...(['ITEM_PURCHASE', 'MEDICINE', 'STORE_SHOPPING'].includes(document.getElementById('tripPurpose').value) ? { purchaseMaxPrice: Number(document.getElementById('purchaseMaxPrice').value) || undefined, purchaseQuantity: Number(document.getElementById('purchaseQuantity').value) || undefined, purchaseAlternatives: document.getElementById('purchaseAlternatives').value.trim() || undefined, purchaseRequiresApproval: document.getElementById('purchaseApproval').checked } : {}), stops: [], description: document.getElementById('tripDescription').value.trim() || 'مشوار بالدباب', contactPhone: document.getElementById('tripPhone').value.trim(), ...(tripTimeInput.value !== 'now' ? { scheduledAt: String(document.getElementById('tripScheduledAt').value || '') ? new Date(String(document.getElementById('tripScheduledAt').value)).toISOString() : new Date(`${tripDateInput.value}T${tripTimeInput.value}`).toISOString() } : {}), notes: document.getElementById('tripNotes').value.trim() };
+        if (body.scheduledAt && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
+            msg.textContent = 'اختر تاريخًا ووقتًا في المستقبل.';
+            msg.className = 'error';
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'جارٍ إرسال الطلب...';
+        try {
+            const j = await api('/trips', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
+            closeModal();
+            await customer();
+            await openOrder(j.order.id);
+        }
+        catch (x) {
+            const offline = !navigator.onLine || /network|fetch failed|failed to fetch|انقطاع|الاتصال|الشبكة/i.test(String(x?.message || ''));
+            if (offline) {
+                const phone = String(state.config?.adminSmsPhone || '').trim();
+                if (!phone) {
+                    msg.textContent = 'لا يوجد رقم SMS للإدارة مضبوط حاليًا. احفظ الطلب عند عودة الإنترنت.';
+                    msg.className = 'error';
+                    btn.disabled = false;
+                    btn.textContent = 'إرسال طلب المشوار';
+                    return;
+                }
+                const smsBody = [
+                    'طلب مشوار جديد — خدمات (إرسال عبر SMS عند انقطاع الإنترنت)',
+                    `الخدمة: ${String(service?.name || 'مشاوير بالدباب')}`,
+                    `من: ${body.origin?.addressText || `${body.origin?.lat}, ${body.origin?.lng}`}`,
+                    `إلى: ${body.destination?.addressText || `${body.destination?.lat}, ${body.destination?.lng}`}`,
+                    `الغرض: ${body.purpose || 'غير محدد'}${body.purposeNote ? ` — ${body.purposeNote}` : ''}`,
+                    `الأغراض/التفاصيل: ${body.description || 'لا توجد'}`,
+                    `هاتف التواصل: ${body.contactPhone || 'غير محدد'}`,
+                    `الموعد: ${body.scheduledAt || 'الآن'}`,
+                    `ملاحظات: ${body.notes || 'لا توجد'}`,
+                    'تنبيه: هذا الطلب غير مسجل في النظام بعد؛ يلزم إرسال الرسالة يدويًا ومراجعته من الإدارة.'
+                ].join('\n');
+                const proceed = confirm('انقطع الاتصال بالإنترنت. هل تريد فتح تطبيق الرسائل لإرسال تفاصيل المشوار إلى رقم الإدارة عبر SMS؟');
+                if (proceed) {
+                    window.location.href = `sms:${encodeURIComponent(phone)}?body=${encodeURIComponent(smsBody)}`;
+                    msg.textContent = 'تم فتح تطبيق الرسائل إن كان مدعومًا. اضغط إرسال بنفسك؛ الطلب غير مؤكد أو مسجل حتى تراجعه الإدارة.';
+                    msg.className = 'muted';
+                }
+            }
+            else {
+                msg.textContent = x.message;
+                msg.className = 'error';
+            }
+            btn.disabled = false;
+            btn.textContent = 'إرسال طلب المشوار';
+        }
+    });
 }
 async function openOrderFormBySlug(slug, initial = null) { if (!state.user) {
     localStorage.setItem('khadamat.pendingCustomerRequest.v1', 'slug:' + slug);
@@ -2233,7 +2291,7 @@ async function openOrderForm(serviceId, initial = null) {
     const hasDedicatedDescription = (s.formSchema || []).some(isDescriptionField);
     const descriptionFields = optionalFields.filter(isDescriptionField);
     const fields = [...requiredFields, ...descriptionFields].map(renderField).join('');
-    const quantityFields = optionalFields.filter((f) => !descriptionFields.includes(f) && (/^(quantity|qty|count)$/i.test(String(f.key)) || /الكمية|عدد القطع/i.test(String(f.labelText || f.label?.ar || ''))));
+    const quantityFields = optionalFields.filter((f) => !descriptionFields.includes(f) && (/^(quantity|qty|count|workers_count|passenger_count|people_count|persons_count|riders_count)$/i.test(String(f.key)) || /الكمية|عدد القطع|عدد العمال|عدد الركاب|عدد الأفراد/i.test(String(f.labelText || f.label?.ar || ''))));
     const quantityFieldsHtml = quantityFields.map(renderField).join('');
     const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
     const suggestionHtml = descSuggestions.length ? `<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x => `<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : '';
@@ -2519,7 +2577,7 @@ async function openOrderForm(serviceId, initial = null) {
       <section class="checkout-reference-recommendations"><div class="checkout-reference-section-title"><b>يمكنك أيضًا الطلب من المتاجر التالية برسوم توصيل منخفضة قدرها</b><strong>250 ر.ي</strong></div><div id="checkoutStoreList">جارٍ تحميل المتاجر…</div></section>
       <section class="checkout-reference-totals"><div class="checkout-total-row"><span>الإجمالي</span><b id="checkoutSubtotal">${s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(Number(s.basePrice)) ? esc(String(Number(s.basePrice))) : '—'} ر.ي</b></div><div class="checkout-total-row"><span>التوصيل</span><b id="checkoutDeliveryFee">${Number.isFinite(Number(initial?.deliveryFee)) ? esc(String(Number(initial.deliveryFee))) : '—'} ر.ي</b></div><div class="checkout-total-row checkout-grand-total"><span>الإجمالي الكلي</span><b id="checkoutGrandTotal">${s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(Number(s.basePrice)) ? esc(String(Number(s.basePrice) + (Number.isFinite(Number(initial?.deliveryFee)) ? Number(initial.deliveryFee) : 0))) : '—'} ر.ي</b></div></section>
       ${(state.campaigns || []).filter((c) => c.title).slice(0, 1).map((c) => `<section class="checkout-reference-subscription">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}">` : ''}<div><b>${esc(c.title)}</b>${c.description ? `<p>${esc(c.description)}</p>` : ''}</div>${c.buttonLabel ? `<button type="button" class="checkout-reference-ad-button">${esc(c.buttonLabel)}</button>` : ''}</section>`).join('')}
-      <!-- id="addReviewPharmacyProduct" id="saveReviewPharmacyProduct": pharmacy products are edited in the prior cart stage before confirmation. --><section class="checkout-reference-invoice"><header class="checkout-invoice-store-head"><button type="button" id="checkoutDeleteInvoice" aria-label="حذف تفاصيل المنتج">♧</button><div class="checkout-invoice-store-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><b>${esc(String(initial?.storeName || s.name))}</b><button type="button" id="toggleInvoice" aria-label="طي الفاتورة">⌃</button></header><div id="checkoutInvoiceBody"><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>${Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length ? initial.pharmacyProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>—</td><td>${esc(String(p.quantity || 1))}</td><td>—</td></tr>`).join('') : `<tr><td>${esc(s.name)}</td><td>${s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(Number(s.basePrice)) ? esc(String(Number(s.basePrice))) : '—'}</td><td>1</td><td>${s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(Number(s.basePrice)) ? esc(String(Number(s.basePrice))) : '—'}</td></tr>`}</tbody></table></div><div class="checkout-invoice-total"><b>الإجمالي</b><strong>${s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(Number(s.basePrice)) ? esc(String(Number(s.basePrice))) : '—'} ر.ي</strong></div></div></section>
+      <!-- id="addReviewPharmacyProduct" id="saveReviewPharmacyProduct": pharmacy products are edited in the prior cart stage before confirmation. --><section class="checkout-reference-invoice"><header class="checkout-invoice-store-head"><button type="button" id="checkoutDeleteInvoice" aria-label="حذف تفاصيل المنتج">♧</button><div class="checkout-invoice-store-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><b>${esc(String(initial?.storeName || s.name))}</b><button type="button" id="toggleInvoice" aria-label="طي الفاتورة">⌃</button></header><div id="checkoutInvoiceBody"><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>${Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length ? initial.pharmacyProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>—</td><td>${esc(String(p.quantity || 1))}</td><td>—</td></tr>`).join('') : (() => { const qf = (s.formSchema || []).find((f) => /^(quantity|qty|count|workers_count|passenger_count|people_count|persons_count|riders_count)$/i.test(String(f.key)) || /الكمية|عدد القطع|عدد العمال|عدد الركاب|عدد الأفراد/i.test(String(f.labelText || f.label?.ar || ''))); const qty = Math.max(1, Math.floor(Number(qf ? fdReview.get(String(qf.key)) : 1) || 1)); const price = Number(s.basePrice); const valid = s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(price); const total = valid ? price * qty : NaN; return `<tr><td>${esc(s.name)}</td><td>${valid ? esc(String(price)) : '—'}</td><td>${qty}</td><td>${Number.isFinite(total) ? esc(String(total)) : '—'}</td></tr>`; })()}</tbody></table></div><div class="checkout-invoice-total"><b>الإجمالي</b><strong>${(() => { const qf = (s.formSchema || []).find((f) => /^(quantity|qty|count|workers_count|passenger_count|people_count|persons_count|riders_count)$/i.test(String(f.key)) || /الكمية|عدد القطع|عدد العمال|عدد الركاب|عدد الأفراد/i.test(String(f.labelText || f.label?.ar || ''))); const qty = Math.max(1, Math.floor(Number(qf ? fdReview.get(String(qf.key)) : 1) || 1)); const price = Number(s.basePrice); return s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(price) ? esc(String(price * qty)) : '—'; })()} ر.ي</strong></div></div></section>
       <div class="checkout-reference-footer"><div class="checkout-reference-footer-total"><span>الإجمالي</span><b>${s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(Number(s.basePrice)) ? esc(String(Number(s.basePrice))) : '—'} ر.ي</b></div><div class="checkout-reference-footer-buttons"><button type="button" class="btn" id="reviewConfirmOrder">تنفيذ الطلب</button><button type="button" class="btn secondary" id="reviewBackToEdit">تعديل السلة</button></div></div>`;
             const originalChildren = Array.from(orderForm.children);
             originalChildren.forEach(el => el.classList.add('order-review-hidden'));
@@ -2533,7 +2591,7 @@ async function openOrderForm(serviceId, initial = null) {
             }
             api('/me/order-store-recommendations').then((p) => { const el = document.getElementById('checkoutStoreList'); if (el) {
                 const a = p.items || [];
-                el.innerHTML = a.length ? `<div class="checkout-store-grid">${a.map((x) => `<article class="checkout-store-tile" aria-label="${esc(x.storeName)}"><div class="checkout-store-avatar">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="${esc(x.storeName)}" loading="lazy">` : `<span aria-hidden="true">${esc(String(x.storeName || 'م').trim().slice(0, 1))}</span>`}</div><b class="checkout-store-name">${esc(x.storeName)}</b></article>`).join('')}</div>` : '<span class="muted">لا توجد متاجر مقترحة.</span>';
+                el.innerHTML = a.length ? `<div class="checkout-store-grid">${a.map((x) => `<article class="checkout-store-tile" aria-label="${esc(x.storeName)}"><div class="checkout-store-avatar">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="${esc(x.storeName)}" loading="lazy">` : `<span aria-hidden="true">${esc(String(x.storeName || 'م').trim().slice(0, 1))}</span>`}</div><small class="checkout-store-category">${esc(x.categoryName || 'متاجر عامة')}</small><b class="checkout-store-name">${esc(x.storeName)}</b></article>`).join('')}</div>` : '<span class="muted">لا توجد متاجر مقترحة.</span>';
             } }).catch(() => { });
             const toggle = (id) => { const el = document.getElementById(id); el?.classList.toggle('hide-section'); };
             document.getElementById('toggleCoupon')?.addEventListener('click', () => toggle('couponEntry'));
@@ -2705,13 +2763,36 @@ async function openOrderForm(serviceId, initial = null) {
         }
         catch (x) {
             if (!navigator.onLine) {
-                queueOrder(b, idempotencyKey, offlineImage);
+                const adminPhone = String(state.config?.adminSmsPhone || '').trim();
+                const offerSms = confirm('لا يوجد اتصال بالإنترنت. هل تريد تجهيز رسالة SMS إلى إدارة خدمات بدلًا من إرسال الطلب عبر الإنترنت؟');
+                if (offerSms) {
+                    if (!adminPhone) {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'إرسال الطلب';
+                        }
+                        msg.textContent = 'لم يُضبط رقم هاتف الإدارة لاستقبال الطلبات عبر SMS. اتصل بالإنترنت أو تواصل مع الإدارة.';
+                        msg.className = 'error';
+                        return;
+                    }
+                    const lines = ['طلب جديد — خدمات', 'العميل: ' + String(state.user?.name || state.user?.fullName || 'غير متوفر'), 'رقم التواصل: ' + String(b.contactPhone || state.user?.phone || 'غير متوفر'), 'الخدمة/المتجر: ' + String(s.name || b.description || 'طلب خدمة'), 'التفاصيل: ' + String(b.description || ''), 'الكمية/البيانات: ' + JSON.stringify(b.formData || {}), 'العنوان: ' + (b.location ? `${b.location.lat}, ${b.location.lng}` : (b.addressId || 'غير محدد')), 'ملاحظات: ' + String(b.notes || 'لا توجد'), 'تنبيه: تجهيز الرسالة لا يعني أن الطلب أُرسل أو قُبل.'];
+                    const smsBody = encodeURIComponent(lines.join('\n'));
+                    const smsHref = `sms:${adminPhone.replace(/[^+0-9]/g, '')}?body=${smsBody}`;
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'فتح رسالة SMS للإدارة';
+                    }
+                    msg.textContent = 'سيُفتح تطبيق الرسائل برسالة جاهزة. راجعها واضغط إرسال بنفسك. لن يُعد الطلب مستلمًا أو مقبولًا حتى تؤكد الإدارة ذلك.';
+                    msg.className = 'muted';
+                    window.location.href = smsHref;
+                    return;
+                }
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'حفظ الطلب وإرساله عند عودة الإنترنت';
+                    submitBtn.textContent = 'إرسال الطلب';
                 }
-                msg.textContent = 'الإنترنت غير متاح. حُفظ الطلب على هذا الجهاز وسيُرسل تلقائيًا عند عودة الاتصال.';
-                msg.className = 'success';
+                msg.textContent = 'لم يُرسل الطلب. يمكنك المحاولة عند عودة الإنترنت أو اختيار إرسال SMS إلى الإدارة.';
+                msg.className = 'error';
                 return;
             }
             if (submitBtn) {
@@ -3962,7 +4043,7 @@ async function admin() {
       ${activeTab === 'liveOps' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>🟢 المراقبة الحية</h2><p class="muted">بيانات تشغيلية حقيقية من قاعدة البيانات، مع مزامنة تلقائية عبر SSE عند تغير الطلبات أو حالة مقدم الخدمة.</p></div><button class="btn secondary" id="refreshLiveOps">تحديث الآن</button></div></div><div class="card"><h3>الطلبات الآن</h3><div class="admin-table-wrap"><table class="table"><thead><tr><th>الطلب</th><th>الخدمة</th><th>العميل</th><th>المقدم</th><th>الحالة</th><th>آخر تحديث</th></tr></thead><tbody>${(liveOps.orders || []).map((x) => `<tr><td>${esc(x.code)}</td><td>${esc(trJson(x.serviceName))}</td><td>${esc(x.customerName)}</td><td>${esc(x.providerName || 'غير مسند')}</td><td>${esc(statusAr(x.status))}</td><td>${esc(formatDateTime(x.updatedAt))}</td></tr>`).join('') || '<tr><td colspan=6 class="muted">لا توجد طلبات نشطة.</td></tr>'}</tbody></table></div></div><div class="card"><h3>مقدمو الخدمة</h3><div class="admin-table-wrap"><table class="table"><thead><tr><th>المقدم</th><th>الاتصال</th><th>التوفر</th><th>استقبال الطلبات</th><th>آخر Heartbeat</th><th>آخر موقع</th><th>الطلب الحالي</th><th>الموقع</th></tr></thead><tbody>${(liveOps.providers || []).map((x) => `<tr><td>${esc(x.displayName)}</td><td>${x.online ? '🟢 متصل' : '⚪ غير متصل'}</td><td>${esc(x.availabilityText || 'غير متاح')}</td><td>${x.acceptingOrders ? '🟢 يستقبل' : '⚪ لا يستقبل'}</td><td>${esc(formatDateTime(x.lastHeartbeatAt || x.lastSeenAt || ''))}</td><td>${esc(formatDateTime(x.lastLocationAt || x.updatedAt || ''))}</td><td>${x.currentOrder?.code ? esc(x.currentOrder.code) + ' · ' + esc(statusAr(x.currentOrder.status)) : 'لا يوجد طلب'}</td><td>${x.lat ?? x.baseLat ? `${Number(x.lat ?? x.baseLat).toFixed(5)} , ${Number(x.lng ?? x.baseLng).toFixed(5)}` : 'غير متوفر'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
       ${activeTab === 'alerts' ? `<div class="card"><h2>🔔 مركز التنبيهات</h2><p class="muted">التنبيهات مولدة من حالات النظام الحقيقية. يمكن الإقرار بها أو حلها.</p></div><div>${(alerts.alerts || []).map((a) => `<div class="card"><div class="row" style="justify-content:space-between"><div><b>${a.severity === 'CRITICAL' ? '🔴' : '🟠'} ${esc(a.title)}</b><p>${esc(a.message)}</p><small class="muted">${esc(formatDateTime(a.last_seen_at))}</small></div><div class="row"><button class="btn secondary small" data-alert-action="ACKNOWLEDGED" data-alert-id="${esc(a.id)}">إقرار</button><button class="btn small" data-alert-action="RESOLVED" data-alert-id="${esc(a.id)}">حل</button></div></div></div>`).join('') || '<div class="card muted">لا توجد تنبيهات مفتوحة.</div>'}</div>` : ''}
       ${activeTab === 'temporary' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>⏳ الخدمات المؤقتة والمناسبات</h2><p class="muted">الخدمة تختفي تلقائيًا بعد انتهاء الفترة دون حذف سجلها.</p></div><button class="btn" id="newTemporaryService">+ خدمة مؤقتة</button></div></div><div>${(temporaryServices.items || []).map((x) => `<div class="card"><b>${esc(trJson(x.title_i18n))}</b><p>${esc(trJson(x.description_i18n || '{}'))}</p><small class="muted">${esc(x.start_at)} → ${esc(x.end_at)} · ${esc(x.state || (x.is_active ? 'مفعلة' : 'معطلة'))} · أولوية ${esc(x.priority || 0)} · مرتبطة بخدمة ${esc(x.linked_service_id)}</small><div class="row" style="margin-top:8px"><button class="btn secondary small" data-temp-edit="${esc(x.id)}">تعديل الفترة والأولوية</button><button class="btn secondary small" data-temp-toggle="${esc(x.id)}" data-next-temp="${x.is_active ? 'false' : 'true'}">${x.is_active ? 'إيقاف' : 'تفعيل'}</button></div></div>`).join('') || '<div class="card muted">لا توجد خدمات مؤقتة.</div>'}</div>` : ''}
-      ${activeTab === 'orderStores' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>🛍️ المتاجر المقترحة في صفحة الطلب</h2><p class="muted">أضف أسماء المتاجر ورسوم التوصيل والحد الأدنى التي تظهر للعميل.</p></div><button class="btn" id="newOrderStore">+ إضافة متجر</button></div></div><div class="grid">${(orderStores.items || []).map((x) => `<div class="card admin-order-store-card"><div class="admin-order-store-avatar">${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.store_name)}">` : `<span>${esc(String(x.store_name || 'م').trim().slice(0, 1))}</span>`}</div><h3>${esc(x.store_name)}</h3><p>${esc(x.description || '')}</p>${x.featured_items ? `<p><b>الأصناف والأسعار:</b><br>${esc(x.featured_items).replace(/\n/g, '<br>')}</p>` : ''}<p>رسوم التوصيل: <b>${esc(x.delivery_fee)} ر.ي</b></p><p>الحد الأدنى: ${esc(x.minimum_order || 0)} ر.ي</p><p>${x.is_active ? '🟢 نشط' : '⚪ متوقف'}</p><div class="row"><button class="btn secondary small" data-edit-order-store="${esc(x.id)}">تعديل</button><button class="btn secondary small" data-toggle-order-store="${esc(x.id)}" data-active="${x.is_active ? 'false' : 'true'}">${x.is_active ? 'إيقاف' : 'تفعيل'}</button><button class="btn danger secondary small" data-delete-order-store="${esc(x.id)}">حذف</button></div></div>`).join('') || '<div class="card muted">لم تتم إضافة متاجر مقترحة بعد.</div>'}</div>` : ''}
+      ${activeTab === 'orderStores' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>🛍️ المتاجر المقترحة في صفحة الطلب</h2><p class="muted">أضف أسماء المتاجر ورسوم التوصيل والحد الأدنى التي تظهر للعميل.</p></div><button class="btn" id="newOrderStore">+ إضافة متجر</button></div></div><div class="grid">${(orderStores.items || []).map((x) => `<div class="card admin-order-store-card"><div class="admin-order-store-avatar">${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.store_name)}">` : `<span>${esc(String(x.store_name || 'م').trim().slice(0, 1))}</span>`}</div><h3>${esc(x.store_name)}</h3><p class="muted">التصنيف: ${esc(x.category_name || 'متاجر عامة')}</p><p>${esc(x.description || '')}</p>${x.featured_items ? `<p><b>الأصناف والأسعار:</b><br>${esc(x.featured_items).replace(/\n/g, '<br>')}</p>` : ''}<p>رسوم التوصيل: <b>${esc(x.delivery_fee)} ر.ي</b></p><p>الحد الأدنى: ${esc(x.minimum_order || 0)} ر.ي</p><p>${x.is_active ? '🟢 نشط' : '⚪ متوقف'}</p><div class="row"><button class="btn secondary small" data-edit-order-store="${esc(x.id)}">تعديل</button><button class="btn secondary small" data-toggle-order-store="${esc(x.id)}" data-active="${x.is_active ? 'false' : 'true'}">${x.is_active ? 'إيقاف' : 'تفعيل'}</button><button class="btn danger secondary small" data-delete-order-store="${esc(x.id)}">حذف</button></div></div>`).join('') || '<div class="card muted">لم تتم إضافة متاجر مقترحة بعد.</div>'}</div>` : ''}
       ${activeTab === 'campaigns' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2>📣 الإعلانات والحملات</h2><p class="muted">تحدد الإدارة المحتوى والجمهور والفترة دون تعديل الكود.</p></div><button class="btn" id="newCampaign">+ حملة جديدة</button></div></div><div>${(campaigns.items || []).map((x) => `<div class="card">${x.image_file_id ? `<img class="campaign-admin-preview" src="/api/v1/files/${esc(x.image_file_id)}" alt="${esc(trJson(x.title_i18n))}" loading="lazy">` : ''}<b>${esc(trJson(x.title_i18n))}</b><p>${esc(trJson(x.description_i18n || '{}'))}</p><small class="muted">${esc(x.start_at)} → ${esc(x.end_at)} · ${esc(x.state || (x.is_active ? 'مفعلة' : 'معطلة'))} · أولوية ${esc(x.priority || 0)} · مناطق: ${esc((JSON.parse(x.area_ids_json || '[]') || []).length || 'كل المناطق')}</small><div class="row" style="margin-top:8px"><button class="btn secondary small" data-camp-edit="${esc(x.id)}">تعديل الحملة</button><button class="btn secondary small" data-camp-toggle="${esc(x.id)}" data-next-camp="${x.is_active ? 'false' : 'true'}">${x.is_active ? 'إيقاف' : 'تفعيل'}</button></div></div>`).join('') || '<div class="card muted">لا توجد حملات.</div>'}</div>` : ''}
       ${activeTab === 'reports' ? `<div class="grid"><div class="card"><div class="stat">${esc(reports.summary?.orders ?? 0)}</div><div>الطلبات</div></div><div class="card"><div class="stat">${esc(reports.summary?.completed ?? 0)}</div><div>مكتملة</div></div><div class="card"><div class="stat">${esc(Math.round(reports.summary?.acceptSec || 0))} ث</div><div>متوسط القبول</div></div><div class="card"><div class="stat">${esc(Math.round(reports.summary?.executionSec || 0))} ث</div><div>متوسط التنفيذ</div></div></div><div class="card"><h3>أكثر الخدمات طلبًا</h3><div class="admin-table-wrap"><table class="table"><thead><tr><th>الخدمة</th><th>الطلبات</th><th>مكتملة</th><th>ملغاة</th><th>متوسط القبول</th></tr></thead><tbody>${(reports.byService || []).map((x) => `<tr><td>${esc(x.service)}</td><td>${esc(x.orders)}</td><td>${esc(x.completed)}</td><td>${esc(x.cancelled)}</td><td>${esc(Math.round(x.acceptSec || 0))} ث</td></tr>`).join('')}</tbody></table></div></div>` : ''}
       ${activeTab === 'system' ? `<div class="grid"><div class="card"><div class="stat">${esc(health.db?.ok ? 'OK' : 'FAIL')}</div><div>قاعدة البيانات</div></div><div class="card"><div class="stat">${esc(health.api?.errors?.length || 0)}</div><div>أخطاء API مسجلة</div></div><div class="card"><div class="stat">${esc(health.api?.slow?.length || 0)}</div><div>مسارات بطيئة</div></div><div class="card"><div class="stat">${esc(perf.server?.database?.queries || 0)}</div><div>استعلامات DB</div><small>${esc(perf.server?.database?.totalMs || 0)}ms إجمالي</small></div><div class="card"><div class="stat">${esc(perf.server?.sse?.connections || 0)}</div><div>اتصالات Realtime</div></div></div><div class="card"><h3>أحدث الأخطاء</h3>${(health.api?.errors || []).map((x) => `<div class="notice error"><b>${esc(x.event_type)}</b> · ${esc(x.path || '')} · ${esc(x.status_code || '')}<br>${esc(x.message)}<br><small>${esc(formatDateTime(x.created_at))}</small></div>`).join('') || '<p class="muted">لا توجد أخطاء مسجلة خلال الفترة.</p>'}</div>` : ''}
@@ -4188,17 +4269,34 @@ function openTemporaryServiceEditor(allServices, refresh, existing = null) {
     } });
 }
 function openOrderStoreEditor(refresh, existing = null) {
-    showModal(`<div><h2>${existing ? 'تعديل متجر مقترح' : 'إضافة متجر مقترح'}</h2><form id="orderStoreEditor"><div class="field"><label>اسم المتجر</label><input name="storeName" required maxlength="120" value="${esc(existing?.store_name || '')}"></div><div class="field"><label>وصف المتجر</label><textarea name="description" maxlength="500">${esc(existing?.description || '')}</textarea></div><div class="field"><label>أصناف وأسعار (كل سطر: اسم الصنف | السعر)</label><textarea name="featuredItems" maxlength="3000" placeholder="مثال: وجبة عائلية | 2500">${esc(existing?.featured_items || '')}</textarea></div><div class="grid"><div class="field"><label>رسوم التوصيل (ر.ي)</label><input name="deliveryFee" type="number" min="0" required value="${Number(existing?.delivery_fee ?? 250)}"></div><div class="field"><label>الحد الأدنى (ر.ي)</label><input name="minimumOrder" type="number" min="0" value="${Number(existing?.minimum_order || 0)}"></div><div class="field"><label>ترتيب العرض</label><input name="sortOrder" type="number" value="${Number(existing?.sort_order || 0)}"></div></div><div class="field"><label>رابط صورة المتجر (تظهر دائرية في صفحة الطلب)</label><input name="imageUrl" type="url" placeholder="https://..." value="${esc(existing?.image_url || '')}"></div>${existing?.image_url ? `<div class="admin-order-store-avatar admin-order-store-avatar-preview"><img src="${esc(existing.image_url)}" alt="معاينة صورة المتجر"></div>` : ''}<label><input type="checkbox" name="isActive" ${existing?.is_active === 0 ? '' : 'checked'}> عرض للعملاء</label><button class="btn">حفظ</button><p id="orderStoreMsg"></p></form></div>`);
-    document.getElementById('orderStoreEditor')?.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const b = { storeName: String(f.get('storeName') || '').trim(), description: String(f.get('description') || ''), featuredItems: String(f.get('featuredItems') || ''), deliveryFee: Number(f.get('deliveryFee')), minimumOrder: Number(f.get('minimumOrder') || 0), sortOrder: Number(f.get('sortOrder') || 0), imageUrl: String(f.get('imageUrl') || '') || undefined, isActive: f.get('isActive') === 'on' }; try {
+    showModal(`<div><h2>${existing ? 'تعديل متجر مقترح' : 'إضافة متجر مقترح'}</h2><form id="orderStoreEditor"><div class="field"><label>تصنيف المتجر</label><select name="categoryName"><option ${!existing?.category_name || existing?.category_name === 'مطاعم' ? 'selected' : ''}>مطاعم</option><option ${existing?.category_name === 'بقالات' ? 'selected' : ''}>بقالات</option><option ${existing?.category_name === 'صيدليات' ? 'selected' : ''}>صيدليات</option><option ${existing?.category_name === 'متاجر عامة' ? 'selected' : ''}>متاجر عامة</option><option ${existing?.category_name === 'خضار وفواكه' ? 'selected' : ''}>خضار وفواكه</option></select><small class="muted">اختر التصنيف أولًا ثم أدخل اسم المتجر المسجّل.</small></div><div class="field"><label>اسم المتجر</label><input name="storeName" required maxlength="120" value="${esc(existing?.store_name || '')}"></div><div class="field"><label>وصف المتجر</label><textarea name="description" maxlength="500">${esc(existing?.description || '')}</textarea></div><div class="field"><label>أصناف وأسعار (كل سطر: اسم الصنف | السعر)</label><textarea name="featuredItems" maxlength="3000" placeholder="مثال: وجبة عائلية | 2500">${esc(existing?.featured_items || '')}</textarea></div><div class="grid"><div class="field"><label>رسوم التوصيل (ر.ي)</label><input name="deliveryFee" type="number" min="0" required value="${Number(existing?.delivery_fee ?? 250)}"></div><div class="field"><label>الحد الأدنى (ر.ي)</label><input name="minimumOrder" type="number" min="0" value="${Number(existing?.minimum_order || 0)}"></div><div class="field"><label>ترتيب العرض</label><input name="sortOrder" type="number" value="${Number(existing?.sort_order || 0)}"></div></div><div class="field"><label>صورة المتجر من الهاتف أو رابط صورة</label><input name="imageFile" type="file" accept="image/png,image/jpeg,image/webp"><input name="imageUrl" type="url" placeholder="أو أدخل رابط صورة https://..." value="${esc(existing?.image_url || '')}"><small class="muted">PNG أو JPG أو WEBP حتى 5MB.</small></div>${existing?.image_url ? `<div class="admin-order-store-avatar admin-order-store-avatar-preview"><img src="${esc(existing.image_url)}" alt="معاينة صورة المتجر"></div>` : ''}<label><input type="checkbox" name="isActive" ${existing?.is_active === 0 ? '' : 'checked'}> عرض للعملاء</label><button class="btn">حفظ</button><p id="orderStoreMsg"></p></form></div>`);
+    document.getElementById('orderStoreEditor')?.addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const f = new FormData(form); const msg = document.getElementById('orderStoreMsg'); const submit = form.querySelector('button[type=submit],button:not([type])'); try {
+        if (submit) {
+            submit.disabled = true;
+            submit.textContent = 'جارٍ الحفظ...';
+        }
+        let imageUrl = String(f.get('imageUrl') || '').trim() || undefined;
+        const image = form.querySelector('[name="imageFile"]')?.files?.[0];
+        if (image) {
+            if (image.size > 5 * 1024 * 1024)
+                throw new Error('حجم الصورة يتجاوز 5MB');
+            const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('تعذرت قراءة الصورة')); reader.readAsDataURL(image); });
+            const uploaded = await api('/files', { method: 'POST', body: JSON.stringify({ purpose: 'service_icon', name: image.name, dataBase64: data }) });
+            imageUrl = uploaded.file.url;
+        }
+        const b = { storeName: String(f.get('storeName') || '').trim(), categoryName: String(f.get('categoryName') || 'متاجر عامة'), description: String(f.get('description') || ''), featuredItems: String(f.get('featuredItems') || ''), deliveryFee: Number(f.get('deliveryFee')), minimumOrder: Number(f.get('minimumOrder') || 0), sortOrder: Number(f.get('sortOrder') || 0), imageUrl, isActive: f.get('isActive') === 'on' };
         await api(existing ? '/admin/order-stores/' + encodeURIComponent(existing.id) : '/admin/order-stores', { method: existing ? 'PATCH' : 'POST', body: JSON.stringify(b) });
         closeModal();
         await refresh();
     }
     catch (err) {
-        const el = document.getElementById('orderStoreMsg');
-        if (el) {
-            el.textContent = err.message;
-            el.className = 'error';
+        if (submit) {
+            submit.disabled = false;
+            submit.textContent = 'حفظ';
+        }
+        if (msg) {
+            msg.textContent = err.message;
+            msg.className = 'error';
         }
     } });
 }

@@ -259,7 +259,7 @@ export function registerCatalogRoutes(app, r) {
     const { catalog } = app;
     r.get('/categories', (ctx) => ({ categories: catalog.tree(ctx.query['lang'] === 'en' ? 'en' : ctx.locale) }));
     // Public checkout recommendations are sourced only from active admin-managed records.
-    r.get('/order-stores', () => ({ items: app.db.all("SELECT id,store_name storeName,description,delivery_fee deliveryFee,minimum_order minimumOrder,image_url imageUrl,sort_order sortOrder FROM order_store_recommendations WHERE is_active=1 ORDER BY sort_order ASC, created_at DESC") }));
+    r.get('/order-stores', () => ({ items: app.db.all("SELECT id,store_name storeName,category_name categoryName,description,delivery_fee deliveryFee,minimum_order minimumOrder,image_url imageUrl,sort_order sortOrder FROM order_store_recommendations WHERE is_active=1 ORDER BY sort_order ASC, created_at DESC") }));
     r.get('/catalog/bootstrap', (ctx) => {
         const locale = ctx.query['lang'] === 'en' ? 'en' : ctx.locale;
         const data = catalog.all();

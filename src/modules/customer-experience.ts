@@ -17,7 +17,7 @@ const beneficiarySchema = s.obj({
 
 export function registerCustomerExperienceRoutes(app: App, r: Router): void {
   const { db } = app;
-  r.get('/me/order-store-recommendations', auth, roles('CUSTOMER'), (ctx:Ctx) => ({ items: db.all<any>('SELECT id,store_name storeName,description,featured_items featuredItems,delivery_fee deliveryFee,minimum_order minimumOrder,image_url imageUrl FROM order_store_recommendations WHERE is_active=1 ORDER BY sort_order ASC,created_at DESC').map((x:any)=>({...x,deliveryFee:Number(x.deliveryFee||0),minimumOrder:Number(x.minimumOrder||0)})) }));
+  r.get('/me/order-store-recommendations', auth, roles('CUSTOMER'), (ctx:Ctx) => ({ items: db.all<any>('SELECT id,store_name storeName,category_name categoryName,description,featured_items featuredItems,delivery_fee deliveryFee,minimum_order minimumOrder,image_url imageUrl FROM order_store_recommendations WHERE is_active=1 ORDER BY sort_order ASC,created_at DESC').map((x:any)=>({...x,deliveryFee:Number(x.deliveryFee||0),minimumOrder:Number(x.minimumOrder||0)})) }));
 
   r.get('/me/favorites/providers', auth, roles('CUSTOMER'), (ctx: Ctx) => ({ providers: db.all<any>(`SELECT sp.id,sp.display_name displayName,sp.rating_avg rating,sp.verification_status verificationStatus FROM favorite_providers f JOIN service_providers sp ON sp.id=f.provider_id WHERE f.customer_id=? ORDER BY f.created_at DESC`, ctx.user!.id) }));
   r.post('/me/favorites/providers/:providerId', auth, roles('CUSTOMER'), (ctx: Ctx) => {
