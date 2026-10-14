@@ -1347,3 +1347,16 @@ body:has(.customer-shell) #modal:has(.account-form-title) .account-delete-card{d
 .customer-shell .customer-empty-banner small{font-size:10px}
 .customer-shell .customer-empty-banner strong{font-size:10px}
 @media(max-width:420px){.customer-shell .brand-lockup small{max-width:104px}.customer-shell .customer-area-label{gap:3px}.customer-shell .customer-area-names{gap:3px}.customer-shell .customer-area-names b{font-size:9px}.customer-shell .customer-area-names i{font-size:8px}.customer-shell .campaign-card{flex-basis:86%}.customer-shell .all-offers-button{right:4px;width:60px;min-width:60px;font-size:9px}.customer-shell .customer-empty-banner{width:calc(100% + 24px);min-height:92px;padding:10px 12px}}
+
+
+/* V2.31 — concise quick-access prompt and image-first square offer cards. */
+.customer-shell .quick-assist-reference-head small{font-size:11px;line-height:1.45}
+.customer-shell .campaign-strip{align-items:stretch;gap:9px}
+.customer-shell .campaign-card{display:block;position:relative;flex:0 0 min(47vw,190px);width:min(47vw,190px);aspect-ratio:1/1;min-height:0;padding:0;overflow:hidden;border:1px solid #e0e9e3;border-radius:14px;background:#edf5ef;box-shadow:0 3px 10px rgba(23,74,54,.07);scroll-snap-align:start}
+.customer-shell .campaign-card .campaign-image-wrap{position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;overflow:hidden}
+.customer-shell .campaign-card .campaign-image{display:block;width:100%;height:100%;aspect-ratio:1/1;object-fit:cover;border-radius:inherit}
+.customer-shell .campaign-card .campaign-image-placeholder{display:grid;place-items:center;width:100%;height:100%;aspect-ratio:1/1;background:linear-gradient(135deg,#e8f5ef,#fff5df);color:#176b4d}
+.customer-shell .campaign-image-overlay-label{position:absolute;right:8px;bottom:8px;left:8px;display:block;max-width:calc(100% - 16px);padding:5px 8px;border-radius:8px;background:rgba(18,54,39,.68);color:#fff;font-size:10px;font-weight:800;line-height:1.4;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);pointer-events:none}
+.customer-shell .campaign-card .campaign-favorite{position:absolute;z-index:2;top:7px;left:7px;display:grid;place-items:center;width:30px;height:30px;min-height:30px;padding:0;border:1px solid rgba(255,255,255,.65);border-radius:50%;background:rgba(255,255,255,.88);color:#176b4d;font-size:19px;box-shadow:0 2px 7px rgba(0,0,0,.12)}
+.customer-shell .campaign-card-copy,.customer-shell .campaign-image-badge{display:none!important}
+@media(max-width:420px){.customer-shell .campaign-card{flex-basis:min(48vw,175px);width:min(48vw,175px)}}
