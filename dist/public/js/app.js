@@ -605,21 +605,157 @@ function openAbout() {
     <section class="about-app-section"><h3>كيف يعمل التطبيق؟</h3><p>بدلًا من أن تبحث بنفسك عن شخص يقدم الخدمة التي تحتاجها، كل ما عليك هو تحديد الخدمة وإرسال طلبك.</p><p>يقوم التطبيق بتنظيم الطلب وربطه بمقدم الخدمة المناسب، مع إمكانية متابعة حالة الطلب إلى أن يتم إنجازه.</p><p class="about-app-slogan">لا تبحث عن مقدم الخدمة... اطلب الخدمة فقط.</p></section>
     <section class="about-app-section"><h3>هدفنا</h3><p>هدفنا هو <strong>خدمتكم وتسهيل حياتكم اليومية</strong> من خلال توفير طريقة أسهل للوصول إلى الخدمات، وربط العملاء بمقدمي الخدمات، وفتح المجال أمام أصحاب المهن والعمال ومقدمي الخدمات للوصول إلى عملاء جدد.</p><p>نسعى إلى تطوير التطبيق باستمرار وإضافة المزيد من الخدمات والمزايا، بما يلبي احتياجات المجتمع ويجعل طلب الخدمة أكثر سهولة وتنظيمًا.</p></section>
     <section class="about-app-contact"><h3>للتواصل والاستفسارات</h3><div class="about-contact-row"><span>📧 <b>البريد الإلكتروني:</b></span><a dir="ltr" href="mailto:HaithamPro77@gmail.com">HaithamPro77@gmail.com</a></div><div class="about-contact-row"><span>📱 <b>واتساب:</b></span><a dir="ltr" href="https://wa.me/967711000121" target="_blank" rel="noopener">00967711000121</a></div><div class="about-contact-row"><span>☎️ <b>رقم التواصل:</b></span><a dir="ltr" href="tel:+967778100022">00967778100022</a></div></section>
-    <section class="about-app-section"><h3>ما الجديد في هذا الإصدار؟</h3><p>${esc(state.config?.releaseNotes || 'تحسينات على تجربة الاستخدام.')}</p><small>الإصدار ${esc(state.config?.appVersion || '2.26.0')}</small></section><footer class="about-app-footer"><strong>تطبيق ${esc(state.config?.appName || 'خدمات')}</strong><span>${esc(state.config?.appTagline || 'كل خدمة تحتاجها... في مكان واحد.')}</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
+    <section class="about-app-section"><h3>ما الجديد في هذا الإصدار؟</h3><p>${esc(state.config?.releaseNotes || 'تحسينات على تجربة الاستخدام.')}</p><small>الإصدار ${esc(state.config?.appVersion || '2.28.0')}</small></section><footer class="about-app-footer"><strong>تطبيق ${esc(state.config?.appName || 'خدمات')}</strong><span>${esc(state.config?.appTagline || 'كل خدمة تحتاجها... في مكان واحد.')}</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
   </article>`);
 }
 function roleHome(role) { return role === 'PROVIDER' ? '/provider' : role === 'ADMIN' ? '/admin' : '/customer'; }
 function redirectToRole(role) { const target = roleHome(role); if (location.pathname !== target)
     location.replace(target); }
-function applyBrandConfig() { const name = String(state.config?.appName || 'خدمات'); const tagline = String(state.config?.appTagline || 'كل خدمة تحتاجها في مكان واحد'); const nameEl = document.querySelector('.brand-lockup strong'); const taglineEl = document.querySelector('.brand-lockup small'); const mark = document.querySelector('.brand-lockup .brand-mark'); if (nameEl)
+function applyBrandConfig() { const name = String(state.config?.appName || 'خدمات'); const areaName = String((state.areas || []).find((a) => a.id === state.selectedAreaId)?.name || 'اختر المنطقة'); const tagline = page === 'customer' ? areaName : String(state.config?.appTagline || 'كل خدمة تحتاجها في مكان واحد'); const nameEl = document.querySelector('.brand-lockup strong'); const taglineEl = document.querySelector('.brand-lockup small'); const mark = document.querySelector('.brand-lockup .brand-mark'); if (nameEl)
     nameEl.textContent = name; if (taglineEl)
     taglineEl.textContent = tagline; if (mark) {
     const symbol = String(state.config?.appSymbol || 'خ').trim() || 'خ';
     mark.textContent = symbol.slice(0, 8);
 } document.title = `${name} | ${page === 'customer' ? 'العميل' : page === 'provider' ? 'مقدم الخدمة' : 'الإدارة'}`; }
-function shell(content, title = 'خدمات') { const home = state.user ? roleHome(state.user.role) : '/'; const brandName = esc(String(state.config?.appName || 'خدمات')); const brandTagline = esc(String(state.config?.appTagline || 'كل خدمة تحتاجها في مكان واحد')); const symbol = String(state.config?.appSymbol || 'خ'); root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''} ${page === 'customer' ? 'customer-shell' : ''} ${page === 'provider' ? 'provider-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="${brandName}"><span class="brand-mark" aria-hidden="true">${symbol === 'خ' ? '<svg viewBox="0 0 40 40"><path d="M8 12h11a5 5 0 0 1 0 10h-2a5 5 0 0 0 0 10h7M32 8v7a5 5 0 0 1-5 5h-2a5 5 0 0 0 0 10h7"/><circle cx="8" cy="12" r="3"/><circle cx="32" cy="8" r="3"/><circle cx="24" cy="32" r="3"/></svg>' : esc(symbol)}</span><span><strong>${brandName}</strong><small>${brandTagline}</small></span></a><div class="row top-actions"><button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>${state.user ? `<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button><button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button">🔔 <span id="notificationCount"></span></button><button class="btn secondary small logout-btn" id="logout">خروج</button>` : (page === 'customer' ? '<button class="btn small" id="guestLoginBtn" type="button">دخول / متابعة الطلب</button>' : '')}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('guestLoginBtn')?.addEventListener('click', () => authBox('CUSTOMER')); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
+function shell(content, title = 'خدمات') { const home = state.user ? roleHome(state.user.role) : '/'; const brandName = esc(String(state.config?.appName || 'خدمات')); const brandTagline = esc(page === 'customer' ? String((state.areas || []).find((a) => a.id === state.selectedAreaId)?.name || 'اختر المنطقة') : String(state.config?.appTagline || 'كل خدمة تحتاجها في مكان واحد')); const symbol = String(state.config?.appSymbol || 'خ'); root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''} ${page === 'customer' ? 'customer-shell' : ''} ${page === 'provider' ? 'provider-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="${brandName}"><span class="brand-mark" aria-hidden="true">${symbol === 'خ' ? '<svg viewBox="0 0 40 40"><path d="M8 12h11a5 5 0 0 1 0 10h-2a5 5 0 0 0 0 10h7M32 8v7a5 5 0 0 1-5 5h-2a5 5 0 0 0 0 10h7"/><circle cx="8" cy="12" r="3"/><circle cx="32" cy="8" r="3"/><circle cx="24" cy="32" r="3"/></svg>' : esc(symbol)}</span><span><strong>${brandName}</strong><small>${brandTagline}</small></span></a>${page === 'customer' ? '<button class="customer-area-arrow" id="customerAreaToggle" type="button" aria-label="تغيير المنطقة">⌄</button><button class="customer-header-icon" id="customerSearchToggle" type="button" aria-label="البحث عن خدمة">⌕</button>' : ''}<div class="row top-actions">${state.user ? `<button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button" aria-label="الإشعارات">🔔 <span id="notificationCount"></span></button>${page !== 'customer' ? '<button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>' : ''}<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button>${page !== 'customer' ? '<button class="btn secondary small logout-btn" id="logout">خروج</button>' : ''}` : (page === 'customer' ? '<button class="btn small" id="guestLoginBtn" type="button">دخول</button>' : '')}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('customerAreaToggle')?.addEventListener('click', openCustomerAreaPicker); document.getElementById('customerSearchToggle')?.addEventListener('click', () => { const searchBox = document.querySelector('.manual-service-fallback'); if (searchBox) {
+    searchBox.classList.toggle('is-visible');
+    if (searchBox.classList.contains('is-visible')) {
+        document.getElementById('search')?.focus();
+        searchBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+} }); document.getElementById('guestLoginBtn')?.addEventListener('click', () => authBox('CUSTOMER')); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
     refreshNotificationBadge().catch(() => { }); applyFieldPlaceholders(root); applyBrandConfig(); }
 async function openAccount() {
+    if (!state.user) {
+        authBox('CUSTOMER');
+        return;
+    }
+    if (state.user.role === 'PROVIDER' || state.user.role === 'ADMIN') {
+        openAccountEditor();
+        return;
+    }
+    const areaName = String((state.areas || []).find((a) => a.id === state.selectedAreaId)?.name || 'إب');
+    const rows = [
+        ['profile', '♙', 'الحساب', 'عرض بيانات الحساب وتعديلها'],
+        ['orders', '▤', 'طلباتي', 'متابعة الطلبات السابقة والحالية'],
+        ['subscriptions', '▣', 'الاشتراكات', 'عرض الاشتراكات ومزاياها'],
+        ['balance', '◉', 'رصيدي', 'الرصيد والمعاملات المالية'],
+        ['addresses', '⌖', 'العناوين', 'إدارة مواقع التنفيذ المحفوظة'],
+        ['city', '⌄', 'تغيير المدينة', 'اختيار المنطقة التي تطلب منها'],
+        ['contact', '☎', 'تواصل معنا', 'قنوات التواصل والدعم'],
+        ['privacy', '▤', 'سياسة الخصوصية', 'معلومات الخصوصية والبيانات'],
+        ['share', '↗', 'مشاركة التطبيق', 'مشاركة رابط خدمات'],
+        ['howto', 'ⓘ', 'كيفية استخدام التطبيق', 'خطوات استخدام خدمات'],
+        ['appearance', '◐', 'مظهر التطبيق', 'إعدادات سهولة الاستخدام'],
+        ['suggestions', '✎', 'إدارة الاقتراحات', 'اقتراحاتك وتحسينات التطبيق'],
+        ['advanced', '⚙', 'الإعدادات المتقدمة', 'خيارات الحساب المتقدمة'],
+        ['logout', '↪', 'تسجيل الخروج', 'الخروج من الحساب'],
+        ['delete', '⌫', 'حذف الحساب نهائيًا', 'حذف الحساب وبيانات التواصل']
+    ];
+    showModal(`<div class="customer-account-home"><div class="customer-account-area" id="accountHomeArea"><span class="customer-account-area-pin">⌖</span><span><small>المنطقة الحالية</small><b>${esc(areaName)}</b></span><span class="customer-account-area-arrow">‹</span></div><div class="customer-account-menu">${rows.map(([key, icon, title, sub]) => `<button type="button" class="customer-account-menu-row" data-account-page="${key}"><span class="customer-account-menu-icon">${icon}</span><span class="customer-account-menu-copy"><b>${title}</b><small>${sub}</small></span><span class="customer-account-menu-chevron">‹</span></button>`).join('')}</div><footer class="customer-account-footer"><span class="customer-account-footer-mark">خ</span><span><b>خدمات</b><small>تم تطويره بواسطة المهندس هيثم القاضي</small><small>الإصدار ${esc(String(state.config?.appVersion || '2.28.0'))}</small></span></footer></div>`);
+    const modal = document.getElementById('modal');
+    const title = modal?.querySelector('.card > .row:first-child span');
+    if (title)
+        title.textContent = 'إدارة الحساب';
+    const close = modal?.querySelector('#close');
+    if (close)
+        close.textContent = 'رجوع';
+    document.getElementById('accountHomeArea')?.addEventListener('click', () => { closeModal(); openCustomerAreaPicker(); });
+    document.querySelectorAll('[data-account-page]').forEach(el => el.addEventListener('click', async () => {
+        const key = el.dataset.accountPage || '';
+        if (key === 'profile') {
+            closeModal();
+            openAccountEditor();
+            return;
+        }
+        if (key === 'orders') {
+            closeModal();
+            document.querySelector('[data-customer-nav="orders"]')?.dispatchEvent(new Event('click', { bubbles: true }));
+            return;
+        }
+        if (key === 'subscriptions') {
+            closeModal();
+            document.querySelectorAll('[data-customer-nav]').forEach(n => n.classList.toggle('active', n.dataset.customerNav === 'subscriptions'));
+            openCustomerSubscriptions();
+            return;
+        }
+        if (key === 'addresses') {
+            closeModal();
+            await openSavedLocations();
+            return;
+        }
+        if (key === 'city') {
+            closeModal();
+            openCustomerAreaPicker();
+            return;
+        }
+        if (key === 'contact') {
+            closeModal();
+            openAbout();
+            return;
+        }
+        if (key === 'share') {
+            await nativeShare('تطبيق خدمات', 'خدمات — كل خدمة تحتاجها في مكان واحد', location.origin);
+            return;
+        }
+        if (key === 'logout') {
+            closeModal();
+            logout();
+            return;
+        }
+        if (key === 'appearance') {
+            closeModal();
+            openAccountEditor();
+            window.setTimeout(() => document.querySelector('.account-accessibility')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+            return;
+        }
+        if (key === 'delete') {
+            if (!confirm('هل أنت متأكد من حذف حسابك؟ ستُخفى بيانات التواصل ولن تتمكن من استخدام الحساب بعد ذلك.'))
+                return;
+            if (!confirm('تأكيد أخير: هل تريد حذف الحساب الآن؟'))
+                return;
+            const button = el;
+            button.disabled = true;
+            try {
+                await api('/me/account', { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE' }) });
+                stopRealtime();
+                stopPollers();
+                state.token = null;
+                state.user = null;
+                localStorage.removeItem(SESSION_KEY);
+                sessionStorage.removeItem(SESSION_KEY);
+                localStorage.removeItem('khadamat.selectedAreaId');
+                closeModal();
+                location.replace('/');
+            }
+            catch (e) {
+                button.disabled = false;
+                alert(e.message);
+            }
+            return;
+        }
+        const pages = {
+            balance: { title: 'رصيدي', body: 'لا توجد محفظة مالية مفعّلة لهذا الحساب حاليًا.' },
+            privacy: { title: 'سياسة الخصوصية', body: 'سيتم عرض سياسة الخصوصية المعتمدة هنا عند نشر نصها الرسمي.' },
+            howto: { title: 'كيفية استخدام التطبيق', body: 'اختر المنطقة، ثم اختر التصنيف أو الخدمة، وأدخل التفاصيل الضرورية فقط، وراجع شاشة التأكيد قبل تنفيذ الطلب. يمكنك متابعة جميع طلباتك من «طلباتي».' },
+            suggestions: { title: 'إدارة الاقتراحات', body: 'إدارة الاقتراحات غير مفعّلة حاليًا. ستظهر الاقتراحات المحفوظة عند تفعيل هذه الميزة.' },
+            advanced: { title: 'الإعدادات المتقدمة', body: 'لا توجد إعدادات متقدمة إضافية متاحة لهذا الحساب حاليًا.' }
+        };
+        const page = pages[key];
+        if (page) {
+            closeModal();
+            showModal(`<div class="customer-account-info-page"><h2>${esc(page.title)}</h2><div class="card customer-account-info-card"><p>${esc(page.body)}</p></div></div>`);
+            const m = document.getElementById('modal');
+            const t = m?.querySelector('.card > .row:first-child span');
+            if (t)
+                t.textContent = page.title;
+            const c = m?.querySelector('#close');
+            if (c)
+                c.textContent = 'رجوع';
+        }
+    }));
+}
+async function openAccountEditor() {
     let accountAreaChanged = false;
     try {
         const j = await api('/auth/me');
@@ -630,7 +766,14 @@ async function openAccount() {
             state.areas = a.areas || [];
         }
         const large = localStorage.getItem(A11Y_KEYS.largeText) === '1', contrast = localStorage.getItem(A11Y_KEYS.highContrast) === '1', reduce = localStorage.getItem(A11Y_KEYS.reduceMotion) === '1';
-        showModal(`<h2>حسابي</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" minlength="2" maxlength="80" required></div><details class="account-phone-disclosure"><summary>رقم الهاتف المسجل <span>${esc(u.phone || '')}</span></summary><div class="field"><label>رقم الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></details>${!isProvider ? `<div class="field customer-account-area-field"><label for="accountCurrentArea">المنطقة الحالية</label><select id="accountCurrentArea" name="currentArea"><option value="">اختر المنطقة التي تطلب منها</option>${(state.areas || []).filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select><small class="muted">هذه منطقة طلباتك كعميل، وليست منطقة تقديم الخدمة.</small></div>` : ''}<div class="field"><label>رقم تواصل إضافي (اختياري)</label><input name="secondaryPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="مثال: +9677xxxxxxxx" value="${esc(u.secondaryPhone || '')}"><small class="muted">لن يحل محل رقم تسجيل الدخول. اتركه فارغًا لإزالته.</small></div>${!isProvider ? `<div class="field"><label>تحديد الموقع</label><button class="btn secondary" type="button" id="accountSetLocation">📍 تحديد موقعي الحالي</button><small id="accountLocationStatus" class="muted">يمكنك تحديد الموقع الآن أو لاحقًا عند الطلب.</small></div>` : ''}</div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<div class="account-accessibility card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>سهولة الاستخدام</b><p class="muted">إعدادات اختيارية مفيدة لكبار السن ومن يحتاج نصًا أكبر أو حركة أقل.</p></div><span class="status">تُحفظ على هذا الجهاز</span></div><div class="a11y-options"><label><input type="checkbox" id="a11yLargeText" ${large ? 'checked' : ''}> تكبير النص والأزرار</label><label><input type="checkbox" id="a11yHighContrast" ${contrast ? 'checked' : ''}> تباين أعلى</label><label><input type="checkbox" id="a11yReduceMotion" ${reduce ? 'checked' : ''}> تقليل الحركة</label></div></div><button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form><section class="account-menu-list"><h3>إدارة الحساب</h3><details open><summary>الحساب والإعدادات</summary><div class="account-menu-grid"><button type="button" class="btn secondary small" id="accountMenuOrders">طلباتي</button><button type="button" class="btn secondary small" id="accountMenuSubscriptions">الاشتراكات</button><button type="button" class="btn secondary small" id="accountMenuBalance">رصيدي</button><button type="button" class="btn secondary small" id="accountMenuAddresses">العناوين</button><button type="button" class="btn secondary small" id="accountMenuCity">تغيير المدينة</button><button type="button" class="btn secondary small" id="accountMenuContact">التواصل معنا</button><button type="button" class="btn secondary small" id="accountMenuPrivacy">سياسة الخصوصية</button><button type="button" class="btn secondary small" id="accountMenuShare">مشاركة التطبيق</button><button type="button" class="btn secondary small" id="accountMenuHowTo">كيفية استخدام التطبيق</button><button type="button" class="btn secondary small" id="accountMenuAppearance">مظهر التطبيق</button><button type="button" class="btn secondary small" id="accountMenuSuggestions">إدارة الاقتراحات</button><button type="button" class="btn secondary small" id="accountMenuAdvanced">الإعدادات المتقدمة</button><button type="button" class="btn secondary small" id="accountMenuLogout">تسجيل الخروج</button></div></details><div class="account-app-footer"><span class="account-app-logo">${esc(String(state.config?.appSymbol || 'خ'))}</span><b>${esc(String(state.config?.appName || 'خدمات'))}</b><small>الإصدار ${esc(String(state.config?.appVersion || '2.26.0'))}</small><small>تم تطويره بواسطة المهندس هيثم القاضي</small></div></section><hr><div class="card account-delete-card"><h3>حذف الحساب</h3><p class="muted">سيُعطّل الحساب وتُخفى بيانات التواصل الشخصية. قد يتعذر الحذف ما دامت لديك طلبات نشطة.</p><button class="btn danger" id="deleteAccountBtn" type="button">حذف حسابي نهائيًا</button></div>`);
+        showModal(`<h2 class="account-form-title">تعديل الحساب</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" minlength="2" maxlength="80" required></div><details class="account-phone-disclosure"><summary>رقم الهاتف المسجل <span>${esc(u.phone || '')}</span></summary><div class="field"><label>رقم الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></details>${!isProvider ? `<div class="field customer-account-area-field"><label for="accountCurrentArea">المنطقة الحالية</label><select id="accountCurrentArea" name="currentArea"><option value="">اختر المنطقة التي تطلب منها</option>${(state.areas || []).filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select><small class="muted">هذه منطقة طلباتك كعميل، وليست منطقة تقديم الخدمة.</small></div>` : ''}<div class="field"><label>رقم تواصل إضافي (اختياري)</label><input name="secondaryPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="مثال: +9677xxxxxxxx" value="${esc(u.secondaryPhone || '')}"><small class="muted">لن يحل محل رقم تسجيل الدخول. اتركه فارغًا لإزالته.</small></div>${!isProvider ? `<div class="field"><label>تحديد الموقع</label><button class="btn secondary" type="button" id="accountSetLocation">📍 تحديد موقعي الحالي</button><small id="accountLocationStatus" class="muted">يمكنك تحديد الموقع الآن أو لاحقًا عند الطلب.</small></div>` : ''}</div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<div class="account-accessibility card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>سهولة الاستخدام</b><p class="muted">إعدادات اختيارية مفيدة لكبار السن ومن يحتاج نصًا أكبر أو حركة أقل.</p></div><span class="status">تُحفظ على هذا الجهاز</span></div><div class="a11y-options"><label><input type="checkbox" id="a11yLargeText" ${large ? 'checked' : ''}> تكبير النص والأزرار</label><label><input type="checkbox" id="a11yHighContrast" ${contrast ? 'checked' : ''}> تباين أعلى</label><label><input type="checkbox" id="a11yReduceMotion" ${reduce ? 'checked' : ''}> تقليل الحركة</label></div></div><button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form><section class="account-menu-list"><h3>إدارة الحساب</h3><details open><summary>الحساب والإعدادات</summary><div class="account-menu-grid"><button type="button" class="btn secondary small" id="accountMenuOrders">طلباتي</button><button type="button" class="btn secondary small" id="accountMenuSubscriptions">الاشتراكات</button><button type="button" class="btn secondary small" id="accountMenuBalance">رصيدي</button><button type="button" class="btn secondary small" id="accountMenuAddresses">العناوين</button><button type="button" class="btn secondary small" id="accountMenuCity">تغيير المدينة</button><button type="button" class="btn secondary small" id="accountMenuContact">التواصل معنا</button><button type="button" class="btn secondary small" id="accountMenuPrivacy">سياسة الخصوصية</button><button type="button" class="btn secondary small" id="accountMenuShare">مشاركة التطبيق</button><button type="button" class="btn secondary small" id="accountMenuHowTo">كيفية استخدام التطبيق</button><button type="button" class="btn secondary small" id="accountMenuAppearance">مظهر التطبيق</button><button type="button" class="btn secondary small" id="accountMenuSuggestions">إدارة الاقتراحات</button><button type="button" class="btn secondary small" id="accountMenuAdvanced">الإعدادات المتقدمة</button><button type="button" class="btn secondary small" id="accountMenuLogout">تسجيل الخروج</button></div></details><div class="account-app-footer"><span class="account-app-logo">${esc(String(state.config?.appSymbol || 'خ'))}</span><b>${esc(String(state.config?.appName || 'خدمات'))}</b><small>الإصدار ${esc(String(state.config?.appVersion || '2.28.0'))}</small><small>تم تطويره بواسطة المهندس هيثم القاضي</small></div></section><hr><div class="card account-delete-card"><h3>حذف الحساب</h3><p class="muted">سيُعطّل الحساب وتُخفى بيانات التواصل الشخصية. قد يتعذر الحذف ما دامت لديك طلبات نشطة.</p><button class="btn danger" id="deleteAccountBtn" type="button">حذف حسابي نهائيًا</button></div>`);
+        const accountEditorModal = document.getElementById('modal');
+        const accountEditorHeader = accountEditorModal?.querySelector('.card > .row:first-child span');
+        if (accountEditorHeader)
+            accountEditorHeader.textContent = 'تعديل الحساب';
+        const accountEditorBack = accountEditorModal?.querySelector('#close');
+        if (accountEditorBack)
+            accountEditorBack.textContent = 'رجوع';
         document.getElementById('accountCurrentArea')?.addEventListener('change', (e) => { const id = e.currentTarget.value; state.selectedAreaId = id; accountAreaChanged = true; if (id)
             localStorage.setItem('khadamat.selectedAreaId', id);
         else
@@ -690,13 +833,13 @@ async function openAccount() {
         });
         document.getElementById('accountMenuOrders')?.addEventListener('click', () => { closeModal(); switchCustomerSection('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
         document.getElementById('accountMenuAddresses')?.addEventListener('click', () => openSavedLocations());
-        document.getElementById('accountMenuCity')?.addEventListener('click', () => { closeModal(); document.getElementById('customerCitySelect')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('customerCitySelect')?.focus(); });
+        document.getElementById('accountMenuCity')?.addEventListener('click', () => { closeModal(); openCustomerAreaPicker(); });
         document.getElementById('accountMenuContact')?.addEventListener('click', () => openAbout());
         document.getElementById('accountMenuHowTo')?.addEventListener('click', () => openAbout());
         document.getElementById('accountMenuShare')?.addEventListener('click', () => nativeShare('تطبيق خدمات', 'خدمات — كل خدمة تحتاجها في مكان واحد', location.origin));
         document.getElementById('accountMenuAppearance')?.addEventListener('click', () => document.querySelector('.account-accessibility')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
         document.getElementById('accountMenuPrivacy')?.addEventListener('click', () => toast('سياسة الخصوصية', 'راجع سياسة الخصوصية المنشورة في صفحة التطبيق الرسمية عند توفرها.'));
-        document.getElementById('accountMenuSubscriptions')?.addEventListener('click', () => toast('الاشتراكات', 'إدارة الاشتراكات غير مفعّلة في هذا الإصدار.'));
+        document.getElementById('accountMenuSubscriptions')?.addEventListener('click', () => { closeModal(); openCustomerSubscriptions(); });
         document.getElementById('accountMenuBalance')?.addEventListener('click', () => toast('رصيدي', 'المحفظة والرصيد غير مفعّلين في هذا الإصدار.'));
         document.getElementById('accountMenuSuggestions')?.addEventListener('click', () => toast('إدارة الاقتراحات', 'قسم إدارة الاقتراحات غير مفعّل في هذا الإصدار.'));
         document.getElementById('accountMenuAdvanced')?.addEventListener('click', () => toast('الإعدادات المتقدمة', 'لا توجد إعدادات متقدمة إضافية متاحة حاليًا.'));
@@ -933,7 +1076,8 @@ async function customer() {
                 }
                 catch { }
             }
-            state.selectedAreaId = validStoredArea ? storedArea : (inferredArea?.id || '');
+            const ibbArea = state.areas.find((a) => ['إب', 'اب', 'Ibb'].includes(String(a.name || '').trim()));
+            state.selectedAreaId = validStoredArea ? storedArea : (inferredArea?.id || ibbArea?.id || '');
             if (state.selectedAreaId)
                 localStorage.setItem('khadamat.selectedAreaId', state.selectedAreaId);
             const areaQuery = state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : '';
@@ -968,7 +1112,10 @@ async function customer() {
         } return cur?.id || ''; };
         const storedArea = localStorage.getItem('khadamat.selectedAreaId') || '';
         const defaultArea = (addressPayload.addresses || []).find((a) => a.isDefault)?.location?.areaId || '';
-        state.selectedAreaId = state.areas.some((a) => a.id === storedArea) ? storedArea : (state.areas.some((a) => a.id === defaultArea) ? defaultArea : resolveCity(defaultArea) || '');
+        const ibbArea = state.areas.find((a) => ['إب', 'اب', 'Ibb'].includes(String(a.name || '').trim()));
+        state.selectedAreaId = state.areas.some((a) => a.id === storedArea) ? storedArea : (state.areas.some((a) => a.id === defaultArea) ? defaultArea : resolveCity(defaultArea) || ibbArea?.id || '');
+        if (state.selectedAreaId)
+            localStorage.setItem('khadamat.selectedAreaId', state.selectedAreaId);
         const areaQuery = state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : '';
         const [catalogPayload, o, platformConfig] = await Promise.all([api('/catalog/bootstrap' + areaQuery), api('/orders'), api('/config').catch(() => ({ currency: 'YER' }))]);
         state.config = platformConfig || { currency: 'YER' };
@@ -1244,27 +1391,6 @@ function pickQuickServices(services, limit = 7, popularity = []) { const rank = 
             break;
     }
 } return picked; }
-function renderCustomerServiceCards(services, filter = 'all', popularity = []) {
-    const favorites = new Set((() => { try {
-        return JSON.parse(localStorage.getItem('khadamat.favoriteServices.v1') || '[]');
-    }
-    catch {
-        return [];
-    } })());
-    const popularityMap = new Map(popularity.map((x) => [String(x.serviceId), Number(x.count || 0)]));
-    let rows = [...(services || [])];
-    if (filter === 'favorite')
-        rows = rows.filter((x) => favorites.has(String(x.id)));
-    if (filter === 'new')
-        rows = rows.filter((x) => { const t = Date.parse(String(x.createdAt || x.updatedAt || '')); return Number.isFinite(t) && Date.now() - t < 30 * 86400000; });
-    if (filter === 'nearby')
-        rows.sort((a, b) => (popularityMap.get(String(b.id)) || 0) - (popularityMap.get(String(a.id)) || 0));
-    if (filter === 'all')
-        rows.sort((a, b) => (popularityMap.get(String(b.id)) || 0) - (popularityMap.get(String(a.id)) || 0));
-    if (!rows.length)
-        return `<div class="customer-service-empty">${filter === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد.' : filter === 'new' ? 'لا توجد خدمات جديدة معروضة حاليًا.' : 'لا توجد خدمات متاحة في هذا القسم حاليًا.'}</div>`;
-    return rows.map((sv) => { const id = String(sv.id); const favorite = favorites.has(id); const price = sv.pricingType === 'FIXED' && sv.basePrice != null ? `${esc(sv.basePrice)} ${esc(currencyLabel())}` : 'السعر حسب تفاصيل الطلب'; return `<article class="customer-service-row" data-service-row="${esc(id)}"><button type="button" class="customer-service-favorite ${favorite ? 'is-favorite' : ''}" data-service-favorite="${esc(id)}" aria-label="${favorite ? 'إزالة من' : 'إضافة إلى'} المفضلة">${favorite ? '♥' : '♡'}</button><button type="button" class="customer-service-main" data-customer-service="${esc(id)}"><span class="customer-service-icon">${serviceIconSvg(sv.name, sv.icon || sv.categoryIcon || sv.categoryName || '')}</span><span class="customer-service-copy"><b>${esc(sv.name)}</b><small>${esc(sv.categoryName || 'خدمات متنوعة')}</small><span class="customer-service-description">${esc(sv.description || 'اختر الخدمة لعرض التفاصيل')}</span><span class="customer-service-price">${price}</span></span><span class="customer-service-arrow" aria-hidden="true">‹</span></button></article>`; }).join('');
-}
 async function setupQuickAssistComposer() {
     const form = document.getElementById('quickAssistForm');
     if (!form)
@@ -1382,7 +1508,7 @@ async function openCustomerLocationSetup(auto) {
         return;
     localStorage.setItem('khadamat.locationIntroSeen', '1');
     showModal(`<div class="card location-permission-intro"><h2>📍 تحديد المدينة وموقع الخدمة</h2><p>نستخدم موقعك الدقيق لمساعدتك على اختيار المدينة الصحيحة، وعرض الخدمات المتاحة في منطقتك، وتسهيل وصول مقدم الخدمة عند إنشاء طلب. لن نبدأ التتبع المباشر لمجرد اختيار المدينة، ويمكنك اختيار المدينة يدويًا بدلًا من ذلك.</p><div class="notice">سيطلب الهاتف إذن الموقع بعد ضغطك على الزر التالي. يمكنك رفض الإذن واستخدام اختيار المدينة اليدوي في أي وقت.</div><p id="customerLocationIntroStatus" class="muted"></p><div class="row"><button class="btn" id="confirmCustomerLocation" type="button">السماح بتحديد موقعي</button><button class="btn secondary" id="manualCustomerCity" type="button">اختيار المدينة يدويًا</button><button class="btn secondary small" id="laterCustomerLocation" type="button">لاحقًا</button></div></div>`);
-    document.getElementById('manualCustomerCity')?.addEventListener('click', () => { closeModal(); document.getElementById('customerCitySelect')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('customerCitySelect')?.focus(); });
+    document.getElementById('manualCustomerCity')?.addEventListener('click', () => { closeModal(); openCustomerAreaPicker(); });
     document.getElementById('laterCustomerLocation')?.addEventListener('click', () => closeModal());
     document.getElementById('confirmCustomerLocation')?.addEventListener('click', () => {
         const status = document.getElementById('customerLocationIntroStatus');
@@ -1417,6 +1543,11 @@ async function openCustomerLocationSetup(auto) {
         document.getElementById('confirmCustomerLocation')?.focus();
     }
 }
+function openCustomerAreaPicker() { const areas = (state.areas || []).filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY'); showModal(`<div class="customer-area-picker"><h2>اختر منطقتك</h2><p class="muted">تظهر الخدمات والعروض المتاحة في المنطقة المختارة.</p><div class="customer-area-options">${areas.map((a) => `<button type="button" class="customer-area-option ${a.id === state.selectedAreaId ? 'active' : ''}" data-select-area="${esc(a.id)}"><span>${esc(a.name)}</span><small>${a.id === state.selectedAreaId ? '✓ المنطقة الحالية' : 'اختيار'}</small></button>`).join('') || '<p class="muted">لا توجد مناطق متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-select-area]').forEach(x => x.addEventListener('click', async () => { const id = x.dataset.selectArea || ''; state.selectedAreaId = id; if (id)
+    localStorage.setItem('khadamat.selectedAreaId', id);
+else
+    localStorage.removeItem('khadamat.selectedAreaId'); closeModal(); await customer(); })); }
+function openCustomerSubscriptions() { showModal(`<div class="customer-subscriptions-view"><h2>الاشتراكات</h2><p class="muted">إدارة اشتراكاتك ومزاياها من مكان واحد.</p><div class="card customer-subscription-empty"><span class="customer-subscription-icon">▣</span><b>لا توجد اشتراكات نشطة</b><p class="muted">عند توفر اشتراكات لحسابك ستظهر تفاصيلها هنا.</p><button type="button" class="btn" id="subscriptionsBrowseServices">تصفح الخدمات</button></div></div>`); document.getElementById('subscriptionsBrowseServices')?.addEventListener('click', () => { closeModal(); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelectorAll('[data-customer-nav]').forEach(n => n.classList.toggle('active', n.dataset.customerNav === 'home')); }); }
 function renderCustomer() {
     const guestView = !state.user;
     const areaById = new Map(state.areas.map((a) => [a.id, a]));
@@ -1427,21 +1558,12 @@ function renderCustomer() {
     const selectableAreas = state.areas.filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').slice().sort((a, b) => areaPath(a).localeCompare(areaPath(b), 'ar'));
     const customerCategories = customerMainCategories(state.cats);
     const tickerText = String(state.config?.newsTicker || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.').trim() || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.';
-    shell(`<section class="hero customer-simple-hero">
-    <div class="customer-city-select card customer-city-select-compact"><label for="customerCitySelect">📍 المحافظة / المنطقة / الحي</label><select id="customerCitySelect"><option value="">كل مناطق التغطية المفتوحة</option>${selectableAreas.map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(areaPath(a))} · ${esc(a.localityType || a.type || 'منطقة')}</option>`).join('')}</select><button class="btn secondary small" id="customerUseLocation" type="button">📍 موقعي</button><small class="muted">يمكنك اختيار المحافظة أو المدينة أو المديرية أو القرية أو الحي من المناطق التي فعّلتها الإدارة.</small></div>
-  </section>
-  <div class="khadamat-news-ticker" role="status" aria-label="آخر الأخبار والعروض"><span class="news-ticker-label">آخر الأخبار والعروض</span><div class="news-ticker-window"><div class="news-ticker-track"><span>${esc(tickerText)}</span><span aria-hidden="true">${esc(tickerText)}</span></div></div></div>
+    shell(`  <div class="khadamat-news-ticker reference-news-ticker" role="status" aria-label="آخر الأخبار والعروض"><span class="news-ticker-label">آخر الأخبار</span><div class="news-ticker-window"><div class="news-ticker-track"><span>${esc(tickerText)}</span><span aria-hidden="true">${esc(tickerText)}</span></div></div></div>
+  <section class="customer-promo-banner" aria-label="العروض الرئيسية"><div class="customer-promo-track">${(state.campaigns || []).slice(0, 3).map((c) => `<button type="button" class="customer-promo-item" data-promo-campaign="${esc(c.id)}" aria-label="${esc(c.title)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="customer-promo-fallback"><b>${esc(c.title)}</b><small>${esc(c.description || 'اكتشف الخدمات المتاحة')}</small></span>`}</button>`).join('') || `<div class="customer-promo-item customer-promo-fallback"><b>خدمات</b><small>كل خدمة تحتاجها في مكان واحد</small></div>`}</div></section>
+  <section class="customer-category-showcase customer-category-showcase-top" aria-label="التصنيفات"><div class="section-heading customer-category-heading"><h2>التصنيفات</h2></div><div class="customer-category-rail" id="cats"><button type="button" class="customer-category-tile all-categories-tile" id="allCategoriesBtn" aria-label="كل التصنيفات"><span class="all-categories-check" aria-hidden="true">✓</span><b>كل التصنيفات</b></button>${customerCategories.map((c) => `<button class="customer-category-tile" data-cat="${esc(c.slug)}" type="button"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join('')}</div></section>
+  <section class="quick-assist-reference" aria-label="الوصول السريع"><div class="quick-assist-reference-head"><span class="quick-assist-reference-icon">✦</span><div><b>الوصول السريع</b><small>اكتب ما تحتاجه وسنساعدك في الوصول إلى الخدمة.</small></div></div><form id="quickAssistForm" class="quick-assist-card" autocomplete="off"><div class="quick-assist-input-row"><textarea id="quickAssistText" maxlength="500" rows="1" aria-label="اكتب ما تحتاجه" placeholder="مثال: أريد واحد يشتري لي بيبسي ويوصله للبيت"></textarea><button class="btn quick-assist-voice" id="quickAssistVoice" type="button" aria-label="التحدث لكتابة الطلب">🎤</button><button class="btn quick-assist-send" type="submit" aria-label="بحث">←</button></div><div id="quickAssistStatus" class="quick-assist-status" role="status" aria-live="polite"></div><div id="quickAssistResults" class="quick-assist-results" aria-live="polite"></div></form></section>
   <section class="customer-offers" aria-label="العروض القريبة منك"><div class="section-heading"><div><h2>العروض القريبة منك</h2></div><span class="customer-section-mark" aria-hidden="true">✦</span></div><div class="campaign-strip-wrap"><div class="campaign-strip">${(state.campaigns || []).length ? (state.campaigns || []).map((c) => `<article class="campaign-card card" data-campaign-card="${esc(c.id)}" tabindex="0" role="button" aria-label="فتح ${esc(c.title)}"><div class="campaign-image-wrap">${c.imageUrl ? `<img class="campaign-image" src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<div class="campaign-image campaign-image-placeholder" aria-hidden="true">${serviceIconSvg(c.title || 'عرض', '')}</div>`}<span class="campaign-image-badge">${esc(c.buttonLabel || 'عرض مميز')}</span><button type="button" class="campaign-favorite" data-campaign-favorite="${esc(c.id)}" aria-label="إضافة إلى المفضلة">♡</button></div><div class="campaign-card-copy"><b>${esc(c.title)}</b><p>${esc(c.description || '')}</p><button type="button" class="btn small campaign-cta" data-campaign-action="${esc(c.actionType || 'NONE')}" data-campaign-value="${esc(c.actionValue || '')}">${esc(c.buttonLabel || 'اكتشف العرض')} ←</button></div></article>`).join('') : `<button type="button" class="customer-empty-banner" data-scroll-categories><span class="customer-empty-banner-art" aria-hidden="true">${serviceIconSvg('خدمات متنوعة', '')}</span><span><b>اكتشف الخدمات المتاحة في منطقتك</b><small>اختر القسم الذي تحتاجه وابدأ طلبك بسهولة.</small><strong>تصفح الخدمات ←</strong></span></button>`}</div><button type="button" class="all-offers-button" id="allOffersBtn">كل العروض</button></div></section>
-  <section class="customer-category-showcase customer-category-showcase-top" aria-label="تصفح فئات الخدمات"><div class="section-heading customer-category-heading"><div><h2>تصفح حسب الخدمة</h2></div></div><div class="customer-category-rail" id="cats"><button type="button" class="customer-category-tile all-categories-tile" id="allCategoriesBtn" aria-label="كل التصنيفات"><span class="all-categories-check" aria-hidden="true">✓</span><b>كل التصنيفات</b></button>${customerCategories.map((c) => `<button class="customer-category-tile" data-cat="${esc(c.slug)}" type="button"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join('')}</div></section>
-  <section class="hero customer-simple-hero quick-assist-home" aria-label="الوصول السريع">
-    <div class="quick-assist-head"><div><h1>الوصول السريع</h1><p>اكتب ما تحتاجه أو تحدث، وسنبحث في الخدمات المتاحة.</p></div></div>
-    <form id="quickAssistForm" class="quick-assist-card" autocomplete="off">
-      <div class="quick-assist-input-row"><textarea id="quickAssistText" maxlength="500" rows="1" aria-label="اكتب ما تحتاجه" placeholder="مثال: أريد واحد يشتري لي بيبسي ويوصله للبيت"></textarea><button class="btn quick-assist-voice" id="quickAssistVoice" type="button" aria-label="التحدث لكتابة الطلب">🎤 تحدث</button></div>
-      <div id="quickAssistStatus" class="quick-assist-status" role="status" aria-live="polite"></div>
-      <div id="quickAssistResults" class="quick-assist-results" aria-live="polite"></div>
-    </form>
-  </section>
-  <div class="card manual-service-fallback"><b>تريد اختيار الخدمة بنفسك؟</b><p class="muted">اكتب اسم الخدمة أو ابحث عنها مباشرة.</p><div class="search-wrap"><div class="row search-row"><div class="search-box"><span class="search-icon">⌕</span><input id="search" autocomplete="off" placeholder="ابحث عن خدمة..."><button class="clear-search" id="clearSearch" type="button" aria-label="مسح">×</button></div></div><div id="suggestions" class="suggestions hide"></div></div></div>
+  <div class="card manual-service-fallback"><div class="search-wrap"><div class="row search-row"><div class="search-box"><span class="search-icon">⌕</span><input id="search" autocomplete="off" placeholder="ابحث عن خدمة..."><button class="clear-search" id="clearSearch" type="button" aria-label="مسح">×</button></div></div><div id="suggestions" class="suggestions hide"></div></div></div>
   ${guestView ? '' : '<div id="customerPriority" class="priority-stack"></div><div id="personalRecommendations"></div>'}
 
   <nav class="section-nav" aria-label="التنقل">
@@ -1449,20 +1571,18 @@ function renderCustomer() {
     ${guestView ? '' : `<button class="section-tab" id="ordersTab">طلباتي <span class="count">${state.orders.length}</span></button>`}
   </nav>
 
-  <section id="servicesSection">
-    <div class="section-heading"><div><h2>الخدمات القريبة من احتياجك</h2><p class="muted">لا تحتاج معرفة اسم مقدم الخدمة؛ اختر ما تحتاجه وسنتولى البحث.</p></div></div>
-    ${(state.temporaryServices || []).length ? `<div class="temporary-priority card"><div class="section-heading"><div><h2>🔥 متاح الآن</h2><p class="muted">خدمات موسمية أو مؤقتة متاحة حاليًا</p></div></div><div class="grid">${state.temporaryServices.slice(0, 4).map((x) => `<div class="card service temporary-service-card" data-temp-id="${esc(x.id)}"><div class="icon">${serviceIconSvg(x.title || x.name, x.icon || '')}</div><b>${esc(x.title || x.name)}</b><p>${esc(x.description || '')}</p><button class="btn small" type="button" data-temp-action="${esc(x.id)}">${esc(x.actionLabel || 'اطلب الآن')} ←</button></div>`).join('')}</div></div>` : ''}
-    <div class="section-heading quick-heading"><div><h2>الخدمات المتاحة</h2><p class="muted">اختر الخدمة لعرض التفاصيل وبدء الطلب.</p></div></div>
-    <nav class="customer-service-filters" id="customerServiceFilters" aria-label="تصفية الخدمات"><button type="button" data-service-filter="favorite">♡ المفضلة</button><button type="button" data-service-filter="new">الجديدة</button><button type="button" data-service-filter="nearby">الأقرب</button><button type="button" class="active" data-service-filter="all">الكل</button></nav>
-    <div class="quick-services-strip customer-service-list-shell"><div class="customer-service-list" id="customerServiceList">${renderCustomerServiceCards(state.services, 'all', state.popularity)}</div></div>
-    ${guestView ? '' : '<div class="customer-tools"><button class="btn secondary small" id="safetyCentersBtn" type="button">🛡️ الأمان</button><button class="btn secondary small" id="myLocations" type="button">📍 مواقعي</button><button class="btn secondary small" id="myFavorites" type="button">⭐ المفضلة</button><button class="btn secondary small" id="myBeneficiaries" type="button">👨‍👩‍👧 لأشخاص آخرين</button></div>'}
+  <section id="servicesSection" class="reference-service-section">
+    <div class="section-heading reference-service-heading"><div><h2>الخدمات المتاحة</h2><p class="muted">اختر الخدمة لبدء الطلب مباشرة.</p></div><span class="reference-service-count">${state.services.length}</span></div>
+    <div class="customer-service-filters" role="group" aria-label="تصفية الخدمات"><button type="button" class="active" data-service-filter="all">الكل</button><button type="button" data-service-filter="nearby">الأقرب</button><button type="button" data-service-filter="new">الجديدة</button><button type="button" data-service-filter="favorite">المفضلة</button></div>
+    <div id="customerServiceList" class="customer-service-list">${state.services.map((sv, i) => `<article class="customer-service-row" data-service-card="${esc(sv.id)}" data-service-index="${i}" data-service-category="${esc(sv.categorySlug || '')}" data-service-created="${esc(sv.createdAt || '')}"><button type="button" class="customer-service-main" data-open-service="${esc(sv.id)}"><span class="customer-service-logo">${serviceIconSvg(sv.name, sv.icon || sv.categoryIcon || sv.categoryName || '')}</span><span class="customer-service-copy"><b>${esc(sv.name)}</b><small>${esc(sv.categoryName || 'خدمات متنوعة')}</small><span>${esc(sv.description || 'اطلب الخدمة بسهولة من هنا')}</span>${sv.pricingType === 'FIXED' && sv.basePrice != null ? `<strong class="customer-service-price">${esc(sv.basePrice)} ${esc(currencyLabel())}</strong>` : ''}</span></button><div class="customer-service-side"><span class="customer-service-open-badge">متاح</span><button type="button" class="customer-service-favorite" data-service-favorite="${esc(sv.id)}" aria-label="إضافة إلى المفضلة">♡</button><button type="button" class="customer-service-order" data-open-service="${esc(sv.id)}">اطلب</button></div></article>`).join('') || '<div class="card empty">لا توجد خدمات متاحة في هذه المنطقة حاليًا.</div>'}</div>
+    ${guestView ? '<div class="customer-guest-hint"><button type="button" class="btn" id="customerSignInToOrder">تسجيل الدخول لطلب خدمة</button></div>' : ''}
   </section>
 
   <section id="ordersSection" class="hide-section" ${guestView ? 'hidden' : ''}>
     <div class="section-heading"><div><h2>طلباتي</h2><p class="muted">تابع طلباتك وحالتها من هنا</p></div></div>
     <div id="orders">${state.orders.length ? state.orders.map(orderCard).join('') : '<div class="card empty">لا توجد طلبات حتى الآن<br><span class="muted">ابدأ باختيار خدمة من القائمة أعلاه</span></div>'}</div>
   </section>
-  <nav class="customer-bottom-nav" aria-label="التنقل الرئيسي للعميل"><button type="button" data-customer-nav="home" class="active"><span aria-hidden="true">⌂</span><small>الرئيسية</small></button><button type="button" data-customer-nav="categories"><span aria-hidden="true">▦</span><small>الخدمات</small></button><button type="button" data-customer-nav="orders"><span aria-hidden="true">▤</span><small>طلباتي</small>${state.orders.length ? `<i>${state.orders.length}</i>` : ''}</button><button type="button" data-customer-nav="account"><span aria-hidden="true">♙</span><small>حسابي</small></button></nav>`);
+  <nav class="customer-bottom-nav" aria-label="التنقل الرئيسي للعميل"><button type="button" data-customer-nav="home" class="active"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg></span><small>الرئيسية</small></button><button type="button" data-customer-nav="orders"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4h13v17H7zM4 7v14h13M10 9h7M10 13h7M10 17h5"/></svg></span><small>طلباتي</small>${state.orders.length ? `<i>${state.orders.length}</i>` : ''}</button><button type="button" data-customer-nav="subscriptions"><span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M7 15h4"/></svg></span><small>الاشتراكات</small></button><button type="button" data-customer-nav="account"><span aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><small>حسابي</small></button></nav>`);
     const activeCustomerOrders = state.orders.filter((o) => ['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS'].includes(o.status));
     const completedCustomerOrders = state.orders.filter((o) => o.status === 'COMPLETED');
     const cp = document.getElementById('customerPriority');
@@ -1503,7 +1623,10 @@ function renderCustomer() {
         }
         suggestions.className = 'suggestions';
         suggestions.innerHTML = matches.map(m => `<button class="suggestion" type="button" data-suggest-service="${esc(m.serviceId)}"><span class="suggestion-icon">${esc(m.icon || '🛠️')}</span><span class="suggestion-text"><b>${esc(m.serviceName)}</b><small>${esc(m.categoryName)}</small></span><span class="suggestion-arrow">←</span></button>`).join('');
-        suggestions.querySelectorAll('[data-suggest-service]').forEach(x => x.addEventListener('click', () => { suggestions.className = 'suggestions hide'; openServiceDetails(x.dataset.suggestService); }));
+        suggestions.querySelectorAll('[data-suggest-service]').forEach(x => x.addEventListener('click', () => { suggestions.className = 'suggestions hide'; const id = x.dataset.suggestService; if (state.user?.role === 'CUSTOMER')
+            openOrderForm(id);
+        else
+            openServiceDetails(id); }));
     };
     search.addEventListener('input', () => {
         clear.style.display = search.value ? 'block' : 'none';
@@ -1544,7 +1667,7 @@ function renderCustomer() {
     document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => openCategory(x.dataset.cat)));
     document.getElementById('allCategoriesBtn')?.addEventListener('click', () => { const all = []; const walk = (xs) => xs.forEach((c) => { all.push(c); if (Array.isArray(c.children))
         walk(c.children); }); walk(state.cats); showModal(`<div class="all-categories-modal"><h2>كل التصنيفات</h2><div class="grid all-categories-grid">${all.map((c) => `<button type="button" class="card service-option" data-all-cat="${esc(c.slug)}"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b><span class="muted">عرض الخدمات ←</span></button>`).join('') || '<p class="muted">لا توجد تصنيفات متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-cat]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCat || ''; closeModal(); openCategory(slug); })); });
-    document.getElementById('allOffersBtn')?.addEventListener('click', () => { const offers = state.campaigns || []; showModal(`<div class="all-offers-modal"><h2>كل العروض</h2><p class="muted">اختر العرض لعرض تفاصيله أو الانتقال إلى الخدمات المرتبطة به.</p><div class="customer-offer-filters" role="group" aria-label="تصفية العروض"><button type="button" class="active" data-offer-filter="all">الكل</button><button type="button" data-offer-filter="nearby">الأقرب</button><button type="button" data-offer-filter="new">الجديدة</button><button type="button" data-offer-filter="favorite">المفضلة</button></div><div class="all-offers-grid">${offers.map((c) => `<button type="button" class="card all-offer-item" data-all-offer="${esc(c.id)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="all-offer-placeholder">✦</span>`}<b>${esc(c.title)}</b><small>${esc(c.description || '')}</small></button>`).join('') || '<p class="muted">لا توجد عروض متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-offer-filter]').forEach(filterButton => filterButton.addEventListener('click', () => { const key = filterButton.dataset.offerFilter || 'all'; document.querySelectorAll('[data-offer-filter]').forEach(b => b.classList.toggle('active', b === filterButton)); const cards = Array.from(document.querySelectorAll('[data-all-offer]')); const fav = JSON.parse(localStorage.getItem('khadamat.favoriteCampaigns.v1') || '[]'); cards.forEach((card, i) => { const c = offers.find((v) => v.id === card.dataset.allOffer); const created = Date.parse(String(c?.startsAt || c?.createdAt || '')); const isNew = Number.isFinite(created) && Date.now() - created < 14 * 86400000; const show = key === 'all' || (key === 'nearby' && (!state.selectedAreaId || !c?.areaId || c.areaId === state.selectedAreaId)) || (key === 'new' && (isNew || (!Number.isFinite(created) && i < 2))) || (key === 'favorite' && fav.includes(String(c?.id))); card.classList.toggle('hide-section', !show); }); })); document.querySelectorAll('[data-all-offer]').forEach(b => b.addEventListener('click', () => { const c = offers.find((v) => v.id === b.dataset.allOffer); if (!c)
+    document.getElementById('allOffersBtn')?.addEventListener('click', () => { const offers = state.campaigns || []; showModal(`<div class="all-offers-modal"><h2>كل العروض</h2><p class="muted">اختر العرض لعرض تفاصيله أو الانتقال إلى الخدمات المرتبطة به.</p><div class="all-offers-grid">${offers.map((c) => `<button type="button" class="card all-offer-item" data-all-offer="${esc(c.id)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="all-offer-placeholder">✦</span>`}<b>${esc(c.title)}</b><small>${esc(c.description || '')}</small></button>`).join('') || '<p class="muted">لا توجد عروض متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-offer]').forEach(b => b.addEventListener('click', () => { const c = offers.find((v) => v.id === b.dataset.allOffer); if (!c)
         return; closeModal(); const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (t === 'CATEGORY' && v)
         openCampaignCategories(c);
     else if ((t === 'SERVICE' || t === 'ORDER') && v)
@@ -1553,11 +1676,19 @@ function renderCustomer() {
         openOrderFormBySlug(v);
     else
         openCampaignDetails(c); })); });
-    document.querySelectorAll('[data-customer-nav]').forEach(x => x.addEventListener('click', () => { const key = String(x.dataset.customerNav || 'home'); document.querySelectorAll('[data-customer-nav]').forEach(n => n.classList.toggle('active', n.dataset.customerNav === key)); if (key === 'account') {
+    document.querySelectorAll('[data-customer-nav]').forEach(x => x.addEventListener('click', () => { if (document.getElementById('modal'))
+        closeModal(); const key = String(x.dataset.customerNav || 'home'); document.querySelectorAll('[data-customer-nav]').forEach(n => n.classList.toggle('active', n.dataset.customerNav === key)); if (key === 'account') {
         if (!state.user)
             authBox('CUSTOMER');
         else
             openAccount();
+        return;
+    } if (key === 'subscriptions') {
+        if (!state.user) {
+            authBox('CUSTOMER');
+            return;
+        }
+        openCustomerSubscriptions();
         return;
     } if (key === 'orders') {
         if (!state.user) {
@@ -1567,13 +1698,39 @@ function renderCustomer() {
         switchCustomerSection('orders');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
-    } const services = document.getElementById('servicesSection'), orders = document.getElementById('ordersSection'); if (services)
-        services.className = ''; if (orders)
+    } document.querySelector('.customer-shell')?.classList.remove('orders-view'); const services = document.getElementById('servicesSection'), orders = document.getElementById('ordersSection'); if (services)
+        services.className = 'reference-service-section'; if (orders)
         orders.className = 'hide-section'; if (key === 'categories') {
         document.querySelector('.customer-category-showcase')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     else
         window.scrollTo({ top: 0, behavior: 'smooth' }); }));
+    document.getElementById('customerSignInToOrder')?.addEventListener('click', () => authBox('CUSTOMER'));
+    document.querySelectorAll('[data-promo-campaign]').forEach(x => x.addEventListener('click', () => { const c = state.campaigns.find((v) => v.id === x.dataset.promoCampaign); if (!c)
+        return; const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (t === 'CATEGORY' && v)
+        openCampaignCategories(c);
+    else if ((t === 'SERVICE' || t === 'ORDER') && v)
+        openOrderForm(v);
+    else if (t === 'TRIP' && v)
+        openOrderFormBySlug(v);
+    else
+        openCampaignDetails(c); }));
+    document.querySelectorAll('[data-open-service]').forEach(x => x.addEventListener('click', () => { const id = x.dataset.openService || ''; if (!id)
+        return; if (!state.user) {
+        openServiceDetails(id);
+        return;
+    } openOrderForm(id); }));
+    const serviceFavorites = () => { try {
+        return JSON.parse(localStorage.getItem('khadamat.favoriteServices.v1') || '[]');
+    }
+    catch {
+        return [];
+    } };
+    document.querySelectorAll('[data-service-favorite]').forEach(x => { const id = x.dataset.serviceFavorite || ''; if (serviceFavorites().includes(id))
+        x.textContent = '♥'; x.addEventListener('click', e => { e.stopPropagation(); const fav = serviceFavorites(); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; localStorage.setItem('khadamat.favoriteServices.v1', JSON.stringify(next)); x.textContent = next.includes(id) ? '♥' : '♡'; if (document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'favorite')
+        applyServiceFilter('favorite'); }); });
+    function applyServiceFilter(key) { document.querySelectorAll('[data-service-filter]').forEach(b => b.classList.toggle('active', b.dataset.serviceFilter === key)); const fav = serviceFavorites(); const cards = Array.from(document.querySelectorAll('[data-service-card]')); cards.forEach((card, i) => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && Date.now() - created < 30 * 86400000; const show = key === 'all' || key === 'nearby' || (key === 'new' && (isNew || (!Number.isFinite(created) && i < 4))) || (key === 'favorite' && fav.includes(String(card.dataset.serviceCard || ''))); card.classList.toggle('hide-section', !show); }); }
+    document.querySelectorAll('[data-service-filter]').forEach(x => x.addEventListener('click', () => applyServiceFilter(x.dataset.serviceFilter || 'all')));
     document.getElementById('customerCitySelect')?.addEventListener('change', async () => { const id = document.getElementById('customerCitySelect').value; state.selectedAreaId = id; try {
         if (id)
             localStorage.setItem('khadamat.selectedAreaId', id);
@@ -1584,14 +1741,9 @@ function renderCustomer() {
     catch (e) {
         alert(e.message);
     } });
-    document.getElementById('customerUseLocation')?.addEventListener('click', () => { if (state.user) {
-        openCustomerLocationSetup(false);
-        return;
-    } if (!navigator.geolocation) {
-        toast('الموقع غير متاح', 'اختر المنطقة يدويًا من القائمة.');
-        return;
-    } navigator.geolocation.getCurrentPosition(pos => { localStorage.setItem('khadamat.currentLocation.v1', JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, source: 'gps', capturedAt: new Date().toISOString() })); customer().catch(() => { }); }, () => toast('تعذر تحديد الموقع', 'تحقق من إذن الموقع أو اختر المنطقة يدويًا.'), { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }); });
     document.querySelectorAll('[data-campaign-favorite]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); const id = x.dataset.campaignFavorite || ''; const fav = JSON.parse(localStorage.getItem('khadamat.favoriteCampaigns.v1') || '[]'); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; localStorage.setItem('khadamat.favoriteCampaigns.v1', JSON.stringify(next)); x.textContent = next.includes(id) ? '♥' : '♡'; toast('المفضلة', next.includes(id) ? 'أُضيف العرض إلى المفضلة.' : 'أُزيل العرض من المفضلة.'); }));
+    document.querySelectorAll('[data-offer-filter]').forEach(x => x.addEventListener('click', () => { const key = x.dataset.offerFilter || 'all'; document.querySelectorAll('[data-offer-filter]').forEach(b => b.classList.toggle('active', b === x)); const cards = Array.from(document.querySelectorAll('[data-campaign-card]')); const fav = JSON.parse(localStorage.getItem('khadamat.favoriteCampaigns.v1') || '[]'); cards.forEach((card, i) => { const c = state.campaigns.find((v) => v.id === card.dataset.campaignCard); const created = Date.parse(String(c?.startsAt || c?.createdAt || '')); const isNew = Number.isFinite(created) && Date.now() - created < 14 * 86400000; let show = key === 'all' || (key === 'nearby' && (!state.selectedAreaId || !c?.areaId || c.areaId === state.selectedAreaId)) || (key === 'new' && (isNew || (!Number.isFinite(created) && i < 2))) || (key === 'favorite' && fav.includes(String(c?.id))); card.classList.toggle('hide-section', !show); }); if (key === 'favorite' && !cards.some(c => !c.classList.contains('hide-section')))
+        toast('المفضلة', 'لم تضف عروضًا إلى المفضلة بعد.'); }));
     document.querySelectorAll('[data-campaign-card]').forEach(x => { const open = () => { const c = state.campaigns.find((v) => v.id === x.dataset.campaignCard); if (!c)
         return; const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (v && t === 'CATEGORY')
         openCampaignCategories(c);
@@ -1661,26 +1813,6 @@ function renderCustomer() {
         toast('تعذر فتح الخدمة', 'الإعلان غير مرتبط بخدمة فعالة حاليًا.'); };
     document.querySelectorAll('[data-temp-id]').forEach(x => x.addEventListener('click', () => openTemporaryAction(x.dataset.tempId || '')));
     document.querySelectorAll('[data-temp-action]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); openTemporaryAction(x.dataset.tempAction || ''); }));
-    document.querySelectorAll('[data-quick-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.quickService)));
-    const serviceList = document.getElementById('customerServiceList');
-    serviceList?.addEventListener('click', e => { const target = e.target; const favoriteButton = target.closest('[data-service-favorite]'); if (favoriteButton) {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = favoriteButton.dataset.serviceFavorite || '';
-        let favorites = [];
-        try {
-            favorites = JSON.parse(localStorage.getItem('khadamat.favoriteServices.v1') || '[]');
-        }
-        catch { }
-        favorites = favorites.includes(id) ? favorites.filter(v => v !== id) : [...favorites, id];
-        localStorage.setItem('khadamat.favoriteServices.v1', JSON.stringify(favorites));
-        const filter = document.querySelector('[data-service-filter].active')?.dataset.serviceFilter || 'all';
-        serviceList.innerHTML = renderCustomerServiceCards(state.services, filter, state.popularity);
-        return;
-    } const serviceButton = target.closest('[data-customer-service]'); if (serviceButton)
-        openServiceDetails(serviceButton.dataset.customerService || ''); });
-    document.querySelectorAll('[data-service-filter]').forEach(button => button.addEventListener('click', () => { const filter = button.dataset.serviceFilter || 'all'; document.querySelectorAll('[data-service-filter]').forEach(item => item.classList.toggle('active', item === button)); if (serviceList)
-        serviceList.innerHTML = renderCustomerServiceCards(state.services, filter, state.popularity); }));
     setupQuickAssistComposer();
     document.getElementById('servicesTab').onclick = () => switchCustomerSection('services');
     document.getElementById('ordersTab')?.addEventListener('click', () => switchCustomerSection('orders'));
@@ -1708,7 +1840,8 @@ function switchCustomerSection(section) {
     if (!services || !orders || !st || !ot)
         return;
     const isServices = section === 'services';
-    services.className = isServices ? '' : 'hide-section';
+    document.querySelector('.customer-shell')?.classList.toggle('orders-view', !isServices);
+    services.className = isServices ? 'reference-service-section hide-section'.replace(' hide-section', '') : 'hide-section';
     orders.className = isServices ? 'hide-section' : '';
     st.classList.toggle('active', isServices);
     ot.classList.toggle('active', !isServices);
@@ -1782,7 +1915,10 @@ catch (e) {
 } if (!services.length) {
     showModal('<div class="empty">لا توجد خدمات متاحة في هذا القسم حاليًا</div>');
     return;
-} showModal(`<div class="service-picker-head"><div><h2>اختر الخدمة</h2><p class="muted">اختر الخدمة الفعلية التي تريد طلبها</p></div></div><div class="grid service-picker">${services.map(s => `<button class="card service service-option" data-service="${esc(s.id)}" type="button"><div class="service-option-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div class="service-option-body"><b>${esc(s.name)}</b><p>${esc(s.description || 'اطلب هذه الخدمة وسيتم البحث عن مقدم خدمة مناسب')}</p><span class="choose-link">${state.user ? 'طلب الخدمة' : 'عرض التفاصيل'} ←</span></div></button>`).join('')}</div>`); document.querySelectorAll('[data-service]').forEach(x => x.addEventListener('click', () => openServiceDetails(x.dataset.service))); }
+} showModal(`<div class="service-picker-head"><div><h2>اختر الخدمة</h2><p class="muted">اختر الخدمة الفعلية التي تريد طلبها</p></div></div><div class="grid service-picker">${services.map(s => `<button class="card service service-option" data-service="${esc(s.id)}" type="button"><div class="service-option-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div class="service-option-body"><b>${esc(s.name)}</b><p>${esc(s.description || 'اطلب هذه الخدمة وسيتم البحث عن مقدم خدمة مناسب')}</p><span class="choose-link">${state.user ? 'طلب الخدمة' : 'عرض التفاصيل'} ←</span></div></button>`).join('')}</div>`); document.querySelectorAll('[data-service]').forEach(x => x.addEventListener('click', () => { const id = x.dataset.service; if (state.user?.role === 'CUSTOMER')
+    openOrderForm(id);
+else
+    openServiceDetails(id); })); }
 async function openMotorcycleTripForm(service, savedAddresses) {
     const purposeLabels = { PASSENGER: 'نقل شخص', PARCEL: 'توصيل طلب أو غرض', ITEM_PURCHASE: 'شراء وإحضار غرض', MEDICINE: 'شراء دواء من الصيدلية', RESTAURANT_PICKUP: 'استلام طلب من مطعم', DOCUMENT_DELIVERY: 'استلام وتسليم مستندات', TECHNICIAN_PICKUP: 'إحضار فني أو عامل', STORE_SHOPPING: 'شراء أغراض من متجر', SMALL_CARGO: 'نقل أغراض صغيرة', HOME_PICKUP: 'استلام أو توصيل شيء من/إلى المنزل', OTHER: 'أخرى' };
     showModal(`<div class="trip-modal"><div class="trip-head"><div><h2>🛵 مشاوير بالدباب</h2><p class="muted">حدد نقطة الانطلاق والوجهة. يمكنك وضع العلامة على الخريطة حتى لو لم يكن للمكان اسم.</p></div></div><form id="tripForm">
@@ -1973,7 +2109,7 @@ async function openOrderForm(serviceId, initial = null) {
     const descSuggestions = DESCRIPTION_SUGGESTIONS[s.slug] || [];
     const suggestionHtml = descSuggestions.length ? `<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x => `<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : '';
     const deliveryLinkHtml = /deliver|parcel|package|shopping|توصيل|طرود|مشتريات/i.test(String(s.slug) + ' ' + String(s.name)) ? `<div class="field"><label for="orderProductUrl">رابط المنتج أو السلة (اختياري)</label><input id="orderProductUrl" type="url" inputmode="url" maxlength="1000" placeholder="الصق رابط المنتج أو السلة هنا"><small class="muted">يمكنك كتابة اسم المنتج في الوصف أو لصق رابط مباشر.</small></div>` : '';
-    showModal(`<div class="order-form-heading"><h2>${esc(s.name)}</h2><p class="muted">أدخل التفاصيل الضرورية فقط.</p></div><details class="optional-order-details order-advanced-area"><summary>تحديد منطقة أدق (اختياري)</summary><div class="field"><label>المنطقة أو القرية</label><select id="orderAreaId"><option value="">سيحددها النظام من الموقع تلقائيًا</option></select><small class="muted">اختر المنطقة يدويًا فقط إذا احتجت إلى تصحيح الموقع.</small></div></details><form id="orderForm"><details class="optional-order-details beneficiary-first"><summary>مستفيد آخر (اختياري)</summary><div class="field"><label>لمن هذه الخدمة؟</label><select id="beneficiarySelect"><option value="">لي أنا</option>${beneficiaries.map((b) => `<option value="${esc(b.id)}">${esc(b.label)} — ${esc(b.fullName)}</option>`).join('')}<option value="__other__">شخص آخر</option></select><div id="otherRecipient" class="hide-section" style="margin-top:8px"><input id="recipientName" placeholder="اسم المستفيد"><input id="recipientPhone" placeholder="هاتف المستفيد"></div></div></details><div class="field description-field"><label>ماذا تريد؟</label><textarea id="orderDescription" name="description" required placeholder="اكتب اسم المنتج أو وصف ما تحتاجه فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${deliveryLinkHtml}${fields}${optionalFieldsHtml}<div class="field location-field"><label>عنوان التنفيذ</label><div id="savedAddressCard" class="card" style="margin-bottom:10px"><div class="row"><select id="savedAddress" style="flex:1"><option value="">📍 استخدام موقع جديد من GPS</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select></div><p id="savedAddressStatus" class="muted" style="margin:8px 0 0">اختر عنوانًا محفوظًا أو حدّد موقع التنفيذ.</p></div><div class="row location-row"><button class="btn secondary" id="useLocation" type="button">📍 إرسال موقعي الحالي</button><span id="locationStatus" class="muted">أضف موقع التنفيذ لتسهيل وصول مقدم الخدمة.</span></div><div class="location-human-fields"><div class="field"><label>وصف الموقع عند الحاجة</label><input id="localityText" name="localityText" maxlength="300" placeholder="مثال: القرية أو الحي أو أقرب معلم"></div></div><div id="locationPreview" class="hide-section"></div><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></div><div class="field"><label>رقم التواصل</label><input name="contactPhone" value="${esc(state.user.phone || '')}" required></div><details class="optional-order-details"><summary>إضافات اختيارية</summary><div class="field"><label>ملاحظات (اختياري)</label><textarea name="notes" placeholder="أضف ملاحظة إذا كانت ضرورية"></textarea></div><div class="field"><label>صورة مرفقة (اختيارية)</label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة فقط إذا كانت تساعد على فهم المطلوب.</small></div></details><div class="card order-price-preview"><h3>ملخص سريع</h3><p><b>${esc(s.name)}</b></p><div id="orderItemSummary" class="order-item-summary"></div>${s.pricingType === 'FIXED' && s.basePrice != null ? `<p>السعر الأساسي: <b>${esc(s.basePrice)} ${esc(state.config.currency || 'YER')}</b></p>` : `<p class="muted">السعر النهائي يُوضح عند توفر عرض مقدم الخدمة.</p>`}<p><b>الدفع:</b> نقدًا</p></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">تنفيذ الطلب</button><p id="msg"></p></form>`);
+    showModal(`<div class="modern-order-flow"><header class="modern-order-heading"><div class="modern-order-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div><p class="modern-order-eyebrow">طلب خدمة</p><h2>${esc(s.name)}</h2><p class="muted">أكمل التفاصيل الضرورية فقط ثم أكد الطلب.</p></div></header><div class="modern-order-service-summary"><span>الخدمة المختارة</span><b>${esc(s.name)}</b><small>${s.pricingType === 'FIXED' && s.basePrice != null ? `السعر الأساسي ${esc(s.basePrice)} ${esc(currencyLabel())}` : 'السعر النهائي حسب تفاصيل الخدمة وعرض مقدم الخدمة'}</small></div><form id="orderForm"><div class="field description-field"><label for="orderDescription">تفاصيل الطلب <span class="muted">(عند الحاجة)</span></label><textarea id="orderDescription" name="description" maxlength="1000" placeholder="اكتب التفاصيل الضرورية فقط">${esc(initial?.description || '')}</textarea>${suggestionHtml}</div>${fields}${deliveryLinkHtml}<section class="modern-order-location"><div class="row modern-order-section-head"><div><b>عنوان تنفيذ الخدمة</b><small>اختر عنوانًا محفوظًا أو حدّد موقعًا عند الحاجة.</small></div><button class="btn secondary small" id="useLocation" type="button">📍 تحديد موقعي</button></div><div id="savedAddressCard" class="modern-saved-address ${s.slug === 'mobile-car-wash' ? 'hide-section' : ''}"><select id="savedAddress" aria-label="العنوان المحفوظ"><option value="">استخدام موقع جديد أو عنوان آخر</option>${savedAddresses.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><p id="savedAddressStatus" class="muted">لا يوجد عنوان مختار.</p></div><div id="locationStatus" class="modern-location-status muted" role="status">${s.slug === 'mobile-car-wash' ? 'حدد موقع تنفيذ الغسيل.' : 'اختر العنوان عند الحاجة.'}</div><div id="locationPreview" class="hide-section"></div><details class="optional-order-details modern-address-extra"><summary>تفاصيل العنوان (اختياري)</summary><div class="field"><label for="localityText">الحي أو أقرب معلم</label><input id="localityText" name="localityText" maxlength="300" placeholder="الحي أو اسم معلم قريب"></div></details><input id="addressId" name="addressId" type="hidden"><input id="lat" name="lat" type="hidden"><input id="lng" name="lng" type="hidden"><input id="accuracy" name="accuracy" type="hidden"><input id="locationConfirmed" name="locationConfirmed" type="hidden" value="0"></section><div class="field"><label for="contactPhone">رقم التواصل</label><input id="contactPhone" name="contactPhone" type="tel" inputmode="tel" value="${esc(state.user.phone || '')}" required></div><details class="optional-order-details modern-order-optional"><summary>ملاحظات أو صورة (اختياري)</summary><div class="field"><label>ملاحظات الطلب</label><textarea name="notes" maxlength="500" placeholder="أضف ملاحظة عند الحاجة فقط"></textarea></div><div class="field"><label>صورة توضيحية (اختيارية)</label><input id="customImage" type="file" accept="image/jpeg,image/png,image/webp"><small class="muted">أرفق صورة فقط إذا كانت تساعد على فهم الخدمة.</small></div></details><select id="orderAreaId" class="hide-section" aria-hidden="true" tabindex="-1"><option value="">تحديد تلقائي</option></select><div class="modern-order-summary"><b>ملخص الطلب</b><div id="orderItemSummary"></div><small>${s.pricingType === 'FIXED' && s.basePrice != null ? `السعر الأساسي: ${esc(s.basePrice)} ${esc(currencyLabel())}` : 'السعر النهائي يُحدد حسب تفاصيل الخدمة.'} · الدفع نقدًا</small></div><button class="btn submit-order-btn" id="submitOrderBtn" type="submit">تنفيذ الطلب</button><p id="msg" role="status"></p></form></div>`);
     const updateOrderItemSummary = () => { const el = document.getElementById('orderItemSummary'), form = document.getElementById('orderForm'); if (!el || !form)
         return; const fd = new FormData(form); const values = (s.formSchema || []).map((f) => ({ key: String(f.key), label: String(f.labelText || f.label?.ar || f.key), value: String(fd.get(String(f.key)) || '').trim() })).filter((x) => x.value); const desc = String(fd.get('description') || '').trim(); el.innerHTML = [desc ? `<p><b>وصف الطلب:</b> ${esc(desc)}</p>` : '', ...values.map((x) => `<p><b>${esc(x.label)}:</b> ${esc(x.value)}${x.key === 'max_price' ? ' (حد أعلى وليس سعرًا نهائيًا)' : ''}</p>`)].filter(Boolean).join(''); };
     document.getElementById('orderForm')?.addEventListener('input', updateOrderItemSummary);
@@ -2027,6 +2163,53 @@ async function openOrderForm(serviceId, initial = null) {
             addressIdInput.value = '';
         }
     });
+    if (s.slug === 'mobile-car-wash') {
+        const savedCard = document.getElementById('savedAddressCard');
+        const radios = Array.from(document.querySelectorAll('input[name="carWashLocationChoice"]'));
+        const applyWashLocation = (mode, requestGps) => {
+            const other = mode === 'other';
+            savedCard?.classList.toggle('hide-section', !other);
+            if (other) {
+                if (savedSelect.value === '') {
+                    document.getElementById('lat').value = '';
+                    document.getElementById('lng').value = '';
+                    document.getElementById('accuracy').value = '';
+                    document.getElementById('locationConfirmed').value = '0';
+                    document.getElementById('addressId').value = '';
+                    const status = document.getElementById('savedAddressStatus');
+                    if (status)
+                        status.textContent = 'اختر عنوانًا محفوظًا أو اضغط «تحديد موقعي» لاختيار موقع آخر.';
+                    const preview = document.getElementById('locationPreview');
+                    if (preview) {
+                        preview.className = 'hide-section';
+                        preview.innerHTML = '';
+                    }
+                }
+                const label = document.querySelector('.location-row #useLocation');
+                if (label)
+                    label.textContent = '📍 تحديد الموقع الآخر من GPS';
+                const status = document.getElementById('locationStatus');
+                if (status)
+                    status.textContent = 'حدد موقعًا آخر أو اختر عنوانًا محفوظًا.';
+            }
+            else {
+                if (savedSelect.value) {
+                    savedSelect.value = '';
+                    savedSelect.dispatchEvent(new Event('change'));
+                }
+                const label = document.querySelector('.location-row #useLocation');
+                if (label)
+                    label.textContent = '📍 إرسال موقعي الحالي';
+                const status = document.getElementById('locationStatus');
+                if (status)
+                    status.textContent = 'سيكون موقع تنفيذ الغسيل هو موقعك الحالي بعد تحديده وتأكيده.';
+                if (requestGps)
+                    document.getElementById('useLocation')?.click();
+            }
+        };
+        radios.forEach(r => r.addEventListener('change', () => { if (r.checked)
+            applyWashLocation(r.value, true); }));
+    }
     document.getElementById('useLocation').addEventListener('click', () => {
         const status = document.getElementById('locationStatus');
         const preview = document.getElementById('locationPreview');
@@ -2081,10 +2264,10 @@ async function openOrderForm(serviceId, initial = null) {
             confirmedInput.value = '0';
             const age = Math.round((Date.now() - started) / 1000);
             const quality = accuracy <= 20 ? 'ممتازة' : accuracy <= 50 ? 'جيدة جدًا' : accuracy <= 100 ? 'جيدة' : accuracy <= 500 ? 'متوسطة' : 'ضعيفة';
-            status.textContent = `أفضل قراءة حتى الآن: دقة تقريبية ${Math.round(accuracy)} متر — ${quality}. جارٍ البحث عن قراءة أدق (${age} ثانية).`;
+            status.textContent = `جارٍ تحديد موقعك… ${quality === 'ضعيفة' ? 'نحاول تحسين الدقة.' : 'يمكنك متابعة التحديد.'}`;
             status.className = accuracy <= 500 ? 'success' : 'muted';
             preview.className = '';
-            preview.innerHTML = `<div class="card" style="margin-top:10px"><b>موقع التنفيذ</b><p class="muted">راجع النقطة على الخريطة ثم أكّد استخدامها.</p><div id="captureMap" style="height:260px;width:100%;border-radius:12px;overflow:hidden;margin:10px 0"></div><button class="btn" id="confirmLocation" type="button" ${accuracy > 1000 ? 'disabled' : ''}>${accuracy > 1000 ? '⏳ انتظر دقة GPS أفضل' : '✅ تأكيد هذا الموقع وإرفاقه بالطلب'}</button></div>`;
+            preview.innerHTML = `<div class="card compact-location-preview" style="margin-top:8px"><b>موقع التنفيذ</b><div id="captureMap" style="height:190px;width:100%;border-radius:10px;overflow:hidden;margin:8px 0"></div><button class="btn" id="confirmLocation" type="button" ${accuracy > 1000 ? 'disabled' : ''}>${accuracy > 1000 ? 'جارٍ تحسين الموقع' : 'تأكيد الموقع'}</button></div>`;
             const mapEl = document.getElementById('captureMap');
             const L = await ensureLeaflet().catch(() => null);
             if (L && mapEl) {
@@ -2190,12 +2373,12 @@ async function openOrderForm(serviceId, initial = null) {
             const contact = String(fdReview.get('contactPhone') || '').trim();
             const areaSelect = document.getElementById('orderAreaId');
             const selectedArea = areaSelect?.selectedOptions?.[0]?.textContent || '';
-            const addressSelectForReview = document.getElementById('savedAddress');
-            const reviewAddress = addressSelectForReview?.value ? String(addressSelectForReview.selectedOptions?.[0]?.textContent || 'العنوان المحفوظ') : String(document.getElementById('localityText')?.value || 'موقع التنفيذ الحالي');
+            const savedAddressSelect = document.getElementById('savedAddress');
+            const reviewAddressText = savedAddressSelect?.value ? (savedAddressSelect.selectedOptions?.[0]?.textContent || 'العنوان المحفوظ') : (Number(document.getElementById('lat')?.value) && Number(document.getElementById('lng')?.value) ? 'موقعي الحالي' : 'لم يُحدد عنوان');
             const review = document.createElement('section');
             review.id = 'orderConfirmationStep';
             review.className = 'order-confirmation-step';
-            review.innerHTML = `<div class="order-confirmation-heading"><h2>تأكيد الطلب</h2></div><div class="card order-confirmation-summary"><b>${esc(s.name)}</b><p>${esc(description || '')}</p></div><div class="card order-confirmation-extra"><div class="row order-confirmation-inline"><b>هل لديك قسيمة تخفيض؟</b><button type="button" class="text-link" id="toggleCoupon">إضافة</button></div><div id="couponEntry" class="field hide-section"><label for="orderCouponCode">كود القسيمة</label><input id="orderCouponCode" maxlength="60" placeholder="أدخل كود القسيمة"></div></div><div class="card order-confirmation-address"><div class="row order-confirmation-inline"><b>عنوان التوصيل</b><span id="reviewAddressLabel">${esc(reviewAddress)}</span><button type="button" class="text-link" id="reviewChangeAddress">تغيير</button></div></div><div class="card order-confirmation-notes"><div class="row order-confirmation-inline"><b>ملاحظات الطلب</b><button type="button" class="text-link" id="toggleOrderNote">إضافة</button></div><p id="reviewNotePreview" class="muted">لا توجد ملاحظة</p><div id="orderNoteEntry" class="field hide-section"><textarea id="reviewOrderNote" maxlength="500" placeholder="اكتب ملاحظتك هنا"></textarea></div>${/deliver|parcel|package|shopping|توصيل|طرود|مشتريات/i.test(String(s.slug) + ' ' + String(s.name)) ? `<div class="field"><label>تفاصيل إضافية (اختياري)</label><textarea id="reviewExtraDetails" maxlength="500" placeholder="تفاصيل تساعد على تنفيذ طلب التوصيل"></textarea></div><div class="field"><label>منتج إضافي (اختياري)</label><input id="customProductName" maxlength="200" placeholder="اسم المنتج الإضافي"><div class="row quantity-control"><button type="button" id="customQtyMinus" aria-label="تقليل الكمية">−</button><input id="customProductQty" type="number" min="1" step="1" value="1" aria-label="الكمية"><button type="button" id="customQtyPlus" aria-label="زيادة الكمية">+</button></div></div>` : ''}</div><div class="card order-time-choice"><h3>وقت الطلب</h3><label class="choice-row"><input type="radio" name="reviewOrderTime" value="now" checked> الآن</label><label class="choice-row"><input type="radio" name="reviewOrderTime" value="later"> وقت لاحق</label><div id="laterOrderTimeBox" class="field hide-section"><label for="reviewScheduledAt">اختر الوقت المناسب</label><input id="reviewScheduledAt" type="datetime-local"></div><p id="reviewTimeError" class="error hide-section"></p></div><div class="card payment-methods"><h3>طريقة الدفع</h3><label class="payment-choice"><input type="radio" name="reviewPaymentMethod" value="CASH" checked><span><b>الدفع عند الاستلام</b></span></label></div><div class="row order-confirmation-actions"><button type="button" class="btn secondary" id="reviewBackToEdit">رجوع</button><button type="button" class="btn" id="reviewConfirmOrder">تأكيد الطلب</button></div>`;
+            review.innerHTML = `<div class="order-confirmation-heading"><h2>تأكيد الطلب</h2><p class="muted">${esc(s.name)}</p></div><div class="card order-confirmation-extra"><div class="row order-confirmation-inline"><b>هل لديك قسيمة تخفيض؟</b><button type="button" class="text-link" id="toggleCoupon">إضافة</button></div><div id="couponEntry" class="field hide-section"><label for="orderCouponCode">كود القسيمة</label><input id="orderCouponCode" maxlength="60" placeholder="أدخل كود القسيمة"></div></div><div class="card order-confirmation-summary"><div class="row order-confirmation-inline"><b>عنوان التوصيل</b><span id="reviewAddressLabel">${esc(reviewAddressText)}</span><button type="button" class="text-link" id="reviewChangeAddress">تغيير</button></div><p class="muted">${esc(description || s.name)}</p></div><div class="card order-confirmation-extra"><div class="row order-confirmation-inline"><b>ملاحظات الطلب</b><button type="button" class="text-link" id="toggleOrderNote">إضافة</button></div><p id="reviewNotePreview" class="muted">${esc(String(fdReview.get('notes') || '').trim() || 'لا توجد ملاحظة')}</p><div id="orderNoteEntry" class="field hide-section"><textarea id="reviewOrderNote" maxlength="500" placeholder="اكتب ملاحظتك هنا">${esc(String(fdReview.get('notes') || '').trim())}</textarea></div>${/deliver|parcel|package|shopping|توصيل|طرود|مشتريات/i.test(String(s.slug) + ' ' + String(s.name)) ? `<div class="field"><label>تفاصيل إضافية (اختياري)</label><textarea id="reviewExtraDetails" maxlength="500" placeholder="تفاصيل تساعد على تنفيذ طلب التوصيل"></textarea></div><div class="field"><label>منتج إضافي (اختياري)</label><input id="customProductName" maxlength="200" placeholder="اسم المنتج الإضافي"><div class="row quantity-control"><button type="button" id="customQtyMinus" aria-label="تقليل الكمية">−</button><input id="customProductQty" type="number" min="1" step="1" value="1" aria-label="الكمية"><button type="button" id="customQtyPlus" aria-label="زيادة الكمية">+</button></div></div>` : ''}</div><div class="card order-time-choice"><h3>تحديد وقت الطلب</h3><label class="choice-row"><input type="radio" name="reviewOrderTime" value="now" checked> الآن</label><label class="choice-row"><input type="radio" name="reviewOrderTime" value="later"> وقت لاحق</label><div id="laterOrderTimeBox" class="field hide-section"><label for="reviewScheduledAt">اختر الوقت المناسب</label><input id="reviewScheduledAt" type="datetime-local"></div><p id="reviewTimeError" class="error hide-section"></p></div><div class="card payment-methods"><h3>طريقة الدفع</h3><label class="payment-choice"><input type="radio" name="reviewPaymentMethod" value="CASH" checked><span><b>الدفع عند الاستلام</b></span></label></div><div class="row order-confirmation-actions"><button type="button" class="btn secondary" id="reviewBackToEdit">رجوع</button><button type="button" class="btn" id="reviewConfirmOrder">تنفيذ الطلب</button></div>`;
             const originalChildren = Array.from(orderForm.children);
             originalChildren.forEach(el => el.classList.add('order-review-hidden'));
             orderForm.appendChild(review);
@@ -2256,7 +2439,7 @@ async function openOrderForm(serviceId, initial = null) {
         }
         const chosenPriority = String(s.defaultPriority || 'NORMAL');
         const scheduledAt = confirmedScheduledAt;
-        const b = { serviceId, description: String(fd.get('description')), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: chosenPriority, scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined, ...(initial?.assistantSessionId ? { assistantSessionId: initial.assistantSessionId } : {}) };
+        const b = { serviceId, description: (String(fd.get('description') || '').trim() || String(s.name)), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: chosenPriority, scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined, ...(initial?.assistantSessionId ? { assistantSessionId: initial.assistantSessionId } : {}) };
         const selectedAreaId = String(document.getElementById('orderAreaId')?.value || '');
         if (selectedAreaId)
             b.areaId = selectedAreaId;
@@ -2322,7 +2505,7 @@ async function openOrderForm(serviceId, initial = null) {
             closeModal();
             await customer();
             if (createdOrder?.id) {
-                showModal(`<div class="card order-created-success"><h2>✓ تمّت إضافة الطلب بنجاح</h2><p>رقم الطلب: <b>${esc(createdOrder.code || '')}</b></p><p class="muted">يمكنك متابعة حالة الطلب من «طلباتي» في أي وقت.</p><div class="row"><button class="btn" id="trackCreatedOrder" type="button">متابعة الطلب</button><button class="btn secondary" id="closeCreatedOrder" type="button">إغلاق</button></div></div>`);
+                showModal(`<div class="card order-created-success"><h2>تم إرسال الطلب</h2><p>رقم الطلب: <b>${esc(createdOrder.code || '')}</b></p><p class="muted">يمكنك متابعة حالة الطلب الآن.</p><div class="row"><button class="btn" id="trackCreatedOrder" type="button">متابعة الطلب</button><button class="btn secondary" id="closeCreatedOrder" type="button">إغلاق</button></div></div>`);
                 document.getElementById('trackCreatedOrder')?.addEventListener('click', () => { closeModal(); openOrder(createdOrder.id); });
                 document.getElementById('closeCreatedOrder')?.addEventListener('click', () => closeModal());
             }

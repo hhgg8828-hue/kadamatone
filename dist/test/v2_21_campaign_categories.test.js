@@ -20,23 +20,22 @@ test('Offer imagery is compact and release asset cache versions match V2.23', ()
     assert.ok(css.includes('.customer-shell .campaign-card .campaign-image{aspect-ratio:16/9;object-fit:cover}') || css.includes('.customer-shell .campaign-card .campaign-image{height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:10px;grid-row:auto}'));
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
-        assert.ok(html.includes('app.js?v=2.26'), file);
-        assert.ok(html.includes('app.css?v=2.26'), file);
+        assert.ok(html.includes('app.js?v=2.28'), file);
+        assert.ok(html.includes('app.css?v=2.28'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-26'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-28'));
 });
-test('Customer home follows the video order: news, offers, categories, then quick access', () => {
+test('Customer home follows the reference order: ticker, banner, categories, then offers', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    const tickerAt = app.indexOf('class="khadamat-news-ticker"');
-    const offersAt = app.indexOf('<section class="customer-offers"');
+    const tickerAt = app.indexOf('class="khadamat-news-ticker reference-news-ticker"');
+    const bannerAt = app.indexOf('class="customer-promo-banner"');
     const categoryAt = app.indexOf('customer-category-showcase customer-category-showcase-top');
-    const quickAt = app.indexOf('aria-label="الوصول السريع"');
-    assert.ok(tickerAt >= 0 && offersAt > tickerAt, 'news ticker precedes offers');
-    assert.ok(categoryAt > offersAt, 'categories follow offers as in the reference video');
-    assert.ok(quickAt > categoryAt, 'the Khadamat quick-access feature remains distinct below categories');
+    const quickAt = app.indexOf('class="quick-assist-reference"');
+    const offersAt = app.indexOf('<section class="customer-offers"');
+    assert.ok(tickerAt >= 0 && bannerAt > tickerAt && categoryAt > bannerAt && quickAt > categoryAt && offersAt > quickAt);
     assert.ok(app.includes('id="allCategoriesBtn"'));
     assert.ok(app.includes('id="allOffersBtn"'));
-    assert.ok(app.includes('customer-city-select card customer-city-select-compact'));
-    assert.ok(fs.readFileSync('public/css/app.css', 'utf8').includes('.customer-shell .customer-city-select-compact small{display:none}'));
+    assert.ok(app.includes('id="customerAreaToggle"'));
+    assert.ok(fs.readFileSync('public/css/app.css', 'utf8').includes('.customer-area-arrow'));
 });
 //# sourceMappingURL=v2_21_campaign_categories.test.js.map

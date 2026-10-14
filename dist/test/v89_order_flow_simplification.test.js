@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-test('Release 2.9 keeps optional order details collapsed by default', () => {
+test('Order form stays concise and removes redundant beneficiary and manual-area questionnaires', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const form = app.slice(app.indexOf('async function openOrderForm(serviceId:string'), app.indexOf('async function openOrderComplaint'));
-    assert.ok(form.includes('<details class="optional-order-details order-advanced-area"><summary>تحديد منطقة أدق (اختياري)</summary>'));
-    assert.ok(form.includes('<details class="optional-order-details beneficiary-first"><summary>مستفيد آخر (اختياري)</summary>'));
-    assert.ok(form.includes('<details class="optional-order-details"><summary>إضافات اختيارية</summary>'));
-    assert.ok(form.includes('id="orderDescription" name="description" required'));
+    assert.ok(!form.includes('<div class="field"><label>الطلب لشخص آخر؟ (اختياري)</label><select id="beneficiarySelect">'));
+    assert.ok(!form.includes('<details class="optional-order-details order-advanced-area"><summary>منطقة الطلب (اختياري)</summary>'));
+    assert.ok(form.includes('<details class="optional-order-details modern-order-optional"><summary>ملاحظات أو صورة (اختياري)</summary>'));
+    assert.ok(form.includes('id="orderDescription" name="description" maxlength="1000"'));
+    assert.ok(form.includes('class="modern-order-flow"'));
+    assert.ok(!form.includes('الموقع الذي سيتم تحديده هو'));
     assert.ok(form.includes('id="submitOrderBtn" type="submit">تنفيذ الطلب</button>'));
 });
 test('Release 2.11 hides internal status events from customer tracking in order tracking', () => {

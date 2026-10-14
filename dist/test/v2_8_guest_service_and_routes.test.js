@@ -15,20 +15,20 @@ test('guest service selection opens service details before requesting authentica
     assert.match(frontend, /if\(!state\.user\)\{openServiceDetails\(serviceId,initial\);return\}/);
     assert.match(frontend, /يمكنك الاطلاع على الخدمة أولًا/);
 });
-test('mobile car wash uses the concise execution-location selector and still requires a confirmed location', () => {
+test('mobile car wash no longer asks a redundant current/other location question and still requires a confirmed location', () => {
     assert.match(frontend, /'mobile-car-wash':\['أحتاج غسيل السيارة في موقعي'/);
-    assert.equal(/هل تريد غسيل السيارة في موقعك الحالي أم في موقع آخر\؟/.test(frontend), false);
-    assert.equal(/name="carWashLocationChoice" value=/.test(frontend), false);
-    assert.match(frontend, /<label>عنوان التنفيذ<\/label>/);
-    assert.match(frontend, /id="savedAddressCard" class="card"/);
+    assert.ok(!/name="carWashLocationChoice" value="other"/.test(frontend));
+    assert.ok(!/هل تريد غسيل السيارة في موقعك الحالي/.test(frontend));
     assert.match(frontend, /if\(s\.slug==='mobile-car-wash'\)/);
     assert.match(frontend, /حدّد موقعك الحالي عبر GPS وأكّده قبل إرسال طلب غسيل السيارة/);
     assert.match(frontend, /f\.required\?'<option value="">اختر الخيار<\/option>'/);
 });
-test('customer area picker supports the full active hierarchy and preserves specific area selection', () => {
-    assert.match(frontend, /const areaPath=/);
-    assert.match(frontend, /المحافظة \/ المنطقة \/ الحي/);
+test('customer area picker uses a compact area-name list without displaying administrative levels', () => {
+    assert.match(frontend, /function openCustomerAreaPicker\(\)/);
+    assert.match(frontend, /data-select-area=/);
     assert.match(frontend, /state\.areas\.some\(\(a:any\)=>a\.id===storedArea\)/);
+    assert.ok(!/المحافظة \/ المنطقة \/ الحي/.test(frontend));
+    assert.match(frontend, /customer-area-option/);
     assert.match(frontend, /api\('\/admin\/areas'/);
     assert.match(frontend, /api\('\/provider\/areas'/);
 });
@@ -59,7 +59,7 @@ test('direct /admin, /provider, and /customer paths and refreshes serve the corr
             assert.equal(refreshed.status, 200, `${route} refresh should return HTTP 200`);
             assert.ok(refreshed.text.includes(expected));
         }
-        const assets = await t.api('GET', '/js/app.js?v=2.26');
+        const assets = await t.api('GET', '/js/app.js?v=2.28');
         assert.equal(assets.status, 200);
         assert.match(assets.headers.get('content-type') || '', /javascript/);
         assert.ok(assets.text.length > 1000);

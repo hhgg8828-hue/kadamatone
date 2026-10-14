@@ -18,8 +18,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 });
 test('provider page and frontend assets use the current version', () => {
     assert.ok(provider.includes('data-page="provider"'));
-    assert.ok(provider.includes('app.js?v=2.26'));
-    assert.ok(index.includes('app.js?v=2.26'));
+    assert.ok(provider.includes('app.js?v=2.28'));
+    assert.ok(index.includes('app.js?v=2.28'));
 });
 test('provider order action is not nested inside the clickable order detail button', () => {
     assert.match(app, /class=\"order-card-main\"/);
@@ -67,20 +67,23 @@ test('admin dashboard can inspect order history and complaint messages', () => {
     assert.ok(app.includes('data-admin-complaint'));
 });
 test('customer location center uses real saved-address APIs and supports address-based orders', () => {
-    assert.ok(app.includes('id=\"myLocations\"'));
+    assert.ok(app.includes('id=\"accountMenuAddresses\"'));
+    assert.ok(app.includes('function openSavedLocations'));
+    assert.ok(app.includes('openSavedLocations'));
     assert.ok(app.includes('/me/addresses'));
     assert.ok(app.includes('data-delete-address'));
     assert.ok(app.includes('data-default-address'));
     assert.ok(app.includes('addressId'));
     assert.ok(app.includes('b.addressId=addressId'));
-    assert.ok(app.includes('اختر عنوانًا محفوظًا أو حدّد موقع التنفيذ.'));
+    assert.ok(app.includes('لا يوجد عنوان مختار.'));
 });
 test('customer location flow is GPS-first and auto-uses a previously granted permission', () => {
     assert.ok(app.includes('📍 إرسال موقعي الحالي'));
     assert.ok(app.includes("permissions.query({name:'geolocation'})"));
     assert.ok(app.includes("permission.state==='granted'"));
     assert.ok(app.includes("getElementById('useLocation') as HTMLButtonElement)?.click()"));
-    assert.ok(app.includes('أضف موقع التنفيذ لتسهيل وصول مقدم الخدمة'));
+    assert.ok(app.includes('اختر العنوان عند الحاجة.'));
+    assert.ok(app.includes('id="customerAreaToggle"'));
 });
 test('provider navigation uses the exact customer coordinates', () => {
     assert.ok(app.includes("https://www.google.com/maps/dir/?api=1&destination="));
