@@ -26,7 +26,7 @@ test('V2.34 offers carousel spans the available width and all-offers button is t
 });
 
 test('V2.34 customer cache and asset URLs are version-aligned', () => {
-  assert.ok(html.includes('app.js?v=2.36'));
-  assert.ok(html.includes('app.css?v=2.36'));
-  assert.ok(sw.includes('khadamat-shell-v2-36'));
+  assert.ok(html.includes('app.js?v=2.38'));
+  assert.ok(html.includes('app.css?v=2.38'));
+  assert.ok(sw.includes('khadamat-shell-v2-38'));
 });

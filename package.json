@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.37.0",
-  "description": "خدمات — الإصدار 2.34: تبسيط تنفيذ الطلب وفق تدفق توصيل وان",
+  "version": "2.38.0",
+  "description": "خدمات — إدارة إعلانات الطلب والمتاجر المقترحة من لوحة الإدارة",
   "private": true,
   "type": "module",
   "engines": {

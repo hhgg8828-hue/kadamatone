@@ -38,7 +38,7 @@ test('role-specific PWAs use separate icons and cache refreshes navigation from 
     assert.ok(manifest.includes(`/icons/icon-${role}-192.png`));
   }
   const sw = fs.readFileSync('public/sw.js', 'utf8');
-  assert.ok(sw.includes('khadamat-shell-v2-36'));
+  assert.ok(sw.includes('khadamat-shell-v2-38'));
   assert.ok(sw.includes("e.request.mode==='navigate'"));
   assert.ok(sw.includes("'/js/app.js'"));
 });

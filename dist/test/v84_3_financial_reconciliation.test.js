@@ -50,7 +50,7 @@ test('V84.4: تدقيق التسويات يكتشف طلبًا مكتملًا ب
 });
 test('V84.4: واجهات PWA تستخدم إصدار الأصول الجديد', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html'])
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.36'), file);
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-36'));
+        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.38'), file);
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-38'));
 });
 //# sourceMappingURL=v84_3_financial_reconciliation.test.js.map
