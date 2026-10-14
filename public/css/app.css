@@ -1421,3 +1421,8 @@ body:has(.customer-shell) #modal:has(.account-form-title) .account-delete-card{d
 .trip-schedule-choice label{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:11px;padding:10px 13px}
 .customer-order-status-timeline .order-timeline{margin-top:8px}
 @media(max-width:420px){.pharmacy-product-row{align-items:flex-start}.pharmacy-product-actions{gap:3px}.quantity-mini,.icon-delete{min-width:29px}.trip-address-pair{grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);gap:4px}.trip-address-choice{padding:9px;min-height:72px}.trip-address-choice b{font-size:12px}.trip-sheet-options{gap:8px}}
+
+/* V2.37 — order tracking details and copyable order code */
+.order-code-copy-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 13px;margin-bottom:8px;border-bottom:1px solid #e7eee9}
+.order-code-copy-row>div{display:grid;gap:4px}.order-code-copy-row small{color:#68766d;font-size:12px}.order-code-copy-row b{font-size:20px;letter-spacing:.3px;direction:ltr;text-align:right}
+.order-terminal-state{display:flex;align-items:center;gap:12px;padding:16px;border:1px solid #e4e7eb;border-radius:14px;background:#f8faf9}.order-terminal-state>span{display:grid;place-items:center;flex:0 0 38px;height:38px;border-radius:50%;font-size:24px;font-weight:800;background:#e8ece9;color:#34463b}.order-terminal-state>div{display:grid;gap:5px}.order-terminal-state small{line-height:1.6;color:#66756b}.order-terminal-state.cancelled{background:#fff6f5;border-color:#f0d4d0}.order-terminal-state.cancelled>span{background:#f9e1dd;color:#a92c20}.order-terminal-state.disputed{background:#fff9eb;border-color:#f0dfb7}.order-terminal-state.disputed>span{background:#f8edcf;color:#835b09}
