@@ -1680,3 +1680,20 @@ body:has(.customer-shell) #modal:has(.reference-tracking)>.card>.row:first-child
 .tracking-live-chat-line{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;background:#1d1d1d;border-radius:12px;overflow-wrap:anywhere}
 .tracking-live-chat-line span{grid-column:1/-1;white-space:pre-wrap}
 .tracking-live-chat-line small{color:#aaa;font-size:11px}
+
+/* V2.45: خريطة المشوار غير المتاحة تعرض خيارات واضحة بلا إحداثيات يدوية */
+.trip-map-unavailable{padding:16px;border:1px solid #e2e7ef;border-radius:14px;background:#fff;text-align:right}.trip-map-unavailable .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.trip-map-unavailable p{margin:8px 0}
+
+/* Latest checkout/trip usability fixes */
+.checkout-reference-footer{bottom:calc(58px + env(safe-area-inset-bottom,0px));}
+body:has(.customer-shell) #modal:has(#tripForm){z-index:900;}
+body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - env(safe-area-inset-top,0px));padding-bottom:calc(92px + env(safe-area-inset-bottom,0px));overflow-y:auto;}
+#tripForm .submit-order-btn{position:sticky;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:10;width:100%;min-height:50px;margin-top:12px;box-shadow:0 -5px 14px rgba(0,0,0,.08);}
+.trip-items-disclosure{display:block;margin:10px 0;padding:0 12px;border:1px solid var(--line,#ddd);border-radius:12px;background:var(--surface,#fff);}
+.trip-items-disclosure summary{display:flex;align-items:center;justify-content:space-between;min-height:48px;font-weight:800;cursor:pointer;list-style:none;}
+.trip-items-disclosure summary::-webkit-details-marker{display:none;}
+.trip-items-disclosure textarea{width:100%;min-height:90px;margin:0 0 10px;resize:vertical;}
+.trip-schedule-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.trip-schedule-fields>.field{min-width:0;margin:0;}
+.trip-schedule-fields input,.trip-schedule-fields select{width:100%;min-width:0;}
+@media(max-width:420px){.trip-schedule-fields{gap:7px;}#tripForm .submit-order-btn{bottom:calc(60px + env(safe-area-inset-bottom,0px));}}

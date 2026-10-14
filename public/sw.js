@@ -1,5 +1,5 @@
-// Previous shell cache khadamat-shell-v2-38 is intentionally retired by the active v2-41 cache.
-const CACHE='khadamat-shell-v2-41';
+// Previous shell cache khadamat-shell-v2-38 is intentionally retired.
+const CACHE='khadamat-shell-v2-46';
 const SHELL=['/','/customer','/customer.html','/provider','/provider.html','/admin','/admin.html','/css/app.css','/js/app.js','/manifest.webmanifest','/manifest-customer.webmanifest','/manifest-provider.webmanifest','/manifest-admin.webmanifest','/js/install-app.js','/icons/icon-customer-192.png','/icons/icon-customer-512.png','/icons/icon-provider-192.png','/icons/icon-provider-512.png','/icons/icon-admin-192.png','/icons/icon-admin-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('khadamat-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

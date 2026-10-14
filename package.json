@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.44.0",
-  "description": "خدمات — تفاصيل تتبع الطلب المنسقة",
+  "version": "2.46.0",
+  "description": "خدمات — تحسين شاشة مشاوير الدباب، تأكيد الخروج، وتثبيت زر تأكيد الطلب",
   "private": true,
   "type": "module",
   "engines": {

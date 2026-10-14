@@ -94,12 +94,13 @@ test('V66.7: المطابقة تستخدم قدرة الشراء الفعلية�
         await t.close();
     }
 });
-test('V66.7: واجهة الخريطة تحتوي مسار CDN احتياطي وFallback للإحداثيات', () => {
+test('V66.7: واجهة الخريطة تقدم إعادة المحاولة أو GPS دون طلب إدخال الإحداثيات يدويًا', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     assert.ok(app.includes('cdn.jsdelivr.net/npm/leaflet@1.9.4'));
-    assert.ok(app.includes('تحديد الموقع بدون خريطة'));
-    assert.ok(app.includes('fallback${key}Lat'));
-    assert.ok(app.includes('fallback${key}Lng'));
-    assert.ok(app.includes('تحديد الموقع بدون خريطة'));
+    assert.ok(app.includes('data-trip-map-retry'));
+    assert.ok(app.includes('data-trip-map-gps'));
+    assert.ok(app.includes('الخريطة غير متاحة حاليًا'));
+    assert.ok(!app.includes('fallback${key}Lat'));
+    assert.ok(!app.includes('fallback${key}Lng'));
 });
 //# sourceMappingURL=v66_7_execution.test.js.map
