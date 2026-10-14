@@ -11,7 +11,7 @@ export function registerPlatformRoutes(app, r) {
         const locale = settings.get('platform.default_locale');
         return { appVersion: '2.34.0', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
             appName: settings.get('app.name'), appTagline: settings.get('app.tagline'), appSymbol: settings.get('app.symbol'),
-            newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'),
+            newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'), adminSmsPhone: settings.get('orders.admin_sms_phone'),
             defaultLocale: locale, supportedLocales: ['ar', 'en'], direction: locale === 'ar' ? 'rtl' : 'ltr', mapProvider: app.config.mapProvider };
     });
     r.get('/admin/settings', auth, adminLevel('ADMIN'), () => ({ settings: settings.all() }));
