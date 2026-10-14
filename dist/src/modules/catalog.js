@@ -79,7 +79,7 @@ export function createCatalog(app) {
         },
         serializeCategory(c, locale, { withServices = true, admin = false } = {}) {
             const data = load();
-            const out = { id: c.id, slug: c.slug, parentId: c.parent_id, name: tr(c.name_i18n, locale), description: tr(c.description_i18n, locale), icon: c.icon, moduleType: c.module_type, sortOrder: c.sort_order };
+            const out = { id: c.id, slug: c.slug, parentId: c.parent_id, name: tr(c.name_i18n, locale), description: tr(c.description_i18n, locale), icon: c.icon, moduleType: c.module_type, sortOrder: c.sort_order, defaultPricingType: c.default_pricing_type || 'QUOTE', defaultBasePrice: c.default_base_price ?? null };
             if (admin) {
                 out.isActive = !!c.is_active;
                 out.nameI18n = parseJson(c.name_i18n, {});
@@ -153,7 +153,7 @@ export function registerCatalogAdminRoutes(app, r) {
         slug: s.str({ min: 2, max: 80, pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ }), name: I18N_ADMIN,
         description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }),
         icon: s.str({ max: 200, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords,
-        moduleType: s.str({ min: 1, max: 40, optional: true, default: 'STANDARD' }), sortOrder: s.int({ min: -100000, max: 100000, optional: true, default: 0 }),
+        moduleType: s.str({ min: 1, max: 40, optional: true, default: 'STANDARD' }), sortOrder: s.int({ min: -100000, max: 100000, optional: true, default: 0 }), defaultPricingType: s.oneOf(['FIXED', 'QUOTE'], { optional: true, default: 'QUOTE' }), defaultBasePrice: s.num({ min: 0, optional: true }),
     });
     const serviceInput = s.obj({
         categoryId: s.str({ min: 1, max: 64 }), slug: s.str({ min: 2, max: 100, pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ }), name: I18N_ADMIN,
@@ -174,7 +174,7 @@ export function registerCatalogAdminRoutes(app, r) {
         if (b.parentId && !db.get('SELECT 1 FROM categories WHERE id = ?', b.parentId))
             throw E.unprocessable('القسم الأب غير موجود', 'INVALID_PARENT');
         const id = uuid(), now = iso(app.clock.now());
-        db.run('INSERT INTO categories(id,parent_id,slug,name_i18n,description_i18n,icon,keywords,module_type,sort_order,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', id, b.parentId || null, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.moduleType || 'STANDARD', b.sortOrder || 0, 1, now, now);
+        db.run('INSERT INTO categories(id,parent_id,slug,name_i18n,description_i18n,icon,keywords,module_type,sort_order,is_active,created_at,updated_at,default_pricing_type,default_base_price) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.parentId || null, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.moduleType || 'STANDARD', b.sortOrder || 0, 1, now, now, b.defaultPricingType || 'QUOTE', b.defaultPricingType === 'FIXED' ? (b.defaultBasePrice ?? null) : null);
         catalog.invalidate();
         app.audit.log({ ctx, action: 'category.create', entityType: 'category', entityId: id, after: b });
         ctx.status = 201;
@@ -185,12 +185,12 @@ export function registerCatalogAdminRoutes(app, r) {
         const old = db.get('SELECT * FROM categories WHERE id=?', ctx.params['id']);
         if (!old)
             throw E.notFound('القسم غير موجود');
-        const b = parse(s.obj({ name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 200, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords, sortOrder: s.int({ min: -100000, max: 100000, optional: true }), isActive: s.bool({ optional: true }) }), ctx.body);
+        const b = parse(s.obj({ name: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), description: s.obj({ ar: s.str({ min: 1, max: 200, optional: true }), en: s.str({ max: 200, optional: true }) }, { optional: true }), icon: s.str({ max: 200, optional: true }), parentId: s.str({ max: 64, optional: true }), keywords, sortOrder: s.int({ min: -100000, max: 100000, optional: true }), isActive: s.bool({ optional: true }), defaultPricingType: s.oneOf(['FIXED', 'QUOTE'], { optional: true }), defaultBasePrice: s.num({ min: 0, optional: true }) }), ctx.body);
         if (b.parentId === old.id)
             throw E.unprocessable('لا يمكن أن يكون القسم أبًا لنفسه', 'INVALID_PARENT');
         if (b.parentId && !db.get('SELECT 1 FROM categories WHERE id=?', b.parentId))
             throw E.unprocessable('القسم الأب غير موجود', 'INVALID_PARENT');
-        db.run(`UPDATE categories SET name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),parent_id=COALESCE(?,parent_id),keywords=COALESCE(?,keywords),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),updated_at=? WHERE id=?`, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.parentId ?? null, b.keywords ? JSON.stringify(b.keywords) : null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), iso(app.clock.now()), old.id);
+        db.run(`UPDATE categories SET name_i18n=COALESCE(?,name_i18n),description_i18n=COALESCE(?,description_i18n),icon=COALESCE(?,icon),parent_id=COALESCE(?,parent_id),keywords=COALESCE(?,keywords),sort_order=COALESCE(?,sort_order),is_active=COALESCE(?,is_active),default_pricing_type=COALESCE(?,default_pricing_type),default_base_price=CASE WHEN ?='QUOTE' THEN NULL ELSE COALESCE(?,default_base_price) END,updated_at=? WHERE id=?`, b.name ? JSON.stringify(b.name) : null, b.description ? JSON.stringify(b.description) : null, b.icon ?? null, b.parentId ?? null, b.keywords ? JSON.stringify(b.keywords) : null, b.sortOrder ?? null, b.isActive === undefined ? null : (b.isActive ? 1 : 0), b.defaultPricingType ?? null, b.defaultPricingType ?? null, b.defaultBasePrice ?? null, iso(app.clock.now()), old.id);
         catalog.invalidate();
         app.sse.broadcast('sync', { scope: 'catalog' });
         app.audit.log({ ctx, action: 'category.update', entityType: 'category', entityId: old.id, before: { isActive: !!old.is_active }, after: b });
@@ -207,10 +207,10 @@ export function registerCatalogAdminRoutes(app, r) {
             throw E.unprocessable('القسم غير موجود', 'INVALID_CATEGORY');
         if (db.get('SELECT 1 FROM services WHERE slug=?', b.slug))
             throw E.conflict('معرّف الخدمة مستخدم بالفعل', 'DUPLICATE_SLUG');
-        if (b.pricingType === 'FIXED' && b.basePrice === undefined)
-            throw E.unprocessable('السعر الأساسي مطلوب للخدمة ذات السعر الثابت', 'BASE_PRICE_REQUIRED');
+        if (b.pricingType === 'FIXED' && b.basePrice === undefined && cat.default_base_price == null)
+            throw E.unprocessable('السعر الأساسي مطلوب للخدمة ذات السعر الثابت أو حدّد سعرًا افتراضيًا للقسم', 'BASE_PRICE_REQUIRED');
         const id = uuid(), now = iso(app.clock.now());
-        db.run('INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,default_priority,sort_order,is_active,created_at,updated_at,requires_inspection,requires_vehicle,supports_waiting,delivery_proof_type,seasonal_enabled,season_start_at,season_end_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.categoryId, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.pricingType, b.pricingType === 'QUOTE' ? null : b.basePrice, JSON.stringify(b.formSchema || []), b.defaultPriority || 'NORMAL', b.sortOrder || 0, 1, now, now, b.requiresInspection ? 1 : 0, b.requiresVehicle ? 1 : 0, b.supportsWaiting ? 1 : 0, b.deliveryProofType || 'NONE', b.seasonalEnabled ? 1 : 0, b.seasonStartAt || null, b.seasonEndAt || null);
+        db.run('INSERT INTO services(id,category_id,slug,name_i18n,description_i18n,icon,keywords,pricing_type,base_price,form_schema,default_priority,sort_order,is_active,created_at,updated_at,requires_inspection,requires_vehicle,supports_waiting,delivery_proof_type,seasonal_enabled,season_start_at,season_end_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', id, b.categoryId, b.slug, JSON.stringify(b.name), b.description ? JSON.stringify(b.description) : null, b.icon || null, JSON.stringify(b.keywords || []), b.pricingType, b.pricingType === 'QUOTE' ? null : (b.basePrice ?? cat.default_base_price), JSON.stringify(b.formSchema || []), b.defaultPriority || 'NORMAL', b.sortOrder || 0, 1, now, now, b.requiresInspection ? 1 : 0, b.requiresVehicle ? 1 : 0, b.supportsWaiting ? 1 : 0, b.deliveryProofType || 'NONE', b.seasonalEnabled ? 1 : 0, b.seasonStartAt || null, b.seasonEndAt || null);
         catalog.invalidate();
         app.audit.log({ ctx, action: 'service.create', entityType: 'service', entityId: id, after: b });
         ctx.status = 201;
