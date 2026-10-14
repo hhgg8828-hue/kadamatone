@@ -142,6 +142,20 @@ function genCode(db: App['db'], now: Date): string {
   return `KH-${year}-${String(n).padStart(6, '0')}`;
 }
 
+function quantityForPrice(fields: FormField[], formData: Record<string, unknown>): number {
+  const field = fields.find((f) => {
+    const key = String(f.key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const label = String(f.label?.ar || '');
+    const byKey = /^(quantity|qty|count|workers|workercount|workerscount|passenger|passengers|passengercount|people|peoplecount|persons|personscount|rider|riders|riderscount|units|unitcount|itemsquantity|numberofpeople|numberofpassengers)$/.test(key);
+    const byLabel = /الكمية|عدد القطع|عدد العمال|عدد العاملين|عدد الركاب|عدد الأفراد|عدد الأشخاص|عدد المسافرين/.test(label);
+    return f.type === 'number' && (byKey || byLabel);
+  });
+  if (!field) return 1;
+  const value = Number(formData[field.key] ?? 1);
+  if (!Number.isFinite(value) || value < 1) return 1;
+  return Math.min(10000, Math.floor(value));
+}
+
 export function registerOrderRoutes(app: App, r: Router): void {
   const { db, catalog, orders } = app;
 
@@ -249,7 +263,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
                 pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, code, ctx.user!.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id,
-        b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? svc.base_price : null, app.settings.get<string>('platform.currency'),
+        b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? Number(svc.base_price) * quantityForPrice(fields, formData) : null, app.settings.get<string>('platform.currency'),
         b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName||null, b.recipientPhone||null, b.recipientUserId||null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', nowIso);
       db.run('INSERT INTO order_contact_confirmations(order_id,status,attempt_count,created_at,updated_at) VALUES(?,?,?,?,?)',id,'PENDING',0,nowIso,nowIso);

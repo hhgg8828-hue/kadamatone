@@ -1697,3 +1697,16 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 .trip-schedule-fields>.field{min-width:0;margin:0;}
 .trip-schedule-fields input,.trip-schedule-fields select{width:100%;min-width:0;}
 @media(max-width:420px){.trip-schedule-fields{gap:7px;}#tripForm .submit-order-btn{bottom:calc(60px + env(safe-area-inset-bottom,0px));}}
+
+/* Internal storefront: recommendations stay within the current catalog category. */
+.same-store-recommendations{margin:12px 0 8px;padding:12px 0;border-top:1px solid #e7eee9;border-bottom:1px solid #e7eee9;min-width:0}
+.same-store-recommendations-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.same-store-recommendations-head h3{font-size:16px;margin:0 0 3px}
+.same-store-recommendations-head small{font-size:12px;color:#667085}
+.same-store-recommendations-track{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;padding:2px 1px 10px;direction:rtl;-webkit-overflow-scrolling:touch}
+.same-store-service-card{flex:0 0 132px;min-height:145px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:right;padding:11px;border:1px solid #e1e9e3;border-radius:14px;background:#fff;scroll-snap-align:start;color:inherit;cursor:pointer}
+.same-store-service-card b{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.same-store-service-card small{font-size:11px;color:#667085;margin-top:auto}
+.same-store-service-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#edf7f0;color:var(--primary)}
+.same-store-service-icon .service-icon-svg{width:25px;height:25px}
+.same-store-service-card:active{transform:scale(.98);border-color:var(--primary)}
