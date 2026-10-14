@@ -2688,16 +2688,19 @@ async function openOrderForm(serviceId, initial = null) {
     });
 }
 function renderOrderTimeline(current) {
-    const steps = ['PENDING', 'SEARCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'COMPLETED'];
-    const idx = steps.indexOf(current);
-    const parts = steps.map((step, i) => {
-        const done = idx >= i && idx >= 0;
-        const active = step === current;
-        return `<div class="timeline-step ${done ? 'done' : ''} ${active ? 'active' : ''}"><span class="timeline-dot">${done ? '✓' : ''}</span><div><b>${esc(statusAr(step))}</b>${active ? '<small>الحالة الحالية</small>' : ''}</div></div>`;
-    });
+    // Four-stage layout matching the supplied tracking reference; progression is based on the real order status.
+    const stages = [
+        { key: 'REVIEW', label: 'قيد المراجعة', states: ['PENDING', 'SEARCHING'] },
+        { key: 'PREPARE', label: 'قيد التحضير', states: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        { key: 'WAY', label: 'في الطريق إليك', states: ['ON_THE_WAY'] },
+        { key: 'DONE', label: 'تم التوصيل', states: ['COMPLETED'] }
+    ];
     if (current === 'CANCELLED' || current === 'DISPUTED')
-        parts.push(`<div class="timeline-step active"><span class="timeline-dot">!</span><div><b>${esc(statusAr(current))}</b><small>توقفت رحلة الطلب</small></div></div>`);
-    return parts.join('');
+        return `<div class="timeline-terminal ${current === 'CANCELLED' ? 'cancelled' : 'disputed'}"><span class="timeline-terminal-icon">!</span><div><b>${esc(statusAr(current))}</b><small>${current === 'CANCELLED' ? 'تم إيقاف الطلب الملغي.' : 'الطلب متوقف للمراجعة بسبب الشكوى.'}</small></div></div>`;
+    let activeIndex = stages.findIndex(x => x.states.includes(current));
+    if (activeIndex < 0)
+        activeIndex = 0;
+    return stages.map((stage, i) => { const done = i < activeIndex || (current === 'COMPLETED' && i === 3); const active = i === activeIndex; return `<div class="timeline-step ${done ? 'done' : ''} ${active ? 'active' : ''}"><span class="timeline-dot">${done ? '✓' : i + 1}</span><div><b>${stage.label}</b></div></div>`; }).join('');
 }
 async function openTripTracking(id) {
     try {

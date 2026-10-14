@@ -1437,3 +1437,38 @@ body:has(.customer-shell) #modal:has(.account-form-title) .account-delete-card{d
 .checkout-ad-item p,.checkout-store-row p{margin:5px 0;font-size:.92em}
 .checkout-store-info{min-width:0;display:grid;gap:3px}
 .checkout-store-info small{color:var(--muted,#6b7280)}
+
+/* Reference-matched customer order tracking layout (v2.39). */
+.customer-order-tracking{gap:16px!important;direction:rtl;color:var(--text,#f6f6f6)}
+.customer-order-tracking .order-tracking-head{background:#171717!important;color:#fff!important;border-radius:0!important;box-shadow:none!important;padding:22px 20px 18px!important;text-align:right;border-bottom:1px solid #2a2a2a!important}
+.customer-order-tracking .order-tracking-head>p{display:none}
+.customer-order-tracking .order-tracking-head h2{font-size:0!important;margin:0!important;line-height:1.4}
+.customer-order-tracking .order-tracking-head h2:before{content:'رقم الطلب';font-size:24px;font-weight:800}
+.customer-order-tracking .order-tracking-head h2:after{content:'  ' attr(data-order-code);font-size:24px}
+.customer-order-tracking .order-current-status{display:none!important}
+.customer-order-tracking .order-info-compact{order:-1;background:#171717!important;border:0!important;border-radius:0!important;padding:0 20px 18px!important;box-shadow:none!important;margin:0!important}
+.customer-order-tracking .order-info-compact h3{display:none}
+.customer-order-tracking .order-info-grid{display:grid;grid-template-columns:1fr;gap:8px;color:#f4f4f4}
+.customer-order-tracking .order-info-grid>span{display:none}
+.customer-order-tracking .order-info-grid b{font-weight:500;font-size:15px;line-height:1.5}
+.customer-order-tracking .order-info-grid .order-code-copy{display:flex;align-items:center;gap:12px;justify-content:flex-start;font-size:24px;font-weight:800;grid-row:1}
+.customer-order-tracking .order-code-copy button{font-size:0!important;min-width:32px;width:32px;height:32px;padding:0;border:0!important;background:transparent!important;color:#fff!important;box-shadow:none!important}
+.customer-order-tracking .order-code-copy button:before{content:'▢';font-size:27px}
+.customer-order-tracking .order-code-copy span{font-size:24px;font-weight:800}
+.customer-order-tracking .order-info-grid b:nth-of-type(2){font-size:16px}
+.customer-order-tracking .order-info-grid b:nth-of-type(3){display:none}
+.customer-order-tracking .order-tracking-summary,.customer-order-tracking .order-info-compact,.customer-order-tracking .customer-order-status-timeline{background:#252525!important;border:1px solid #292929!important;border-radius:20px!important;box-shadow:none!important;color:#f7f7f7!important;padding:18px!important}
+.customer-order-tracking .order-tracking-summary>h3{display:none}
+.customer-order-tracking .order-tracking-summary>p:first-of-type{margin:0 0 12px;font-size:16px}
+.customer-order-tracking .customer-order-status-timeline h3{font-size:18px;margin:0 0 24px}
+.customer-order-tracking .customer-order-status-timeline .timeline-step{display:flex;align-items:center;gap:14px;min-height:74px;position:relative;padding:0 0 0 0}
+.customer-order-tracking .customer-order-status-timeline .timeline-step:not(:last-child):after{content:'';position:absolute;right:11px;top:44px;height:30px;width:2px;background:#888}
+.customer-order-tracking .customer-order-status-timeline .timeline-step.done:not(:last-child):after{background:var(--primary,#c41446)}
+.customer-order-tracking .customer-order-status-timeline .timeline-dot{width:42px;height:42px;min-width:42px;border-radius:50%;display:grid;place-items:center;background:#929292;color:#fff;font-size:18px;border:0}
+.customer-order-tracking .customer-order-status-timeline .timeline-step.done .timeline-dot,.customer-order-tracking .customer-order-status-timeline .timeline-step.active .timeline-dot{background:var(--primary,#c41446);color:#fff}
+.customer-order-tracking .customer-order-status-timeline .timeline-step b{font-size:19px;font-weight:700}
+.customer-order-tracking .timeline-terminal{display:flex;align-items:center;gap:14px;padding:14px 0}
+.customer-order-tracking .timeline-terminal-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#c41446;color:white;font-size:22px}
+.customer-order-tracking .timeline-terminal small{display:block;margin-top:5px;color:#ccc}
+.customer-order-tracking .order-primary-actions{gap:8px;flex-wrap:wrap}
+@media(max-width:600px){.customer-order-tracking .order-tracking-head{padding:18px 16px 12px!important}.customer-order-tracking .order-code-copy span,.customer-order-tracking .order-tracking-head h2:before{font-size:22px}.customer-order-tracking .order-tracking-summary,.customer-order-tracking .customer-order-status-timeline{padding:16px!important}.customer-order-tracking .customer-order-status-timeline .timeline-step b{font-size:18px}}
