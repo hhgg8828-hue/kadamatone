@@ -52,7 +52,7 @@ if(!(window as any).__khadamatBackGuardInstalled){
       armBackGuard();
       return;
     }
-    const leave=window.confirm('هل أنت متأكد أنك تريد الخروج من التطبيق؟');
+    const leave=window.confirm('هل أنت متأكد أنك تريد الخروج من تطبيق خدمات؟');
     if(!leave){armBackGuard();return;}
     (window as any).__khadamatBackGuardInstalled=false;
   });}catch{}
@@ -321,6 +321,7 @@ async function openAccountEditor(){
       e.preventDefault();
       const f=new FormData(e.currentTarget as HTMLFormElement);
       const msg=document.getElementById('accountMsg')!;
+      const selectedTheme=String(f.get('khadamatTheme')||localStorage.getItem(THEME_KEY)||'system');setThemePreference(selectedTheme);
       try{
         if(isProvider){
           const avatar=(document.getElementById('providerAvatarFile') as HTMLInputElement)?.files?.[0];
@@ -941,7 +942,7 @@ async function openOrderForm(serviceId:string, initial:any = null){
   const fields=[...requiredFields,...descriptionFields].map(renderField).join('');
   const isQuantityField=(f:any)=>{const key=String(f.key||'').toLowerCase().replace(/[^a-z0-9]/g,'');const label=String(f.labelText||f.label?.ar||'');return /^(quantity|qty|count|workers|workercount|workerscount|passenger|passengers|passengercount|passengercounts|people|peoplecount|persons|personscount|rider|riders|riderscount|units|unitcount|itemsquantity|numberofpeople|numberofpassengers)$/i.test(key)||/quantity|passenger|worker|rider|person|people|count|عدد|كمية/i.test(key)&&f.type==='number'||/الكمية|عدد القطع|عدد العمال|عدد العاملين|عدد الركاب|عدد الأفراد|عدد الأشخاص|عدد الأشخاص|عدد المسافرين/i.test(label)};
   const quantityFields=optionalFields.filter((f:any)=>!descriptionFields.includes(f)&&isQuantityField(f));
-  const quantityFieldsHtml=quantityFields.map(renderField).join('');
+  const quantityFieldsHtml=quantityFields.map((f:any)=>{const key=String(f.key||'');const label=String(f.labelText||f.label?.ar||'الكمية');const min=Math.max(1,Number(f.min??1)||1);const max=Math.max(min,Number(f.max??999)||999);return `<div class="field dynamic-order-field quantity-stepper-field"><label for="qty_${esc(key)}">${esc(label)}</label><div class="quantity-stepper" dir="ltr"><button type="button" class="quantity-stepper-btn" data-qty-step="-1" data-qty-target="qty_${esc(key)}" aria-label="تقليل ${esc(label)}">−</button><input id="qty_${esc(key)}" name="${esc(key)}" type="number" min="${min}" max="${max}" step="1" value="1" inputmode="numeric" required aria-label="${esc(label)}"><button type="button" class="quantity-stepper-btn" data-qty-step="1" data-qty-target="qty_${esc(key)}" aria-label="زيادة ${esc(label)}">+</button></div></div>`}).join('');
   const descSuggestions=DESCRIPTION_SUGGESTIONS[s.slug]||[];
   const suggestionHtml=descSuggestions.length?`<div class="description-suggestions"><span>اقتراحات سريعة</span><div>${descSuggestions.map(x=>`<button type="button" class="description-chip" data-description-suggestion="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>`:'';
   // لا يظهر مربع كتابة عام لكل الخدمات؛ يظهر فقط إذا أرسل المساعد وصفًا مسبقًا أو كانت الخدمة المفتوحة بلا مخطط حقول وتحتاج عرض سعر.
@@ -963,6 +964,8 @@ async function openOrderForm(serviceId:string, initial:any = null){
   document.getElementById('nearbyProvidersBtn')?.addEventListener('click',()=>{const la=Number((document.getElementById('lat') as HTMLInputElement|null)?.value);const ln=Number((document.getElementById('lng') as HTMLInputElement|null)?.value);openNearbyProviders(serviceId,Number.isFinite(la)?la:undefined,Number.isFinite(ln)?ln:undefined)});
   try{const areas=(await api('/areas')).areas||[];const areaEl=document.getElementById('orderAreaId') as HTMLSelectElement|null;if(areaEl){const by=new Map(areas.map((a:any)=>[a.id,a]));const path=(a:any)=>{const out:string[]=[];let cur=a;while(cur&&out.length<8){out.unshift(cur.name);cur=cur.parentId?by.get(cur.parentId):null;}return out.join(' ← ')};areas.slice().sort((a:any,b:any)=>path(a).localeCompare(path(b),'ar')).forEach((a:any)=>{const o=document.createElement('option');o.value=a.id;o.textContent=`${path(a)} · ${a.localityType||a.type}`;areaEl.appendChild(o)});}}catch{}
   document.getElementById('beneficiarySelect')?.addEventListener('change',e=>{const v=(e.target as HTMLSelectElement).value;document.getElementById('otherRecipient')?.classList.toggle('hide-section',v!=='__other__')});
+  document.querySelectorAll<HTMLButtonElement>('[data-qty-step]').forEach(btn=>btn.addEventListener('click',()=>{const input=document.getElementById(btn.dataset.qtyTarget||'') as HTMLInputElement|null;if(!input)return;const min=Math.max(1,Number(input.min||1)||1),max=Math.max(min,Number(input.max||999)||999),current=Math.max(min,Math.floor(Number(input.value)||1));input.value=String(Math.min(max,Math.max(min,current+Number(btn.dataset.qtyStep||0))));input.dispatchEvent(new Event('change',{bubbles:true}));}));
+  document.querySelectorAll<HTMLInputElement>('.quantity-stepper input').forEach(input=>input.addEventListener('change',()=>{const min=Math.max(1,Number(input.min||1)||1),max=Math.max(min,Number(input.max||999)||999);input.value=String(Math.min(max,Math.max(min,Math.floor(Number(input.value)||1))))}));
   document.querySelectorAll('[data-description-suggestion]').forEach(x=>x.addEventListener('click',()=>{const t=document.getElementById('orderDescription') as HTMLTextAreaElement|null;if(t){t.value=(x as HTMLElement).dataset.descriptionSuggestion||'';t.focus();}}));
   const savedSelect=document.getElementById('savedAddress') as HTMLSelectElement;
   const addressIdInput=document.getElementById('addressId') as HTMLInputElement;

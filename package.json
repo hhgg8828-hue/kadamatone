@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.55.0",
-  "description": "خدمات — إصلاحات شاملة للفلاتر والمظهر وصفحة طلباتي ومسار تفاصيل الطلب",
+  "version": "2.57.0",
+  "description": "استكمال تسعير الأقسام وتحسين إعدادات الرسوم",
   "private": true,
   "type": "module",
   "engines": {
