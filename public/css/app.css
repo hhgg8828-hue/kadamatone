@@ -1381,3 +1381,43 @@ body:has(.customer-shell) #modal:has(.account-form-title) .account-delete-card{d
 .customer-shell .customer-sticky-discovery .customer-category-showcase-top{margin:0;padding:0 10px 5px;background:rgba(255,255,255,.97);}
 .customer-shell .customer-offers{margin-top:12px;}
 @media(max-width:600px){.customer-shell .app-topbar{min-height:59px}.customer-shell .customer-sticky-discovery{top:59px}.customer-shell .customer-sticky-discovery .quick-assist-reference{padding:7px 9px}.customer-shell .customer-sticky-discovery .quick-assist-reference-head{margin-bottom:5px}.customer-shell .customer-sticky-discovery .quick-assist-reference textarea{min-height:36px}}
+
+/* V2.36 — multi-item purchase flow, saved-address bottom sheet, and clearer order tracking */
+.pharmacy-cart-section{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--surface,#fff)}
+.pharmacy-cart-section h3{margin:0 0 10px;font-size:15px}
+.pharmacy-empty{padding:12px 0;text-align:center;margin:0}
+.pharmacy-product-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 8px;border-top:1px solid var(--line);border-radius:10px}
+.pharmacy-product-main{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.pharmacy-product-main b{overflow-wrap:anywhere}
+.pharmacy-product-main small{color:var(--muted)}
+.pharmacy-product-image{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.pharmacy-product-actions{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.quantity-mini,.icon-delete{min-width:32px;height:34px;border:1px solid var(--line);border-radius:9px;background:var(--surface,#fff);color:var(--primary);font-size:18px;font-weight:800;cursor:pointer}
+.icon-delete{color:#bd234a;font-size:15px}
+.pharmacy-review-product{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)}
+.pharmacy-review-product:last-child{border-bottom:0}
+.pharmacy-review-product span{flex:1;min-width:120px;overflow-wrap:anywhere}
+.pharmacy-review-product small{width:100%}
+.trip-address-pair{display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:8px;align-items:stretch;margin:10px 0 14px}
+.trip-address-choice{min-width:0;min-height:76px;text-align:right;display:flex;flex-direction:column;justify-content:center;gap:7px;padding:12px;border:1px solid var(--line);border-radius:15px;background:var(--surface,#fff);color:var(--text);cursor:pointer}
+.trip-address-choice small{color:var(--muted);font-size:12px}
+.trip-address-choice b{font-size:13px;overflow-wrap:anywhere}
+.trip-address-swap{border:0;border-radius:12px;background:transparent;color:var(--primary);font-size:26px;cursor:pointer}
+.trip-address-sheet{position:fixed;inset:0;z-index:10020;display:flex;align-items:flex-end;justify-content:center}
+.trip-sheet-backdrop{position:absolute;inset:0;border:0;background:rgba(0,0,0,.62)}
+.trip-address-sheet-panel{position:relative;width:min(100%,650px);max-height:78dvh;overflow:auto;padding:14px 18px 28px;border-radius:28px 28px 0 0;background:var(--card,#242424);color:var(--text,#fff);box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+.trip-sheet-handle{width:42px;height:4px;border-radius:999px;background:#777;margin:0 auto 16px}
+.trip-address-sheet-panel h3{margin:0 0 18px;text-align:center}
+.trip-sheet-options{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.trip-sheet-option{display:flex;min-height:125px;flex-direction:column;align-items:center;justify-content:center;gap:12px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(255,255,255,.04);color:inherit;font:inherit;cursor:pointer}
+.trip-sheet-icon{font-size:40px;color:var(--primary)}
+.trip-sheet-option b{font-size:14px;text-align:center}
+.trip-sheet-saved-list{display:grid;gap:8px;margin-top:14px}
+.trip-saved-address{display:flex;align-items:center;gap:12px;text-align:right;padding:12px;border:1px solid var(--line);border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.trip-saved-address>span:first-child{font-size:22px;color:var(--primary)}
+.trip-saved-address>span:last-child{display:flex;flex-direction:column;gap:4px}
+.trip-saved-address small{color:var(--muted)}
+.trip-schedule-choice{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0}
+.trip-schedule-choice label{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:11px;padding:10px 13px}
+.customer-order-status-timeline .order-timeline{margin-top:8px}
+@media(max-width:420px){.pharmacy-product-row{align-items:flex-start}.pharmacy-product-actions{gap:3px}.quantity-mini,.icon-delete{min-width:29px}.trip-address-pair{grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);gap:4px}.trip-address-choice{padding:9px;min-height:72px}.trip-address-choice b{font-size:12px}.trip-sheet-options{gap:8px}}

@@ -24,6 +24,7 @@ const tripInputSchema: Schema = s.obj({
   purposeNote: s.str({ max: 500, optional: true }),
   description: s.str({ min: 5, max: 1000 }),
   contactPhone: s.str({ min: 8, max: 24 }),
+  scheduledAt: s.str({ max: 40, optional: true }),
   notes: s.str({ max: 500, optional: true }),
   stops: s.arr(tripLocation, { max: 5, optional: true, default: [] }),
   waitingPerMinute: s.num({ min: 0, max: 100000, optional: true }),
@@ -128,6 +129,7 @@ export function registerTripRoutes(app: App, r: Router): void {
     const tripService = app.catalog.all().services.find(x => x.slug === 'motorcycle-trips');
     if (!tripService || !tripService.is_active) throw E.notFound('خدمة المشاوير غير متاحة', 'SERVICE_NOT_FOUND');
     const b = parse<any>(tripInputSchema, ctx.body);
+    if (b.scheduledAt && (!Number.isFinite(Date.parse(b.scheduledAt)) || Date.parse(b.scheduledAt) <= app.clock.now())) throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST');
     const origin = makeLocation(app, ctx.user!.id, b.origin, b.originAddressId);
     const destination = b.destination ? makeLocation(app, ctx.user!.id, b.destination, b.destinationAddressId) : origin;
     const stops: LocationRow[] = []; for (const stop of (b.stops||[])) stops.push(app.locations.create(stop, { requireArea:false }));
@@ -146,7 +148,7 @@ export function registerTripRoutes(app: App, r: Router): void {
       app.db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,pricing_type,price_snapshot,agreed_price,currency,customer_notes,attachments,created_at,updated_at)
                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, code, ctx.user!.id, tripService.id, 'PENDING', 'NORMAL', b.description,
         JSON.stringify({ purpose:b.purpose, purposeNote:b.purposeNote || null, originAddressText:b.origin.addressText || null, destinationAddressText:b.destination?.addressText || null, destinationPending, stops: points.slice(1,-1).map((p:any)=>({lat:p.lat,lng:p.lng,addressText:p.address_text||p.addressText||null})) }), origin.id, origin.area_id,
-        b.contactPhone, null, 'FIXED', pricing.fare, null, pricing.currency, b.notes || null, '[]', now, now);
+        b.contactPhone, b.scheduledAt || null, 'FIXED', pricing.fare, null, pricing.currency, b.notes || null, '[]', now, now);
       app.db.run(`INSERT INTO trip_orders(order_id,destination_location_id,destination_pending,purpose,purpose_note,distance_km,base_fare,per_km_fare,minimum_fare,fare,currency,waiting_per_minute_fare,waiting_total_minutes,purchase_max_price,purchase_quantity,purchase_alternatives,purchase_requires_approval,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, destination.id, destinationPending?1:0, b.purpose as Purpose, b.purposeNote || null, distanceKm, pricing.baseFare, pricing.perKmFare, pricing.minimumFare, pricing.fare, pricing.currency, Number(b.waitingPerMinute ?? app.settings.get<number>('trips.waiting_per_minute_fare')), 0, b.purchaseMaxPrice ?? null, b.purchaseQuantity ?? null, b.purchaseAlternatives ?? null, b.purchaseRequiresApproval?1:0, now, now);
       stops.forEach((p:any,i:number)=>app.db.run('INSERT INTO trip_stops(id,order_id,sequence_no,location_id,note) VALUES(?,?,?,?,?)',uuid(),id,i+1,p.id,null));
       app.db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', now);

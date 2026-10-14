@@ -31,7 +31,7 @@ test('V2.34 removes the extra header promo control while retaining carousel camp
 });
 
 test('V2.34 customer assets and service-worker cache are version-aligned', () => {
-  assert.ok(customerHtml.includes('app.js?v=2.34'));
-  assert.ok(customerHtml.includes('app.css?v=2.34'));
-  assert.ok(sw.includes('khadamat-shell-v2-34'));
+  assert.ok(customerHtml.includes('app.js?v=2.36'));
+  assert.ok(customerHtml.includes('app.css?v=2.36'));
+  assert.ok(sw.includes('khadamat-shell-v2-36'));
 });

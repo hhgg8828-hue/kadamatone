@@ -55,3 +55,20 @@ test('نظام المشاوير: نقاط الخريطة يمكن أن تكون 
     assert.equal(typeof res.body.order.trip.destination.lng, 'number');
   } finally { await t.close(); }
 });
+
+test('نظام المشاوير: يحفظ موعد التنفيذ المستقبلي عند اختيار وقت لاحق', async () => {
+  const t = await startApp();
+  try {
+    const customer = await registerUser(t.api);
+    const scheduledAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const res = await t.api('POST', '/api/v1/trips', { token: customer.body.accessToken, body: {
+      origin: { lat: 15.3694, lng: 44.1910, addressText: 'نقطة الاستلام', source: 'map' },
+      destination: { lat: 15.3794, lng: 44.1910, addressText: 'وجهة التوصيل', source: 'map' },
+      purpose: 'PARCEL', description: 'توصيل أغراض من نقطة الاستلام إلى الوجهة', contactPhone: customer.creds.phone, scheduledAt
+    }});
+    assert.equal(res.status, 201, res.text);
+    assert.equal(new Date(res.body.order.scheduledAt).toISOString(), scheduledAt);
+    const row = t.app.db.get<any>('SELECT scheduled_at FROM orders WHERE id=?', res.body.order.id);
+    assert.equal(row.scheduled_at, scheduledAt);
+  } finally { await t.close(); }
+});
