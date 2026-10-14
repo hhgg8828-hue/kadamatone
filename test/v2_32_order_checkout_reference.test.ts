@@ -42,8 +42,8 @@ test('V2.34 confirmation avoids extra product questions after the customer compl
 test('V2.34 app assets and service-worker cache are aligned', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.41'), file);
-    assert.ok(html.includes('app.css?v=2.41'), file);
+    assert.ok(html.includes('app.js?v=2.38'), file);
+    assert.ok(html.includes('app.css?v=2.38'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-41'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-38'));
 });

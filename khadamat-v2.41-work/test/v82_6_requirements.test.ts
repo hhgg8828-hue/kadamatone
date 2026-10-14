@@ -1,0 +1,49 @@
+import test, { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { startApp, registerUser } from './helpers.js';
+
+let t: Awaited<ReturnType<typeof startApp>>;
+before(async () => { t = await startApp(); });
+after(async () => { await t.close(); });
+
+test('V82.6: مقدم الخدمة الذي يبدأ استقبال الطلبات يرى الطلب المفتوح الذي أُنشئ قبله', async () => {
+  const c = await registerUser(t.api); const ct = c.body.accessToken as string;
+  const p = await registerUser(t.api, { role:'PROVIDER', email:`v826-${Date.now()}@test.local`, provider:{ providerType:'DRIVER', displayName:'مقدم الطلبات القديمة' } });
+  const pt = p.body.accessToken as string;
+  const me = await t.api('GET','/api/v1/auth/me',{token:pt}); const pid = me.body.provider.id as string;
+  t.app.db.run(`UPDATE service_providers SET verification_status='VERIFIED', verified_at=? WHERE id=?`, new Date().toISOString(), pid);
+  await t.api('PATCH','/api/v1/provider/profile',{token:pt,body:{baseLocation:{lat:13.9759,lng:44.1709}}});
+  const cats=(await t.api('GET','/api/v1/categories')).body.categories;
+  const svc=cats.flatMap((x:any)=>x.services||[]).find((x:any)=>x.slug==='air-conditioning') || cats.flatMap((x:any)=>x.services||[]).find((x:any)=>x.slug!=='motorcycle-trips');
+  await t.api('PUT','/api/v1/provider/services',{token:pt,body:{services:[{serviceId:svc.id,experienceYears:1}]}});
+  await t.api('POST','/api/v1/provider/online',{token:pt,body:{online:true}});
+  await t.api('POST','/api/v1/provider/accepting-orders',{token:pt,body:{accepting:false}});
+  const order=await t.api('POST','/api/v1/orders',{token:ct,body:{serviceId:svc.id,description:'طلب مفتوح للاختبار قبل دخول مقدم الخدمة',contactPhone:c.creds.phone,location:{lat:13.9759,lng:44.1709},formData:{}}});
+  assert.equal(order.status,201,JSON.stringify(order.body));
+  await t.api('POST','/api/v1/provider/accepting-orders',{token:pt,body:{accepting:true}});
+  const offers=await t.api('GET','/api/v1/provider/offers',{token:pt});
+  assert.ok((offers.body.offers||[]).some((x:any)=>x.orderId===order.body.order.id), JSON.stringify(offers.body));
+});
+
+test('V82.6: صورة العميل يمكن حفظها وتظهر لمقدم الخدمة كصورة فقط دون رقم الهاتف', async () => {
+  const c = await registerUser(t.api); const ct=c.body.accessToken as string;
+  const upload=await t.api('POST','/api/v1/files',{token:ct,body:{purpose:'avatar',name:'avatar.jpg',dataBase64:'data:image/jpeg;base64,/9j/4AAQSkZJRg=='}});
+  assert.equal(upload.status,201,JSON.stringify(upload.body));
+  const up=await t.api('PATCH','/api/v1/me/profile',{token:ct,body:{avatarFileId:upload.body.file.id}});
+  assert.equal(up.status,200,JSON.stringify(up.body));
+  const p=await registerUser(t.api,{role:'PROVIDER',email:`v826-avatar-${Date.now()}@test.local`,provider:{providerType:'DRIVER',displayName:'مقدم'} });
+  const pt=p.body.accessToken as string; const me=await t.api('GET','/api/v1/auth/me',{token:pt}); const pid=me.body.provider.id;
+  t.app.db.run(`UPDATE service_providers SET verification_status='VERIFIED', verified_at=? WHERE id=?`,new Date().toISOString(),pid);
+  await t.api('PATCH','/api/v1/provider/profile',{token:pt,body:{baseLocation:{lat:13.9759,lng:44.1709}}});
+  const cats=(await t.api('GET','/api/v1/categories')).body.categories; const svc=cats.flatMap((x:any)=>x.services||[]).find((x:any)=>x.slug==='air-conditioning') || cats.flatMap((x:any)=>x.services||[]).find((x:any)=>x.slug!=='motorcycle-trips');
+  await t.api('PUT','/api/v1/provider/services',{token:pt,body:{services:[{serviceId:svc.id,experienceYears:1}]}});
+  await t.api('POST','/api/v1/provider/online',{token:pt,body:{online:true}});
+  const order=await t.api('POST','/api/v1/orders',{token:ct,body:{serviceId:svc.id,description:'طلب صورة عميل للاختبار',contactPhone:c.creds.phone,location:{lat:13.9759,lng:44.1709},formData:{}}});
+  assert.equal(order.status,201,JSON.stringify(order.body));
+  assert.equal(order.status,201,JSON.stringify(order.body));
+  t.app.db.run(`UPDATE orders SET provider_id=?, status='ACCEPTED', accepted_at=?, updated_at=? WHERE id=?`,pid,new Date().toISOString(),new Date().toISOString(),order.body.order.id);
+  const detail=await t.api('GET',`/api/v1/orders/${order.body.order.id}`,{token:pt});
+  assert.equal(detail.status,200,JSON.stringify(detail.body));
+  assert.equal(detail.body.order.customer.phone,null);
+  assert.ok(detail.body.order.customer.avatarUrl);
+});

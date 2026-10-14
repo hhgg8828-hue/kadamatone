@@ -1,0 +1,201 @@
+import { normalizeAr, tr, parseJson } from '../core/util.js';
+import type { Locale, ServiceRow, CategoryRow } from '../types/domain.js';
+import type { Catalog } from '../modules/catalog.js';
+import type { Config } from '../config.js';
+
+export interface IntentMatch { serviceId: string; serviceSlug: string; serviceName: string; categoryId: string; categorySlug: string; categoryName: string; score: number; confidence: number; icon: string | null }
+export interface IntentStep { serviceId: string; serviceSlug: string; serviceName: string; reason: string; confidence: number }
+export interface StructuredIntent {
+  taskType: 'PASSENGER'|'DELIVERY'|'PURCHASE_AND_DELIVERY'|'PURCHASE_PHARMACY'|'PICKUP_AND_DELIVERY'|'AGRICULTURE_PLOWING'|'AGRICULTURE_HARVEST'|'AGRICULTURE_CROP_TRANSPORT'|'SHOPPING'|'CUSTOM'|'UNKNOWN';
+  item: string | null;
+  quantity: number | null;
+  pickupText: string | null;
+  deliveryText: string | null;
+  requiredCapabilities: string[];
+  sourceSignals: string[];
+}
+export interface IntentResult {
+  matches: IntentMatch[];
+  priority: 'LOW' | 'NORMAL' | 'URGENT';
+  extracted: { urgent: boolean; when: 'today' | 'now' | null; destinationHint: 'CITY_TO_VILLAGE' | 'VILLAGE_TO_CITY' | null; purchaseIntent: boolean; compound: boolean; structured: StructuredIntent };
+  steps: IntentStep[];
+  clarification: { question: string; options: Array<{ label: string; serviceId: string }> } | null;
+  source: 'RULES' | 'AI' | 'RULES_AI_FALLBACK';
+}
+export interface IntentParser { parse(text: string, ctx: { catalog: Catalog; locale?: Locale; image?: { mime: string; dataBase64: string } }): Promise<IntentResult> }
+
+const URGENT = ['اليوم','الان','حالا','فورا','بسرعه','مستعجل','عاجل','ضروري','طارئ','سريع','urgent','asap','now','today'].map(normalizeAr);
+const VILLAGE = ['قرية','ريف','مزرعة','عزلة','منطقة','القرية','المزرعة','الريف','قرية صغيرة','مكان غير مسمى'].map(normalizeAr);
+const CITY = ['مدينة','المدينة','المدينه','السوق','المركز','إب','صنعاء','تعز','عدن'].map(normalizeAr);
+const PURCHASE_WORDS = ['اشتر','اشتري','اشترِ','يشتري','شراء','تسوق','تسوق لي','تسوق عني','بدلي','بالنيابة','جيب لي','هات لي','جيب','هات','وفر لي','وفرلي','اشتريلي','اشترلي','دبر لي','دبرلي','دواء','صيدلية'].map(normalizeAr);
+const PASSENGER_WORDS = ['يوصلني','يوصلنى','يأخذني','ياخذني','ياخذنى','يجيبني','يجيبنى','ينقلني','ينقلنى','توصيلة','مشوار شخصي','مشوار لي','اركب','يركبني','نقل شخص','نقلني'].map(normalizeAr);
+const DELIVERY_WORDS = ['يوصله','يوصلها','يوصلهم','توصيل','يوصل','يوصله','يجيبه','يجيبها','يجيبه لي','احضره','احضرها','استلام','يستلمه','يأخذ الغرض','ياخذ الغرض','يوصل للبيت','يوصله للبيت'].map(normalizeAr);
+const PICKUP_WORDS = ['يأخذ من','ياخذ من','استلام من','يستلم من','من بيت اخوي','من بيت اخي','من عند اخوي','من عند اخي','من بيت اخوه','من بيت أخوي'].map(normalizeAr);
+const PHARMACY_WORDS = ['صيدلية','دواء','دوا','ادوية','علاج','روشتة','وصفة طبية'].map(normalizeAr);
+const SHOPPING_WORDS = ['مقاضي','مقاضي البيت','بقالة','بقاله','مواد غذائية','مواد غذائيه','اغراض البيت','أغراض البيت','مستلزمات البيت','مشتريات البيت','مشتريات','سوبرماركت','ماركت','من السوق','حاجات البيت','احتياجات البيت','مقاضي المنزل'].map(normalizeAr);
+const AGRI_PLOW = ['يحرث','احرث','حرث','حراثة','تجهيز الأرض','تجهيز الارض','يجهز الأرض','يجهز الارض'].map(normalizeAr);
+const AGRI_HARVEST = ['يحصد','احصد','حصاد','حصد','محصول يحصد','حصيدة'].map(normalizeAr);
+const AGRI_CROP = ['نقل المحصول','انقل المحصول','ينقل المحصول','نقل محاصيل','محاصيل من المزرعة','محصول إلى السوق'].map(normalizeAr);
+const LABOR_WORDS = ['عامل','عمال','عمالة','شغيل','شغال','شاغل','عامل يومي','عمال يومية','شخص يشتغل معي','احد يشتغل معي','أحد يشتغل معي','يشتغل معي','يشتغل عندي','يعمل معي','عامل للعمل معي'].map(normalizeAr);
+const FARM_CONTEXT = ['الزراعة','زراعة','مزرعة','مزرعتي','مزرعتنا','الحقل','الارض','الأرض','زرع','شغل المزرعة','اعمال المزرعة','أعمال المزرعة'].map(normalizeAr);
+const FARM_HELP_WORDS = ['يساعدني','يعاونني','يعاوني','يعوني','يساعد','مساعدة','معاونة','شغل','اشتغل','يشتغل','يعمل'].map(normalizeAr);
+const stripPrefix = (w: string): string => w.replace(/^(وال|بال|كال|فال|لل|ال)/, '').replace(/^و(?=.{4,})/, '');
+const tokenize = (norm:string) => norm.split(/\s+/).filter(Boolean).flatMap(w => [w, stripPrefix(w)]).filter(w=>w.length>=2);
+const hasAny=(norm:string,words:string[])=>words.some(w=>norm.includes(w));
+const extractItem=(norm:string):string|null=>{
+  const patterns=[/يشتري?\s+لي\s+(.+?)(?:\s+و(?:يوصله|يجيبه|يوصلها)|$)/, /اشتر(?:ي|ِ)?\s+لي\s+(.+?)(?:\s+و(?:يوصله|يجيبه|يوصلها)|$)/, /تسوق(?:\s+لي|\s+عني)?\s+(.+)/, /شراء\s+(.+?)(?:\s+وتوصيل|\s+ويوصل|$)/];
+  for(const re of patterns){const m=norm.match(re);if(m?.[1]){const x=m[1].trim().replace(/^(هذا|هذه)\s+/,'');if(x.length>=2)return x.slice(0,180);}}
+  return null;
+};
+const extractQuantity=(norm:string):number|null=>{const m=norm.match(/(?:عدد|كمية|كم)\s*(\d{1,4})|(?:\b|^)(\d{1,4})\s+(?:حبة|حبات|قطعة|قطع|متر|كيلو|كيلوجرام)/);const n=Number(m?.[1]||m?.[2]);return Number.isFinite(n)&&n>0?n:null;};
+const chooseService=(data:any[],slug:string)=>data.find((x:any)=>x.slug===slug&&x.is_active&&x.active!==false&&x.isSeasonActive!==false);
+
+function deterministic(text: string, { catalog, locale='ar' }: { catalog: Catalog; locale?: Locale }): IntentResult {
+  const norm = normalizeAr(text); const tokens=tokenize(norm); const tokenSet=new Set(tokens); const data=catalog.all();
+  const activeCats=new Map(data.categories.filter(c=>c.is_active).map(c=>[c.id,c]));
+  const matches:Array<{svc:ServiceRow;cat:CategoryRow;score:number}> = [];
+  const passenger=hasAny(norm,PASSENGER_WORDS); const pharmacy=hasAny(norm,PHARMACY_WORDS); const purchase=hasAny(norm,PURCHASE_WORDS); const delivery=hasAny(norm,DELIVERY_WORDS)||/يوصل|توصيل|يجيب/.test(norm); const pickupDelivery=hasAny(norm,PICKUP_WORDS)&&delivery; const shopping=hasAny(norm,[...SHOPPING_WORDS,'تسوق لي','تسوق عني','تسوق','اشتر لي','اشترِ لي','شراء بالنيابة'].map(normalizeAr));
+  const plow=hasAny(norm,AGRI_PLOW), harvest=hasAny(norm,AGRI_HARVEST), crop=hasAny(norm,AGRI_CROP);
+  const labor=hasAny(norm,LABOR_WORDS); const farmContext=hasAny(norm,FARM_CONTEXT); const farmHelp=farmContext&&hasAny(norm,FARM_HELP_WORDS);
+  const constructionContext=hasAny(norm,['بناء','بنا','بناء البيت','مبنى','ترميم'].map(normalizeAr));
+  const loadingContext=hasAny(norm,['تحميل','تنزيل','حمل العفش','نقل اثاث','شيل اغراض'].map(normalizeAr));
+  const cleaningContext=hasAny(norm,['نظافة','تنظيف','تنظيف البيت','تنظيف المنزل'].map(normalizeAr));
+  let forcedSlug:string|null=null;
+  if(plow) forcedSlug='seasonal-plowing'; else if(harvest) forcedSlug='seasonal-harvest'; else if(crop) forcedSlug='seasonal-crop-transport';
+  else if((labor||farmHelp)&&farmContext) forcedSlug='farm-worker';
+  else if(labor&&constructionContext) forcedSlug='construction-worker';
+  else if(labor&&loadingContext) forcedSlug='loading-worker';
+  else if(labor&&cleaningContext) forcedSlug='cleaning-worker';
+  else if(labor) forcedSlug='daily-worker';
+  else if(passenger) forcedSlug=norm.includes('دباب')||norm.includes('موتوسيكل')?'motorcycle-trips':'passenger-transport';
+  else if(pharmacy && (purchase||delivery)) forcedSlug='pharmacy-purchase';
+  else if(purchase && delivery) forcedSlug='purchase-and-delivery';
+  else if(shopping && delivery) forcedSlug='shopping-delivery';
+  else if(shopping || purchase) forcedSlug='shopping-for-me';
+  else if(delivery) forcedSlug='parcel-delivery';
+
+  for(const svc of data.services){
+    const cat=activeCats.get(svc.category_id); if(!svc.is_active||!cat||!catalog.getActiveService(svc.id)) continue;
+    const terms=new Set<string>(); for(const k of parseJson<string[]>(svc.keywords,[])||[])terms.add(normalizeAr(k)); for(const lang of ['ar','en'] as const)terms.add(normalizeAr(tr(svc.name_i18n,lang))); for(const alias of catalog.aliasesForService(svc.id)) terms.add(normalizeAr(alias));
+    let score=0; if(forcedSlug===svc.slug) score+=12;
+    for(const term of terms){if(!term)continue;if(term.includes(' ')){if(norm.includes(term))score+=4+term.split(' ').length;continue;}if(tokenSet.has(term))score+=3;else if(term.length>=3&&tokens.some(t=>t.length>=3&&(t.startsWith(term)||term.startsWith(t))))score+=1.5;}
+    for(const k of parseJson<string[]>(cat.keywords,[])||[]){const kk=normalizeAr(k);if(kk&&(tokenSet.has(kk)||norm.includes(kk)))score+=.75;}
+    if(passenger&&['car-with-driver','passenger-transport','motorcycle-trips'].includes(svc.slug))score+=4;
+    if(purchase&&delivery&&['purchase-and-delivery','shopping-for-me','pharmacy-purchase','shopping-delivery','motorcycle-trips'].includes(svc.slug))score+=4;
+    if(plow&&svc.slug==='seasonal-plowing')score+=5;if(harvest&&svc.slug==='seasonal-harvest')score+=5;if(crop&&svc.slug==='seasonal-crop-transport')score+=5;
+    if((labor||farmHelp)&&farmContext&&svc.slug==='farm-worker')score+=8;
+    if(labor&&!farmContext&&svc.slug==='daily-worker')score+=5;
+    if(labor&&constructionContext&&svc.slug==='construction-worker')score+=6;
+    if(labor&&loadingContext&&svc.slug==='loading-worker')score+=6;
+    if(labor&&cleaningContext&&svc.slug==='cleaning-worker')score+=6;
+    if(score>0)matches.push({svc,cat,score});
+  }
+  matches.sort((a,b)=>b.score-a.score);
+  const top:IntentMatch[]=matches.slice(0,6).map(({svc,cat,score})=>({serviceId:svc.id,serviceSlug:svc.slug,serviceName:tr(svc.name_i18n,locale),categoryId:cat.id,categorySlug:cat.slug,categoryName:tr(cat.name_i18n,locale),score,confidence:Math.min(1,Math.round((score/6)*100)/100),icon:svc.icon}));
+  const urgent=URGENT.some(u=>norm.includes(u)||tokenSet.has(u)); const hasVillage=VILLAGE.some(u=>norm.includes(u)); const hasCity=CITY.some(u=>norm.includes(u));
+  const cityPos=Math.min(...CITY.map(x=>norm.indexOf(x)).filter(x=>x>=0)); const villagePos=Math.min(...VILLAGE.map(x=>norm.indexOf(x)).filter(x=>x>=0)); const hasDirection=/\b(?:من|في|الى|إلى|ل)\b/.test(norm)||norm.includes('من')||norm.includes('الى')||norm.includes('إلى');
+  const cityToVillage=hasCity&&hasVillage&&hasDirection&&cityPos>=0&&villagePos>=0&&cityPos<villagePos;
+  const villageToCity=hasCity&&hasVillage&&hasDirection&&cityPos>=0&&villagePos>=0&&villagePos<cityPos;
+  const destinationHint=cityToVillage?'CITY_TO_VILLAGE':villageToCity?'VILLAGE_TO_CITY':null;
+  const compound=(purchase&&delivery)||(/\sو\s/.test(norm)&&purchase&&!pharmacy);
+  const item=extractItem(norm); const quantity=extractQuantity(norm);
+  const taskType:StructuredIntent['taskType']=plow?'AGRICULTURE_PLOWING':harvest?'AGRICULTURE_HARVEST':crop?'AGRICULTURE_CROP_TRANSPORT':passenger?'PASSENGER':pharmacy&&(purchase||delivery)?'PURCHASE_PHARMACY':purchase&&delivery?'PURCHASE_AND_DELIVERY':pickupDelivery?'PICKUP_AND_DELIVERY':shopping?'SHOPPING':delivery?'DELIVERY':(item||norm.length>=6)?'CUSTOM':'UNKNOWN';
+  const requiredCapabilities = taskType==='PASSENGER'?['trip:passenger']:taskType==='PURCHASE_PHARMACY'?['purchase:pharmacy','delivery:item']:taskType==='PURCHASE_AND_DELIVERY'||taskType==='SHOPPING'?['purchase:store','delivery:item']:taskType==='PICKUP_AND_DELIVERY'?['pickup:item','delivery:item']:taskType==='DELIVERY'?['delivery:item']:taskType==='AGRICULTURE_PLOWING'?['agri:plowing']:taskType==='AGRICULTURE_HARVEST'?['agri:harvest']:taskType==='AGRICULTURE_CROP_TRANSPORT'?['agri:crop-transport']:[];
+  const structured:StructuredIntent={taskType,item,quantity,pickupText:pharmacy?'الصيدلية':null,deliveryText:/للبيت|الى البيت|إلى البيت|للمنزل|الى المنزل|إلى المنزل/.test(norm)?'منزل العميل':null,requiredCapabilities,sourceSignals:[forcedSlug?'forced-intent': '',passenger?'passenger-synonym':'',purchase?'purchase-synonym':'',delivery?'delivery-synonym':'',pharmacy?'pharmacy-signal':'',item?'item-extracted':''].filter(Boolean)};
+  const steps=top.slice(0,3).map(m=>({serviceId:m.serviceId,serviceSlug:m.serviceSlug,serviceName:m.serviceName,reason:forcedSlug===m.serviceSlug?'فهم مباشر للنية من صياغة الطلب':requiredCapabilities.length?'يتوافق مع القدرات المطلوبة للمهمة':'يتوافق مع كلمات الطلب',confidence:m.confidence}));
+  let clarification:IntentResult['clarification']=null;
+  if(!top.length){const custom=data.services.find(x=>x.slug==='custom-request');if(custom)clarification={question:'ما الخدمة التي تحتاجها؟ يمكنك وصفها بكلماتك أو إرسال صورة.',options:[{label:tr(custom.name_i18n,locale),serviceId:custom.id}]};}
+  else if((taskType==='DELIVERY' || taskType==='PICKUP_AND_DELIVERY' || taskType==='PURCHASE_AND_DELIVERY') && !item){
+    clarification={question:'ما الطلب الذي تريد توصيله؟ اكتب اسم الغرض أو صفه بكلماتك.',options:[]};
+  }
+  else if(top[0].confidence<.35){clarification={question:'ما الذي تريد تنفيذه تحديدًا؟',options:top.slice(0,3).map(x=>({label:x.serviceName,serviceId:x.serviceId}))};}
+  const best=data.byService.get(top[0]?.serviceId||'');
+  return {matches:top,priority:urgent?'URGENT':(best?.default_priority||'NORMAL'),extracted:{urgent,when:/اليوم|today/.test(norm)?'today':/الان|حالا|فورا|now/.test(norm)?'now':null,destinationHint,purchaseIntent:purchase,compound,structured},steps,clarification,source:'RULES'};
+}
+
+export class HybridIntentParser implements IntentParser {
+  private failures = 0;
+  private circuitOpenUntil = 0;
+  constructor(private readonly config: Config) {}
+
+  private shouldAskAi(base: IntentResult, hasImage = false): boolean {
+    if (!this.config.aiIntentAuto || !this.config.aiIntentUrl || !this.config.aiIntentKey) return false;
+    // An attached image is a first-class signal: always send it to the visual intent layer.
+    // Never let a weak text-only local match bypass visual analysis.
+    if (hasImage) return true;
+    if (Date.now() < this.circuitOpenUntil) return false;
+    // Clear, single-intent requests do not need a network round-trip.
+    // AI is invoked automatically when the local parser signals ambiguity or a compound request.
+    return base.clarification !== null || base.extracted.compound || (base.matches[0]?.confidence ?? 0) < 0.68;
+  }
+
+  private async callAi(text: string, ctx: { catalog: Catalog; locale?: Locale; image?: { mime: string; dataBase64: string } }): Promise<{ serviceIds: string[]; confidence: number } | null> {
+    const locale = ctx.locale || 'ar';
+    const catalog = ctx.catalog.all().services.filter(s => s.is_active).map(s => ({
+      id: s.id,
+      slug: s.slug,
+      name: tr(s.name_i18n, locale),
+      keywords: parseJson<string[]>(s.keywords, []) || [],
+    }));
+    const system = `أنت محلل نية داخل تطبيق خدمات يمني. مهمتك تحديد الخدمة أو الخدمات الموجودة فعلًا في الكتالوج من طلب العميل. لا تخترع خدمة أو معرفًا غير موجود. إذا كانت هناك صورة مرفقة فاعتبر محتوى الصورة دليلًا أساسيًا على الشيء المطلوب، ولا تضف خدمة غير مرتبطة بما يظهر في الصورة لمجرد وجود تشابه ضعيف في الكلمات. إذا كانت الصورة تظهر دواء أو علبة دواء أو وصفة دوائية وكان الطلب هو الشراء أو الإحضار، فاختر خدمة شراء وإحضار الدواء (pharmacy-purchase) إن كانت موجودة في الكتالوج. لا تستنتج عامل بناء أو صيانة أو خدمة أخرى من صورة دواء. إذا لم يذكر النص بوضوح أكثر من حاجة مستقلة، أعد خدمة واحدة فقط حتى لو وجدت خدمات مشابهة في الكتالوج. لا تعتبر كلمات واجهة مثل بحث أو اقتراح دليلًا على طلب مركب. أعد أكثر من معرف فقط عندما يذكر العميل صراحة حاجتين أو أكثر مستقلتين. إذا كان غير واضح أعد قائمة فارغة. أعد JSON فقط بالشكل: {"serviceIds":["id"],"confidence":0.0}. افهم العربية والفصحى واللهجة اليمنية والسياق مثل القرية والمدينة والشراء والإحضار والنقل والإصلاح والحصاد والحرث.`;
+    const userContent: any[] = [{ type: 'text', text: `الطلب: ${text}\nالكتالوج:\n${JSON.stringify(catalog)}` }];
+    if (ctx.image) userContent.push({ type: 'image_url', image_url: { url: `data:${ctx.image.mime};base64,${ctx.image.dataBase64}` } });
+    const body = {
+      model: this.config.aiIntentModel,
+      temperature: 0,
+      max_tokens: 250,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }],
+    };
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.aiIntentKey}` };
+    // Abort the underlying request on timeout instead of racing it against an uncancelled timer.
+    const res = await fetch(this.config.aiIntentUrl!, { method: 'POST', headers, body: JSON.stringify(body), signal: (globalThis as any).AbortSignal.timeout(this.config.aiIntentTimeoutMs) });
+    if (!res.ok) throw new Error(`AI intent HTTP ${res.status}`);
+    const j = await res.json() as any;
+    const content = j?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') throw new Error('AI intent response missing content');
+    const parsed = JSON.parse(content);
+    return {
+      serviceIds: Array.isArray(parsed.serviceIds) ? parsed.serviceIds.filter((x: any) => typeof x === 'string').slice(0, 5) : [],
+      confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
+    };
+  }
+
+  async parse(text:string, ctx:{catalog:Catalog;locale?:Locale;image?:{mime:string;dataBase64:string}}):Promise<IntentResult>{
+    const base=deterministic(text,ctx);
+    if (!this.shouldAskAi(base, Boolean(ctx.image))) return base;
+    try {
+      const ai = await this.callAi(text, ctx);
+      this.failures = 0;
+      this.circuitOpenUntil = 0;
+      if (!ai) return {...base,source:'RULES_AI_FALLBACK'};
+      const byId = new Map(ctx.catalog.all().services.filter(s => s.is_active).map(s => [s.id, s]));
+      const cats = new Map(ctx.catalog.all().categories.filter(c => c.is_active).map(c => [c.id, c]));
+      // When an image is present and the customer did not explicitly ask for
+      // multiple independent needs, trust the visual AI result as a single intent.
+      // This prevents unrelated catalog matches (e.g. construction worker) from
+      // leaking into a medicine-photo request.
+      const aiServiceIds = ctx.image && !base.extracted.compound ? ai.serviceIds.slice(0, 1) : ai.serviceIds;
+      const aiMatches: IntentMatch[] = aiServiceIds.map(id => {
+        const svc = byId.get(id); const cat = svc ? cats.get(svc.category_id) : undefined;
+        if (!svc || !cat) return null;
+        return { serviceId:svc.id,serviceSlug:svc.slug,serviceName:tr(svc.name_i18n,ctx.locale||'ar'),categoryId:cat.id,categorySlug:cat.slug,categoryName:tr(cat.name_i18n,ctx.locale||'ar'),score:Math.max(1,ai.confidence*10),confidence:Math.max(ai.confidence,0.55),icon:svc.icon };
+      }).filter(Boolean) as IntentMatch[];
+      if (!aiMatches.length) return {...base,source:'RULES_AI_FALLBACK'};
+      const ids = new Set(aiMatches.map(m=>m.serviceId));
+      // With an image, visual AI is authoritative. Do not merge unrelated local
+      // text matches into the result (e.g. construction worker + medicine photo).
+      const merged = ctx.image
+        ? aiMatches.slice(0, 6)
+        : [...aiMatches, ...base.matches.filter(m=>!ids.has(m.serviceId))].slice(0,6);
+      const steps = aiMatches.slice(0,3).map(m=>({serviceId:m.serviceId,serviceSlug:m.serviceSlug,serviceName:m.serviceName,reason:ctx.image ? 'يتوافق مع محتوى الصورة والطلب' : 'اقتراح المساعد الذكي',confidence:m.confidence}));
+      return {...base,matches:merged,clarification:null,extracted:{...base.extracted,compound:ctx.image ? aiMatches.length>1 : aiMatches.length>1},steps,source:'AI'};
+    } catch {
+      this.failures += 1;
+      if (this.failures >= 3) this.circuitOpenUntil = Date.now() + this.config.aiIntentCircuitCooldownMs;
+      return {...base,source:'RULES_AI_FALLBACK'};
+    }
+  }
+}
+
+export { deterministic as keywordIntentParse };
