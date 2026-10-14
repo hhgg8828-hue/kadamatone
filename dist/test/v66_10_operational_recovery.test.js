@@ -42,7 +42,7 @@ test('V66.14: واجهة مقدم الخدمة تعيد عرض العرض الج
     const admin = fs.readFileSync('public/admin.html', 'utf8');
     assert.match(app, /providerPollTimer=window\.setInterval[\s\S]*?8000/);
     assert.match(app, /if\(addedOffers\.length\)/);
-    assert.match(provider, /app\.js\?v=2\.28/);
-    assert.match(admin, /app\.js\?v=2\.28/);
+    assert.match(provider, /app\.js\?v=2\.29/);
+    assert.match(admin, /app\.js\?v=2\.29/);
 });
 //# sourceMappingURL=v66_10_operational_recovery.test.js.map

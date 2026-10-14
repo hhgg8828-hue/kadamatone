@@ -9,7 +9,7 @@ export function registerPlatformRoutes(app, r) {
     const { db, settings, catalog } = app;
     r.get('/config', () => {
         const locale = settings.get('platform.default_locale');
-        return { appVersion: '2.28.0', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
+        return { appVersion: '2.29.0', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
             appName: settings.get('app.name'), appTagline: settings.get('app.tagline'), appSymbol: settings.get('app.symbol'),
             newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'),
             defaultLocale: locale, supportedLocales: ['ar', 'en'], direction: locale === 'ar' ? 'rtl' : 'ltr', mapProvider: app.config.mapProvider };
