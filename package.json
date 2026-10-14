@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.39.0",
-  "description": "خدمات — مطابقة شاشة تتبع الطلب للصور المرجعية",
+  "version": "2.40.0",
+  "description": "خدمات — مربعات المتاجر المقترحة وملخص الطلب المنظم",
   "private": true,
   "type": "module",
   "engines": {

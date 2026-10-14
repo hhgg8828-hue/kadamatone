@@ -1472,3 +1472,23 @@ body:has(.customer-shell) #modal:has(.account-form-title) .account-delete-card{d
 .customer-order-tracking .timeline-terminal small{display:block;margin-top:5px;color:#ccc}
 .customer-order-tracking .order-primary-actions{gap:8px;flex-wrap:wrap}
 @media(max-width:600px){.customer-order-tracking .order-tracking-head{padding:18px 16px 12px!important}.customer-order-tracking .order-code-copy span,.customer-order-tracking .order-tracking-head h2:before{font-size:22px}.customer-order-tracking .order-tracking-summary,.customer-order-tracking .customer-order-status-timeline{padding:16px!important}.customer-order-tracking .customer-order-status-timeline .timeline-step b{font-size:18px}}
+
+/* Order checkout: compact circular store tiles and reference-style payment selector. */
+.checkout-store-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;margin-top:12px}
+.checkout-store-tile{min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:12px 6px;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--surface,#fff);box-shadow:0 1px 3px #00000008}
+.checkout-store-avatar{width:66px;height:66px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--surface-soft,#f3f4f6);border:1px solid var(--border,#e5e7eb);flex:0 0 auto}
+.checkout-store-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.checkout-store-avatar span{font-size:24px;font-weight:800;color:var(--primary,#555)}
+.checkout-store-name{font-size:12px;line-height:1.45;overflow-wrap:anywhere;max-width:100%}
+.checkout-store-fee,.checkout-store-min{font-size:10px;line-height:1.4;color:var(--muted,#6b7280)}
+.payment-method-select-label{display:block;font-size:13px;margin:0 0 7px}
+.payment-method-select-wrap{position:relative}
+.payment-method-select-wrap select{appearance:none;width:100%;min-height:46px;border:1px solid var(--border,#d1d5db);border-radius:10px;background:var(--surface,#fff);padding:10px 14px 10px 38px;font:inherit;color:var(--text,#222);direction:rtl}
+.payment-method-chevron{position:absolute;left:14px;top:50%;transform:translateY(-55%);pointer-events:none;font-size:20px;color:var(--muted,#6b7280)}
+.payment-method-note{font-size:11px;margin:7px 0 0}
+@media(max-width:520px){.checkout-store-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.checkout-store-tile{padding:9px 3px;border-radius:12px}.checkout-store-avatar{width:52px;height:52px}.checkout-store-name{font-size:10px}.checkout-store-fee,.checkout-store-min{font-size:9px}}
+.admin-order-store-card{text-align:center}
+.admin-order-store-avatar{width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;border:1px solid var(--border,#e5e7eb);background:var(--surface-soft,#f3f4f6)}
+.admin-order-store-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.admin-order-store-avatar span{font-size:26px;font-weight:800}
+.admin-order-store-avatar-preview{margin:8px 0}
