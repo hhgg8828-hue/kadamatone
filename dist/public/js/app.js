@@ -1806,14 +1806,19 @@ function renderCustomer() {
     document.querySelectorAll('[data-service-favorite]').forEach(x => { const id = x.dataset.serviceFavorite || ''; if (serviceFavorites().includes(id))
         x.textContent = '♥'; x.addEventListener('click', e => { e.stopPropagation(); const fav = serviceFavorites(); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; localStorage.setItem('khadamat.favoriteServices.v1', JSON.stringify(next)); x.textContent = next.includes(id) ? '♥' : '♡'; if (document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'favorite')
         applyServiceFilter('favorite'); }); });
-    function applyServiceFilter(key) { document.querySelectorAll('[data-service-filter]').forEach(b => b.classList.toggle('active', b.dataset.serviceFilter === key)); const fav = serviceFavorites(); const list = document.getElementById('customerServiceList'); const cards = Array.from(document.querySelectorAll('[data-service-card]')); cards.forEach(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && Date.now() - created < 30 * 86400000; const show = key === 'all' || key === 'nearby' || (key === 'new' && isNew) || (key === 'favorite' && fav.includes(String(card.dataset.serviceCard || ''))); card.classList.toggle('hide-section', !show); }); let empty = list?.querySelector('[data-service-filter-empty]'); const visible = cards.some(c => !c.classList.contains('hide-section')); if (!visible && list) {
+    function applyServiceFilter(key) { document.querySelectorAll('[data-service-filter]').forEach(b => b.classList.toggle('active', b.dataset.serviceFilter === key)); const fav = serviceFavorites(); const list = document.getElementById('customerServiceList'); const cards = Array.from(document.querySelectorAll('[data-service-card]')); cards.forEach(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && Date.now() - created < 30 * 86400000; const loc = (() => { try {
+        return JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
+    }
+    catch {
+        return null;
+    } })(); const hasLoc = loc && Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lng)); const sv = state.services.find((v) => String(v.id) === String(card.dataset.serviceCard || '')); const slat = Number(sv?.latitude ?? sv?.lat ?? sv?.location?.lat), slng = Number(sv?.longitude ?? sv?.lng ?? sv?.location?.lng); const hasServiceLoc = Number.isFinite(slat) && Number.isFinite(slng); const nearby = !!hasLoc && hasServiceLoc; const show = key === 'all' || (key === 'nearby' && nearby) || (key === 'new' && isNew) || (key === 'favorite' && fav.includes(String(card.dataset.serviceCard || ''))); card.classList.toggle('hide-section', !show); }); let empty = list?.querySelector('[data-service-filter-empty]'); const visible = cards.some(c => !c.classList.contains('hide-section')); if (!visible && list) {
         if (!empty) {
             empty = document.createElement('div');
             empty.dataset.serviceFilterEmpty = '1';
             empty.className = 'card empty service-filter-empty';
             list.appendChild(empty);
         }
-        empty.textContent = key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على رمز القلب بجانب أي خدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات جديدة متاحة حاليًا.' : 'لا توجد خدمات متاحة لهذا الاختيار حاليًا.';
+        empty.textContent = key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على رمز القلب بجانب أي خدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات جديدة متاحة حاليًا.' : key === 'nearby' ? 'لا تتوفر مواقع دقيقة كافية لترتيب الخدمات الأقرب. حدّد موقعك أو جرّب كل الخدمات.' : 'لا توجد خدمات متاحة لهذا الاختيار حاليًا.';
     }
     else
         empty?.remove(); if (key === 'nearby' && list) {
@@ -1841,7 +1846,7 @@ function renderCustomer() {
         alert(e.message);
     } });
     document.querySelectorAll('[data-campaign-favorite]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); const id = x.dataset.campaignFavorite || ''; const fav = JSON.parse(localStorage.getItem('khadamat.favoriteCampaigns.v1') || '[]'); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; localStorage.setItem('khadamat.favoriteCampaigns.v1', JSON.stringify(next)); x.textContent = next.includes(id) ? '♥' : '♡'; toast('المفضلة', next.includes(id) ? 'أُضيف العرض إلى المفضلة.' : 'أُزيل العرض من المفضلة.'); }));
-    document.querySelectorAll('[data-offer-filter]').forEach(x => x.addEventListener('click', () => { const key = x.dataset.offerFilter || 'all'; document.querySelectorAll('[data-offer-filter]').forEach(b => b.classList.toggle('active', b === x)); const cards = Array.from(document.querySelectorAll('[data-campaign-card]')); const fav = JSON.parse(localStorage.getItem('khadamat.favoriteCampaigns.v1') || '[]'); cards.forEach((card, i) => { const c = state.campaigns.find((v) => v.id === card.dataset.campaignCard); const created = Date.parse(String(c?.startsAt || c?.createdAt || '')); const isNew = Number.isFinite(created) && Date.now() - created < 14 * 86400000; let show = key === 'all' || (key === 'nearby' && (!state.selectedAreaId || !c?.areaId || c.areaId === state.selectedAreaId)) || (key === 'new' && (isNew || (!Number.isFinite(created) && i < 2))) || (key === 'favorite' && fav.includes(String(c?.id))); card.classList.toggle('hide-section', !show); }); if (key === 'favorite' && !cards.some(c => !c.classList.contains('hide-section')))
+    document.querySelectorAll('[data-offer-filter]').forEach(x => x.addEventListener('click', () => { const key = x.dataset.offerFilter || 'all'; document.querySelectorAll('[data-offer-filter]').forEach(b => b.classList.toggle('active', b === x)); const cards = Array.from(document.querySelectorAll('[data-campaign-card]')); const fav = JSON.parse(localStorage.getItem('khadamat.favoriteCampaigns.v1') || '[]'); cards.forEach((card, i) => { const c = state.campaigns.find((v) => v.id === card.dataset.campaignCard); const created = Date.parse(String(c?.startsAt || c?.createdAt || '')); const isNew = Number.isFinite(created) && Date.now() - created < 14 * 86400000; let show = key === 'all' || (key === 'nearby' && (!state.selectedAreaId || !c?.areaId || c.areaId === state.selectedAreaId)) || (key === 'new' && isNew) || (key === 'favorite' && fav.includes(String(c?.id))); card.classList.toggle('hide-section', !show); }); if (key === 'favorite' && !cards.some(c => !c.classList.contains('hide-section')))
         toast('المفضلة', 'لم تضف عروضًا إلى المفضلة بعد.'); }));
     document.querySelectorAll('[data-campaign-card]').forEach(x => { const open = () => { const c = state.campaigns.find((v) => v.id === x.dataset.campaignCard); if (!c)
         return; const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (v && t === 'CATEGORY')
@@ -4307,7 +4312,16 @@ function openTemporaryServiceEditor(allServices, refresh, existing = null) {
         return; temporarySaving = true; const form = e.currentTarget; const saveButton = form.querySelector('button[type=submit],button:not([type])'); if (saveButton) {
         saveButton.disabled = true;
         saveButton.textContent = 'جارٍ الحفظ...';
-    } const f = new FormData(form); const body = { title: { ar: String(f.get('titleAr')), en: String(f.get('titleAr')) }, description: { ar: String(f.get('descriptionAr') || ''), en: String(f.get('descriptionAr') || '') }, startAt: new Date(String(f.get('startAt'))).toISOString(), endAt: new Date(String(f.get('endAt'))).toISOString(), sortOrder: Number(f.get('sortOrder') || 0), priority: Number(f.get('priority') || 0), requestFlow: String(f.get('requestFlow') || 'SERVICE'), actionValue: String(f.get('actionValue') || '') || undefined, isActive: true }; try {
+    } const f = new FormData(form); const startRaw = String(f.get('startAt') || ''), endRaw = String(f.get('endAt') || ''); const startDate = new Date(startRaw), endDate = new Date(endRaw); if (!startRaw || !endRaw || !Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime()) || endDate <= startDate) {
+        temporarySaving = false;
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = existing ? 'حفظ التعديلات' : 'حفظ الخدمة المؤقتة';
+        }
+        document.getElementById('tempMsg').textContent = 'يجب أن يكون تاريخ ووقت النهاية بعد البداية.';
+        document.getElementById('tempMsg').className = 'error';
+        return;
+    } const body = { title: { ar: String(f.get('titleAr')), en: String(f.get('titleAr')) }, description: { ar: String(f.get('descriptionAr') || ''), en: String(f.get('descriptionAr') || '') }, startAt: startDate.toISOString(), endAt: endDate.toISOString(), sortOrder: Number(f.get('sortOrder') || 0), priority: Number(f.get('priority') || 0), requestFlow: String(f.get('requestFlow') || 'SERVICE'), actionValue: String(f.get('actionValue') || '') || undefined, isActive: true }; try {
         if (existing) {
             await api('/admin/temporary-services/' + encodeURIComponent(existing.id), { method: 'PATCH', body: JSON.stringify(body) });
         }
