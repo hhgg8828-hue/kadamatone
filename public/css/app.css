@@ -1908,3 +1908,24 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="dark"] .customer-shell .reference-news-ticker.temporary-offer-ticker{background:linear-gradient(100deg,#12392c 0%,#172f3d 52%,#3b3019 100%);border-color:#356d54;}
 :root[data-theme="dark"] .customer-shell .reference-news-ticker.temporary-offer-ticker .news-ticker-track span{color:#b7f7d5;}
 @media(max-width:420px){.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:62px;min-width:62px}.customer-shell .customer-category-showcase-top .customer-category-art{width:46px;height:46px;flex-basis:46px}}
+
+
+/* v2.65: administration navigation grouped by operational priority */
+.admin-navigation{display:grid;gap:12px;margin:0 0 20px;max-width:100%;min-width:0}
+.admin-nav-group{min-width:0;padding:13px 14px;border:1px solid #dfe9e2;border-radius:17px;background:rgba(255,255,255,.94);box-shadow:0 4px 15px rgba(24,65,43,.045)}
+.admin-nav-group h2{font-size:14px;line-height:1.5;margin:0 0 10px;color:#234b36;display:flex;align-items:center;gap:7px}
+.admin-nav-items{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.admin-nav-items .btn{min-width:0;width:100%;min-height:42px;display:flex;align-items:center;justify-content:center;gap:6px;text-align:center;white-space:normal;overflow-wrap:anywhere;line-height:1.45;padding:9px 8px;border-radius:12px;font-size:13px}
+.admin-nav-items .btn.secondary{background:#f7faf8;border-color:#e4ece6;color:#365342}
+.admin-nav-items .btn:not(.secondary){background:#176b4d;border-color:#176b4d;color:white;box-shadow:0 4px 10px rgba(23,107,77,.12)}
+.admin-nav-rare summary{cursor:pointer;font-weight:800;color:#475569;list-style:none;display:flex;align-items:center;gap:8px;padding:2px 0}
+.admin-nav-rare summary::-webkit-details-marker{display:none}.admin-nav-rare[open] summary{margin-bottom:12px}
+.admin-nav-rare .admin-nav-items{padding-top:4px}
+.admin-page .admin-navigation,.admin-shell .admin-navigation{direction:rtl;text-align:right}
+@media(max-width:900px){.admin-nav-items{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.admin-nav-group{padding:10px;border-radius:14px}.admin-nav-items{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.admin-nav-items .btn{font-size:12px;min-height:42px;padding:8px 6px}.admin-nav-group h2{font-size:13px}}
+.service-editor-modal .field.field-invalid{border-radius:12px;background:#fff4f3;padding:8px;border:1px solid #d92d20;box-shadow:0 0 0 3px rgba(217,45,32,.08)}
+.service-editor-modal .field.field-invalid input,.service-editor-modal .field.field-invalid select,.service-editor-modal .field.field-invalid textarea{border-color:#d92d20!important;outline-color:#d92d20}
+.service-field-error{display:block;color:#b42318;font-size:12px;font-weight:700;margin-top:5px;line-height:1.5}
+
+/* v2.65 — administration information architecture and field-level validation */

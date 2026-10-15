@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.64.0",
-  "description": "تحسين واجهة التصنيفات وشريط العروض المؤقتة",
+  "version": "2.65.0",
+  "description": "تنظيم لوحة الإدارة وتحسين التحقق من الخدمات",
   "private": true,
   "type": "module",
   "engines": {
