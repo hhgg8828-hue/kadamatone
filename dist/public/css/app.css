@@ -1929,3 +1929,47 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 .service-field-error{display:block;color:#b42318;font-size:12px;font-weight:700;margin-top:5px;line-height:1.5}
 
 /* v2.65 — administration information architecture and field-level validation */
+
+/* v2.66: theme-aware order tracking and checkout category navigation */
+.checkout-store-rail-layout{display:grid;grid-template-columns:84px minmax(0,1fr);align-items:center;gap:8px;direction:rtl}
+.checkout-all-stores-fixed{position:relative;z-index:2;align-self:center;min-height:74px;border:1px solid var(--primary,#13866c);border-radius:14px;padding:10px 8px;background:var(--primary,#13866c);color:#fff;font:inherit;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.12);cursor:pointer}
+.checkout-store-rail-layout #checkoutRestaurantStores{min-width:0;overflow:hidden}
+.checkout-store-rail-layout .checkout-recommendation-rail{margin:0}
+.checkout-stores-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.checkout-stores-title b{font-size:15px}
+.customer-order-tracking.reference-tracking{background:var(--theme-bg,var(--surface-soft,#f6f8f7))!important;color:var(--theme-text,var(--text,#1b2c27))!important}
+.customer-order-tracking.reference-tracking .tracking-reference-appbar,
+.customer-order-tracking.reference-tracking .tracking-reference-header{background:var(--theme-surface,var(--surface,#fff))!important;color:var(--theme-text,var(--text,#1b2c27))!important;border-color:var(--theme-line,var(--border,#dfe7e3))!important}
+.customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2{font-size:clamp(20px,4vw,27px)!important;color:var(--theme-text,var(--text,#1b2c27))!important;display:flex!important;align-items:center;gap:8px;line-height:1.5!important;margin:0!important}
+.customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2:before,.customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2:after{content:none!important;display:none!important}
+.customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2 span{font-size:inherit!important;color:inherit!important}
+.customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2 bdi{display:inline!important;visibility:visible!important;font-size:inherit!important;color:inherit!important;direction:ltr;unicode-bidi:isolate}
+.customer-order-tracking.reference-tracking .tracking-reference-header p{display:block!important;color:var(--theme-muted,var(--muted,#66756f))!important;margin:4px 0;font-size:13px}
+.customer-order-tracking.reference-tracking .tracking-reference-store,
+.customer-order-tracking.reference-tracking .tracking-reference-payment,
+.customer-order-tracking.reference-tracking .tracking-reference-status,
+.customer-order-tracking.reference-tracking .tracking-reference-products,
+.customer-order-tracking.reference-tracking .tracking-reference-totals,
+.customer-order-tracking.reference-tracking .tracking-reference-accordion,
+.customer-order-tracking.reference-tracking .tracking-reference-live-chat{background:var(--theme-surface,var(--surface,#fff))!important;color:var(--theme-text,var(--text,#1b2c27))!important;border:1px solid var(--theme-line,var(--border,#e0e7e3))!important;box-shadow:0 2px 12px rgba(0,0,0,.04)!important}
+.customer-order-tracking.reference-tracking .tracking-reference-products b,
+.customer-order-tracking.reference-tracking .tracking-reference-products strong,
+.customer-order-tracking.reference-tracking .tracking-reference-products small,
+.customer-order-tracking.reference-tracking .tracking-reference-products span,
+.customer-order-tracking.reference-tracking .tracking-reference-totals span,
+.customer-order-tracking.reference-tracking .tracking-reference-totals b,
+.customer-order-tracking.reference-tracking .tracking-reference-payment b,
+.customer-order-tracking.reference-tracking .tracking-reference-payment small,
+.customer-order-tracking.reference-tracking .tracking-reference-accordion,
+.customer-order-tracking.reference-tracking .tracking-reference-accordion p{color:var(--theme-text,var(--text,#1b2c27))!important}
+.customer-order-tracking.reference-tracking .tracking-reference-products .tracking-reference-product-image{background:var(--theme-bg,var(--surface-soft,#f4f6f5))!important;color:var(--theme-text,var(--text,#1b2c27))!important}
+.customer-order-tracking.reference-tracking .tracking-reference-products .tracking-reference-product-row{border-color:var(--theme-line,var(--border,#e0e7e3))!important}
+:root[data-theme="dark"] .customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2,
+:root[data-theme="dark"] .customer-order-tracking.reference-tracking .tracking-reference-products b,
+:root[data-theme="dark"] .customer-order-tracking.reference-tracking .tracking-reference-products strong,
+:root[data-theme="dark"] .customer-order-tracking.reference-tracking .tracking-reference-products span{color:var(--theme-text,#f3f7f5)!important}
+:root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-header .tracking-reference-code-row h2,
+:root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-products b,
+:root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-products strong,
+:root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-products span{color:var(--theme-text,#17231f)!important}
+@media(max-width:420px){.checkout-store-rail-layout{grid-template-columns:76px minmax(0,1fr);gap:6px}.checkout-all-stores-fixed{min-height:68px;padding:8px 5px;font-size:12px}.customer-order-tracking.reference-tracking .tracking-reference-header{padding:16px!important}}
