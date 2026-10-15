@@ -1973,3 +1973,91 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-products strong,
 :root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-products span{color:var(--theme-text,#17231f)!important}
 @media(max-width:420px){.checkout-store-rail-layout{grid-template-columns:76px minmax(0,1fr);gap:6px}.checkout-all-stores-fixed{min-height:68px;padding:8px 5px;font-size:12px}.customer-order-tracking.reference-tracking .tracking-reference-header{padding:16px!important}}
+
+/* v2.67 — complete light/dark visual pass based on the supplied My Orders reference. */
+:root{--kh-accent-red:#c91445;--kh-accent-gold:#f4b51b;--kh-accent-green:#16845b;--kh-bg-light:#fff;--kh-surface-light:#fff;--kh-line-light:#e5e7eb;--kh-bg-dark:#000;--kh-surface-dark:#090909;--kh-line-dark:#282828}
+/* The customer region is a real, full-width selector in the header, not tiny secondary text. */
+.customer-shell .app-topbar{position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px 16px}
+.customer-shell .brand-lockup{flex:1 1 150px;min-width:0;gap:9px}
+.customer-shell .customer-area-label{display:inline-flex;align-items:center;gap:8px;min-height:44px;max-width:100%;padding:7px 12px;border:1.5px solid var(--kh-accent-gold);border-radius:13px;background:var(--theme-surface,#fff);color:var(--theme-text,#17231f);box-sizing:border-box}
+.customer-shell .customer-area-label>svg{width:23px;height:23px;flex:0 0 23px;fill:none;stroke:var(--kh-accent-red);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.customer-shell .customer-area-names{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
+.customer-shell .customer-area-names small{font-size:10px;line-height:1.3;color:var(--theme-muted,#667085)}
+.customer-shell .customer-area-names b{font-size:14px;line-height:1.35;color:var(--theme-text,#17231f)}
+.customer-shell .customer-area-arrow{min-width:42px;min-height:42px;border:1.5px solid var(--kh-accent-gold);border-radius:12px;background:var(--theme-surface,#fff);color:var(--theme-text,#17231f);font-size:22px}
+.customer-shell .customer-header-icon{color:var(--theme-text,#17231f);border:1px solid var(--theme-line,#e5e7eb);background:var(--theme-surface,#fff);min-width:42px;min-height:42px;border-radius:12px;font-size:25px}
+.customer-shell .brand-lockup strong{color:var(--kh-accent-red)}
+.customer-shell .brand-lockup .brand-mark{color:var(--kh-accent-red)}
+/* Account entry and account menu: deep black cards, white labels, red user icon. */
+.customer-shell .account-btn{background:#090909!important;border:1px solid #252525!important;color:#fff!important;border-radius:13px!important}
+.customer-shell .account-btn::before{content:"♙";display:inline-block;margin-inline-end:7px;color:var(--kh-accent-red);font-size:20px;vertical-align:-2px}
+.customer-account-home{color:var(--theme-text)}
+.customer-account-menu-row{background:var(--theme-surface)!important;border-color:var(--theme-line)!important;color:var(--theme-text)!important}
+.customer-account-menu-row b,.customer-account-menu-row .customer-account-menu-chevron{color:var(--theme-text)!important}
+.customer-account-menu-icon{color:var(--kh-accent-red)!important;background:color-mix(in srgb,var(--kh-accent-red) 10%,var(--theme-surface))!important}
+.customer-account-area{border:1.5px solid var(--kh-accent-gold)!important;background:var(--theme-surface)!important;color:var(--theme-text)!important}
+.customer-account-area-pin{color:var(--kh-accent-red)!important}
+.customer-account-area-arrow{color:var(--theme-text)!important}
+/* Region selection: red map pin, gold outlined choice, readable selected state. */
+.customer-area-picker .customer-area-option{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:11px 13px;border:1.5px solid var(--kh-accent-gold);border-radius:13px;background:var(--theme-surface);color:var(--theme-text);text-align:right}
+.customer-area-picker .customer-area-option-name{display:inline-flex;align-items:center;gap:9px;font-weight:800;color:var(--theme-text)}
+.customer-area-picker .customer-area-option-name svg{width:22px;height:22px;flex:0 0 22px;fill:none;stroke:var(--kh-accent-red);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.customer-area-picker .customer-area-option small{color:var(--theme-muted);font-size:12px;white-space:nowrap}
+.customer-area-picker .customer-area-option.active{border-color:var(--kh-accent-green);box-shadow:inset 0 0 0 1px var(--kh-accent-green);background:color-mix(in srgb,var(--kh-accent-green) 8%,var(--theme-surface))}
+/* Consistent action outlines; keep semantic colors in both themes. */
+.btn.danger,.button-danger,[data-action="delete"],.delete-location-btn{border:1.5px solid #d92d45!important}
+.btn.secondary,[data-action="edit"],.edit-location-btn{border:1.5px solid var(--kh-accent-gold)}
+/* My Orders page: centered title, segmented tabs and soft, reference-like cards. */
+.customer-shell.orders-view .customer-sticky-discovery{background:var(--kh-accent-red);color:#fff;border-radius:0 0 22px 22px;padding:14px 14px 18px;margin:-1px -1px 18px;box-shadow:0 7px 22px rgba(201,20,69,.12)}
+.customer-shell.orders-view .customer-sticky-discovery .section-tab{min-height:48px;border:0;border-radius:999px;background:rgba(255,255,255,.18);color:#fff;font-weight:800;padding:10px 18px}
+.customer-shell.orders-view .customer-sticky-discovery .section-tab.active{background:#ffb13f;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.customer-shell.orders-view #ordersSection>.section-heading{justify-content:center;text-align:center;margin:12px 0 18px}
+.customer-shell.orders-view #ordersSection>.section-heading h2{font-size:25px;font-weight:900}
+.customer-shell.orders-view .order-card-premium{border:0!important;border-radius:25px!important;background:var(--theme-surface)!important;color:var(--theme-text)!important;box-shadow:0 7px 26px rgba(0,0,0,.06)!important}
+.customer-shell.orders-view .order-card-total-row{color:var(--kh-accent-red)}
+.customer-shell.orders-view .order-card-total-row strong{color:var(--kh-accent-red)}
+.customer-shell.orders-view .order-card-service-icon{background:var(--theme-bg)!important}
+.customer-shell.orders-view .order-card-delivery{background:#fce7ee;color:var(--kh-accent-red)}
+.customer-shell.orders-view .order-card-repeat{margin-top:13px!important}
+.customer-shell.orders-view .order-repeat-btn{background:#ffad3e!important;color:#fff!important;border:0!important}
+/* Category artwork stays line-drawn on a near-black tile; selection fills the icon accent. */
+:root[data-theme="dark"] .customer-shell{--theme-bg:#000;--theme-surface:#090909;--theme-line:#282828;--theme-text:#fff;--theme-muted:#c0c0c0;--surface:#090909;--card:#090909;--border:#282828;--text:#fff;--muted:#c0c0c0;background:#000!important;color:#fff!important}
+:root[data-theme="dark"] body,:root[data-theme="dark"] #app,:root[data-theme="dark"] .shell,:root[data-theme="dark"] .customer-shell,:root[data-theme="dark"] .reference-service-section,:root[data-theme="dark"] #servicesSection,:root[data-theme="dark"] #ordersSection{background:#000!important;color:#fff!important}
+:root[data-theme="dark"] .customer-shell .card,:root[data-theme="dark"] .customer-shell .customer-category-tile,:root[data-theme="dark"] .customer-shell .all-categories-tile,:root[data-theme="dark"] .customer-shell .customer-service-row,:root[data-theme="dark"] .customer-shell .customer-service-logo,:root[data-theme="dark"] .customer-shell .customer-category-art,:root[data-theme="dark"] .customer-shell .checkout-category-tile{background:#090909!important;color:#fff!important;border-color:#282828!important}
+:root[data-theme="dark"] .customer-shell .customer-category-art{color:#fff!important}
+:root[data-theme="dark"] .customer-shell .customer-category-tile.selected .customer-category-art,:root[data-theme="dark"] .customer-shell .customer-category-tile[aria-pressed="true"] .customer-category-art{background:color-mix(in srgb,var(--category-accent,#c91445) 26%,#090909)!important;color:var(--category-accent,#c91445)!important}
+:root[data-theme="dark"] .customer-shell .customer-service-copy b,:root[data-theme="dark"] .customer-shell .customer-category-tile b,:root[data-theme="dark"] .customer-shell .all-categories-tile b,:root[data-theme="dark"] .customer-shell .section-heading h2,:root[data-theme="dark"] .customer-shell h1,:root[data-theme="dark"] .customer-shell h2,:root[data-theme="dark"] .customer-shell h3{color:#fff!important}
+:root[data-theme="dark"] .customer-shell input,:root[data-theme="dark"] .customer-shell textarea,:root[data-theme="dark"] .customer-shell select,:root[data-theme="dark"] .customer-shell .field input,:root[data-theme="dark"] .customer-shell .field select,:root[data-theme="dark"] .customer-shell .field textarea{background:#090909!important;color:#fff!important;border-color:#333!important}
+:root[data-theme="dark"] .customer-shell .customer-bottom-nav{background:#090909!important;border-color:#282828!important;color:#fff!important}
+:root[data-theme="dark"] .customer-shell .customer-bottom-nav button{color:#c7c7c7!important}
+:root[data-theme="dark"] .customer-shell .customer-bottom-nav button.active{color:var(--kh-accent-red)!important}
+:root[data-theme="dark"] .customer-shell .customer-sticky-discovery{background:#090909!important;border-bottom:1px solid #282828;box-shadow:none}
+:root[data-theme="dark"] .customer-shell.orders-view .customer-sticky-discovery .section-tab{background:#101010;color:#fff;border:1px solid #292929}
+:root[data-theme="dark"] .customer-shell.orders-view .customer-sticky-discovery .section-tab.active{background:#c91445;color:#fff;border-color:#c91445}
+:root[data-theme="dark"] .customer-shell .order-card-premium,:root[data-theme="dark"] .customer-shell .order-card-service-icon,:root[data-theme="dark"] .customer-shell .order-card-topline,:root[data-theme="dark"] .customer-shell .order-card-total-row{background:#090909!important;color:#fff!important;border-color:#282828!important}
+:root[data-theme="dark"] .customer-shell .order-card-total-row strong{color:#ff5b83!important}
+:root[data-theme="dark"] .customer-shell .order-card-code,:root[data-theme="dark"] .customer-shell .order-card-date,:root[data-theme="dark"] .customer-shell .order-card-title p{color:#c0c0c0!important}
+:root[data-theme="dark"] .customer-shell .order-card-code b{color:#fff!important}
+:root[data-theme="dark"] .customer-shell .order-card-delivery{background:#261017;color:#ff8baa}
+:root[data-theme="dark"] .customer-shell .account-btn{background:#090909!important;color:#fff!important;border-color:#282828!important}
+:root[data-theme="dark"] .customer-shell .customer-account-menu-row{background:#090909!important;border-color:#282828!important;color:#fff!important}
+:root[data-theme="dark"] .customer-shell .customer-account-menu-row b,:root[data-theme="dark"] .customer-shell .customer-account-menu-chevron{color:#fff!important}
+:root[data-theme="dark"] .customer-shell .customer-account-area,:root[data-theme="dark"] .customer-shell .customer-area-option{background:#090909!important;color:#fff!important}
+/* Light mode is intentionally the inverse: white pages and surfaces, dark readable text. */
+:root[data-theme="light"] .customer-shell{--theme-bg:#fff;--theme-surface:#fff;--theme-line:#e5e7eb;--theme-text:#17231f;--theme-muted:#667085;--surface:#fff;--card:#fff;--border:#e5e7eb;--text:#17231f;--muted:#667085;background:#fff;color:#17231f}
+:root[data-theme="light"] .customer-shell .customer-sticky-discovery{background:var(--kh-accent-red);color:#fff}
+:root[data-theme="light"] .customer-shell .customer-area-label,:root[data-theme="light"] .customer-shell .customer-area-arrow{background:#fff;color:#17231f}
+:root[data-theme="light"] .customer-shell .customer-category-art{background:#f7f8f8;color:#17231f}
+:root[data-theme="light"] .customer-shell .customer-category-tile.selected .customer-category-art{background:#e7f5ec;color:var(--kh-accent-green)}
+:root[data-theme="light"] .customer-shell .customer-bottom-nav{background:#f5f5f5;color:#6b7280}
+:root[data-theme="light"] .customer-shell .customer-bottom-nav button.active{color:var(--kh-accent-red)}
+:root[data-theme="light"] .customer-shell .order-card-total-row,:root[data-theme="light"] .customer-shell .order-card-total-row strong{color:var(--kh-accent-red)}
+/* Keep system mode synchronized after OS theme changes. */
+@media(prefers-reduced-motion:reduce){.customer-shell *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+/* Modal content is mounted at body level, so theme it independently of .customer-shell. */
+:root[data-theme="dark"] .customer-account-home,:root[data-theme="dark"] .customer-account-menu-row,:root[data-theme="dark"] .customer-account-area,:root[data-theme="dark"] .customer-account-footer,:root[data-theme="dark"] .customer-area-picker,:root[data-theme="dark"] .customer-area-picker .customer-area-option{background:#090909!important;color:#fff!important;border-color:#282828}
+:root[data-theme="dark"] .customer-account-menu-row b,:root[data-theme="dark"] .customer-account-menu-row small,:root[data-theme="dark"] .customer-account-menu-chevron,:root[data-theme="dark"] .customer-account-area b,:root[data-theme="dark"] .customer-account-area small{color:#fff!important}
+:root[data-theme="dark"] .customer-account-menu-icon{background:#16080c!important;color:#ff456f!important}
+:root[data-theme="dark"] .customer-account-area{border:1.5px solid var(--kh-accent-gold)!important}
+:root[data-theme="light"] .customer-account-home,:root[data-theme="light"] .customer-account-menu-row,:root[data-theme="light"] .customer-account-area,:root[data-theme="light"] .customer-area-picker .customer-area-option{background:#fff;color:#17231f}
+:root[data-theme="light"] .customer-account-menu-row b,:root[data-theme="light"] .customer-account-menu-chevron{color:#17231f}
