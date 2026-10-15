@@ -67,7 +67,7 @@ export function createCatalog(app) {
         all: load,
         serializeService(x, locale, { full = false } = {}) {
             const c = load().byCategory.get(x.category_id);
-            const out = { id: x.id, slug: x.slug, categoryId: x.category_id, categorySlug: c?.slug, name: tr(x.name_i18n, locale), description: tr(x.description_i18n, locale), icon: x.icon,
+            const out = { id: x.id, slug: x.slug, categoryId: x.category_id, categorySlug: c?.slug, createdAt: x.created_at || undefined, updatedAt: x.updated_at || undefined, name: tr(x.name_i18n, locale), description: tr(x.description_i18n, locale), icon: x.icon,
                 pricingType: x.pricing_type, basePrice: x.pricing_type === 'FIXED' && (x.uses_category_default === 1 || (x.base_price == null && c?.default_pricing_type === 'FIXED')) ? (c?.default_base_price ?? null) : x.base_price, currency: app.settings.get('platform.currency'), defaultPriority: x.default_priority, deliveryProofType: x.delivery_proof_type, requiresInspection: !!x.requires_inspection, requiresVehicle: !!x.requires_vehicle, supportsWaiting: !!x.supports_waiting, seasonalEnabled: !!x.seasonal_enabled, seasonStartAt: x.season_start_at, seasonEndAt: x.season_end_at, isActive: !!x.is_active };
             if (full) {
                 const fields = parseJson(x.form_schema, []) ?? [];

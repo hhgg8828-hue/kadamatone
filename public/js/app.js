@@ -1685,10 +1685,11 @@ function renderCustomer() {
     } return out.join(' ← '); };
     const selectableAreas = state.areas.filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').slice().sort((a, b) => areaPath(a).localeCompare(areaPath(b), 'ar'));
     const customerCategories = customerMainCategories(state.cats);
-    const activeTemporaryService = (state.temporaryServices || []).find((x) => { const now = Date.now(), start = Date.parse(String(x.startAt || '')), end = Date.parse(String(x.endAt || '')); return x.isActive !== false && (!Number.isFinite(start) || start <= now) && (!Number.isFinite(end) || end > now); });
-    const tickerText = activeTemporaryService ? `${String(activeTemporaryService.title || activeTemporaryService.name || 'خدمة مؤقتة')}${activeTemporaryService.description ? ' — ' + String(activeTemporaryService.description) : ''}` : (String(state.config?.newsTicker || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.').trim() || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.');
+    const activeTemporaryService = (state.temporaryServices || []).filter((x) => { const now = Date.now(), start = Date.parse(String(x.startAt || '')), end = Date.parse(String(x.endAt || '')); return x.isActive === true && Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now; }).sort((a, b) => (Number(b.priority || 0) - Number(a.priority || 0)) || ((Date.parse(String(a.endAt)) - Date.parse(String(b.endAt)))))[0];
+    const temporaryTitle = activeTemporaryService ? String(activeTemporaryService.title || activeTemporaryService.name || 'العرض المؤقت').trim() : ' ';
+    const tickerText = activeTemporaryService ? `اضغط هنا لعرض ${temporaryTitle}` : (String(state.config?.newsTicker || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.').trim() || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.');
     shell(`<div class="customer-sticky-discovery">
-  <div class="khadamat-news-ticker reference-news-ticker" role="${activeTemporaryService ? 'button' : 'status'}" ${activeTemporaryService ? `data-temp-id="${esc(activeTemporaryService.id)}" tabindex="0" aria-label="فتح الخدمة المؤقتة: ${esc(activeTemporaryService.title || activeTemporaryService.name || 'خدمة مؤقتة')}"` : 'aria-label="آخر الأخبار والعروض"'}><span class="news-ticker-label">آخر الأخبار</span><div class="news-ticker-window"><div class="news-ticker-track"><span>${esc(tickerText)}</span><span aria-hidden="true">${esc(tickerText)}</span></div></div></div>
+  <div class="khadamat-news-ticker reference-news-ticker ${activeTemporaryService ? 'temporary-offer-ticker' : ''}" role="${activeTemporaryService ? 'button' : 'status'}" ${activeTemporaryService ? `data-temp-id="${esc(activeTemporaryService.id)}" tabindex="0" aria-label="اضغط هنا لعرض ${esc(temporaryTitle)}"` : 'aria-label="آخر الأخبار والعروض"'}><span class="news-ticker-label">${activeTemporaryService ? 'عرض مؤقت' : 'آخر الأخبار'}</span><div class="news-ticker-window"><div class="news-ticker-track"><span>${esc(tickerText)}</span><span aria-hidden="true">${esc(tickerText)}</span></div></div>${activeTemporaryService ? '<span class="temporary-offer-arrow" aria-hidden="true">←</span>' : ''}</div>
   <section class="quick-assist-reference" aria-label="الوصول السريع"><div class="quick-assist-reference-head"><span class="quick-assist-reference-icon">✦</span><div><b>الوصول السريع</b><small>تحدث أو اكتب ما تحتاجه وسنساعدك في الوصول إلى الخدمة.</small></div></div><form id="quickAssistForm" class="quick-assist-card" autocomplete="off"><div class="quick-assist-input-row"><textarea id="quickAssistText" maxlength="500" rows="1" aria-label="اكتب ما تحتاجه" placeholder="مثال: أريد واحد يشتري لي بيبسي ويوصله للبيت"></textarea><button class="btn quick-assist-voice" id="quickAssistVoice" type="button" aria-label="التحدث لكتابة الطلب">🎤</button><button class="btn quick-assist-send" type="submit" aria-label="بحث">←</button></div><div id="quickAssistStatus" class="quick-assist-status" role="status" aria-live="polite"></div><div id="quickAssistResults" class="quick-assist-results" aria-live="polite"></div></form></section>
   <section class="customer-category-showcase customer-category-showcase-top" aria-label="التصنيفات"><div class="section-heading customer-category-heading"><h2>التصنيفات</h2></div><div class="customer-category-rail" id="cats"><button type="button" class="customer-category-tile all-categories-tile" id="allCategoriesBtn" aria-label="كل التصنيفات"><span class="all-categories-check" aria-hidden="true">✓</span><b>كل التصنيفات</b></button>${customerCategories.map((c) => `<button class="customer-category-tile" data-cat="${esc(c.slug)}" type="button"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join('')}</div></section>
   </div>
@@ -1850,42 +1851,82 @@ function renderCustomer() {
         openServiceDetails(id);
         return;
     } openOrderForm(id); }));
+    const serviceFavoritesKey = () => `khadamat.favoriteServices.v1:${state.user?.id || 'guest'}`;
     const serviceFavorites = () => { try {
-        return JSON.parse(localStorage.getItem('khadamat.favoriteServices.v1') || '[]');
+        const scoped = localStorage.getItem(serviceFavoritesKey());
+        if (scoped !== null)
+            return JSON.parse(scoped); /* Migrate the previous single-user key only for the same browser's guest view. */
+        if (!state.user) {
+            const legacy = localStorage.getItem('khadamat.favoriteServices.v1');
+            if (legacy !== null) {
+                localStorage.setItem(serviceFavoritesKey(), legacy);
+                return JSON.parse(legacy);
+            }
+        }
+        return [];
     }
     catch {
         return [];
     } };
+    const saveServiceFavorites = (ids) => localStorage.setItem(serviceFavoritesKey(), JSON.stringify([...new Set(ids)]));
     document.querySelectorAll('[data-service-favorite]').forEach(x => { const id = x.dataset.serviceFavorite || ''; if (serviceFavorites().includes(id)) {
         x.textContent = '♥';
         x.setAttribute('aria-pressed', 'true');
+        x.setAttribute('aria-label', 'إزالة من المفضلة');
     }
-    else
-        x.setAttribute('aria-pressed', 'false'); x.addEventListener('click', e => { e.stopPropagation(); const fav = serviceFavorites(); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; localStorage.setItem('khadamat.favoriteServices.v1', JSON.stringify(next)); x.textContent = next.includes(id) ? '♥' : '♡'; x.setAttribute('aria-pressed', next.includes(id) ? 'true' : 'false'); if (document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'favorite')
+    else {
+        x.setAttribute('aria-pressed', 'false');
+        x.setAttribute('aria-label', 'إضافة إلى المفضلة');
+    } x.addEventListener('click', e => { e.stopPropagation(); const fav = serviceFavorites(); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; saveServiceFavorites(next); x.textContent = next.includes(id) ? '♥' : '♡'; x.setAttribute('aria-pressed', next.includes(id) ? 'true' : 'false'); x.setAttribute('aria-label', next.includes(id) ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'); if (document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'favorite')
         applyServiceFilter('favorite'); }); });
-    function applyServiceFilter(key) { document.querySelectorAll('[data-service-filter]').forEach(b => b.classList.toggle('active', b.dataset.serviceFilter === key)); const fav = serviceFavorites(); const list = document.getElementById('customerServiceList'); const cards = Array.from(document.querySelectorAll('[data-service-card]')); const loc = (() => { try {
-        return JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
-    }
-    catch {
-        return null;
-    } })(); const hasLoc = Number.isFinite(Number(loc?.lat)) && Number.isFinite(Number(loc?.lng)); const distance = (card) => { const sv = state.services.find((v) => v.id === card.dataset.serviceCard); const lat = Number(sv?.latitude ?? sv?.lat ?? sv?.location?.lat), lng = Number(sv?.longitude ?? sv?.lng ?? sv?.location?.lng); if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
-        return Infinity; const r = (x) => x * Math.PI / 180; const a = Math.sin(r(lat - Number(loc.lat)) / 2) ** 2 + Math.cos(r(Number(loc.lat))) * Math.cos(r(lat)) * Math.sin(r(lng - Number(loc.lng)) / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); }; cards.forEach(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && created <= Date.now() && Date.now() - created < 30 * 86400000; const d = key === 'nearby' && hasLoc ? distance(card) : Infinity; const show = key === 'all' || (key === 'nearby' && hasLoc && Number.isFinite(d)) || (key === 'new' && isNew) || (key === 'favorite' && fav.includes(String(card.dataset.serviceCard || ''))); card.classList.toggle('hide-section', !show); if (key === 'nearby' && show)
-        card.dataset.distanceKm = String(d);
-    else
-        delete card.dataset.distanceKm; }); if (key === 'nearby' && list)
-        cards.sort((a, b) => Number(a.dataset.distanceKm ?? Infinity) - Number(b.dataset.distanceKm ?? Infinity)).forEach(c => list.appendChild(c));
-    else if (key === 'new' && list)
-        cards.sort((a, b) => (Date.parse(b.dataset.serviceCreated || '') || 0) - (Date.parse(a.dataset.serviceCreated || '') || 0)).forEach(c => list.appendChild(c)); let empty = list?.querySelector('[data-service-filter-empty]'); const visible = cards.some(c => !c.classList.contains('hide-section')); if (!visible && list) {
-        if (!empty) {
-            empty = document.createElement('div');
-            empty.dataset.serviceFilterEmpty = '1';
-            empty.className = 'card empty service-filter-empty';
-            list.appendChild(empty);
+    function validCoordinates(latValue, lngValue) { if (latValue === null || latValue === undefined || lngValue === null || lngValue === undefined || String(latValue).trim() === '' || String(lngValue).trim() === '')
+        return null; const lat = Number(latValue), lng = Number(lngValue); return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null; }
+    function applyServiceFilter(key) {
+        const validKeys = ['all', 'nearby', 'new', 'favorite'];
+        if (!validKeys.includes(key))
+            key = 'all';
+        document.querySelectorAll('[data-service-filter]').forEach(b => { const active = b.dataset.serviceFilter === key; b.classList.toggle('active', active); b.setAttribute('aria-pressed', active ? 'true' : 'false'); });
+        const fav = new Set(serviceFavorites());
+        const list = document.getElementById('customerServiceList');
+        if (!list)
+            return;
+        const cards = Array.from(list.querySelectorAll('[data-service-card]'));
+        const loc = (() => { try {
+            const x = JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
+            return validCoordinates(x?.lat, x?.lng);
         }
-        empty.textContent = key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على رمز القلب بجانب أي خدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات جديدة متاحة حاليًا.' : key === 'nearby' && !hasLoc ? 'حدد موقعك أو اختر عنوانًا محفوظًا لعرض الخدمات الأقرب.' : 'لا تتوفر إحداثيات موثوقة للخدمات القريبة حاليًا.';
+        catch {
+            return null;
+        } })();
+        const distance = (card) => { const sv = state.services.find((v) => String(v.id) === String(card.dataset.serviceCard)); const point = validCoordinates(sv?.latitude ?? sv?.lat ?? sv?.location?.lat, sv?.longitude ?? sv?.lng ?? sv?.location?.lng); if (!loc || !point)
+            return Infinity; const r = (x) => x * Math.PI / 180; const dLat = r(point.lat - loc.lat), dLng = r(point.lng - loc.lng); const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(loc.lat)) * Math.cos(r(point.lat)) * Math.sin(dLng / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a))); };
+        const now = Date.now(), newWindow = 30 * 86400000;
+        const ranked = cards.map(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && created <= now && now - created < newWindow; const d = key === 'nearby' ? distance(card) : Infinity; const id = String(card.dataset.serviceCard || ''); const show = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d)); return { card, show, d, created: Number.isFinite(created) ? created : 0 }; });
+        if (key === 'nearby')
+            ranked.sort((a, b) => a.d - b.d || a.card.dataset.serviceCard.localeCompare(b.card.dataset.serviceCard));
+        else if (key === 'new')
+            ranked.sort((a, b) => b.created - a.created || a.card.dataset.serviceCard.localeCompare(b.card.dataset.serviceCard));
+        else
+            ranked.sort((a, b) => Number(a.card.dataset.serviceIndex || 0) - Number(b.card.dataset.serviceIndex || 0));
+        ranked.forEach(({ card, show, d }) => { card.classList.toggle('hide-section', !show); if (key === 'nearby' && show)
+            card.dataset.distanceKm = String(d);
+        else
+            delete card.dataset.distanceKm; list.appendChild(card); });
+        let empty = list.querySelector('[data-service-filter-empty]');
+        const visible = ranked.some(x => x.show);
+        if (!visible) {
+            if (!empty) {
+                empty = document.createElement('div');
+                empty.dataset.serviceFilterEmpty = '1';
+                empty.className = 'card empty service-filter-empty';
+                empty.setAttribute('role', 'status');
+                list.appendChild(empty);
+            }
+            empty.textContent = key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.';
+        }
+        else
+            empty?.remove();
     }
-    else
-        empty?.remove(); }
     document.querySelectorAll('[data-service-filter]').forEach(x => x.addEventListener('click', () => applyServiceFilter(x.dataset.serviceFilter || 'all')));
     document.getElementById('customerCitySelect')?.addEventListener('change', async () => { const id = document.getElementById('customerCitySelect').value; state.selectedAreaId = id; try {
         if (id)

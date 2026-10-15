@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.62.0",
-  "description": "تحسين بصري للواجهة الرئيسية وحالة العمل",
+  "version": "2.64.0",
+  "description": "تحسين واجهة التصنيفات وشريط العروض المؤقتة",
   "private": true,
   "type": "module",
   "engines": {

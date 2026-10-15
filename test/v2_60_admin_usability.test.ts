@@ -33,9 +33,10 @@ test('توصيات تأكيد الطلب تظهر كبطاقات أفقية مص
 });
 
 test('الفلاتر تعتمد على المفضلة والتاريخ والمسافة الحقيقية', () => {
-  assert.match(app, /fav\.includes\(String\(card\.dataset\.serviceCard\|\|''\)\)/);
-  assert.match(app, /Date\.parse\(b\.dataset\.serviceCreated\|\|''\)/);
-  assert.match(app, /Number\(a\.dataset\.distanceKm\?\?Infinity\)-Number\(b\.dataset\.distanceKm\?\?Infinity\)/);
+  assert.match(app, /key==='favorite'&&fav\.has\(id\)/);
+  assert.match(app, /key==='new'&&isNew/);
+  assert.match(app, /key==='nearby'&&Number\.isFinite\(d\)/);
+  assert.match(app, /data-service-created="\$\{esc\(sv\.createdAt\|\|''\)\}"/);
 });
 
 test('إشعارات الخلفية مدعومة عبر Push في Service Worker', () => {

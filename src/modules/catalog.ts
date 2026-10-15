@@ -45,7 +45,7 @@ export function validateFormData(fields: FormField[], data: unknown): Record<str
 }
 
 export interface CatalogSnapshot { categories: CategoryRow[]; services: ServiceRow[]; areas: ServiceAreaRow[]; byService: Map<string, ServiceRow>; byCategory: Map<string, CategoryRow> }
-export interface ServiceOut { id: string; slug: string; categoryId: string; categorySlug: string | undefined; name: string; description: string; icon: string | null; pricingType: PricingType; basePrice: number | null; currency: string; defaultPriority: Priority; formSchema?: unknown; requiresInspection?: boolean; requiresVehicle?: boolean; supportsWaiting?: boolean; deliveryProofType?: string; seasonalEnabled?: boolean; seasonStartAt?: string | null; seasonEndAt?: string | null; isActive?: boolean; nameI18n?: unknown; descriptionI18n?: unknown }
+export interface ServiceOut { id: string; slug: string; categoryId: string; categorySlug: string | undefined; createdAt?: string; updatedAt?: string; name: string; description: string; icon: string | null; pricingType: PricingType; basePrice: number | null; currency: string; defaultPriority: Priority; formSchema?: unknown; requiresInspection?: boolean; requiresVehicle?: boolean; supportsWaiting?: boolean; deliveryProofType?: string; seasonalEnabled?: boolean; seasonStartAt?: string | null; seasonEndAt?: string | null; isActive?: boolean; nameI18n?: unknown; descriptionI18n?: unknown }
 export interface CategoryOut { id: string; slug: string; parentId: string | null; name: string; description: string; icon: string | null; moduleType: string; sortOrder: number; defaultPricingType?: string; defaultBasePrice?: number | null; services?: ServiceOut[]; isActive?: boolean; nameI18n?: unknown; descriptionI18n?: unknown; keywords?: unknown; children?: CategoryOut[] }
 export interface AreaOut { id: string; parentId: string | null; name: string; type: string; localityType: string; centerLat: number; centerLng: number; radiusKm: number; isActive?: boolean; nameI18n?: unknown }
 
@@ -91,7 +91,7 @@ export function createCatalog(app: App): Catalog {
     all: load,
     serializeService(x, locale, { full = false } = {}) {
       const c = load().byCategory.get(x.category_id);
-      const out: ServiceOut = { id: x.id, slug: x.slug, categoryId: x.category_id, categorySlug: c?.slug, name: tr(x.name_i18n, locale), description: tr(x.description_i18n, locale), icon: x.icon,
+      const out: ServiceOut = { id: x.id, slug: x.slug, categoryId: x.category_id, categorySlug: c?.slug, createdAt: (x as any).created_at || undefined, updatedAt: (x as any).updated_at || undefined, name: tr(x.name_i18n, locale), description: tr(x.description_i18n, locale), icon: x.icon,
         pricingType: x.pricing_type, basePrice: x.pricing_type === 'FIXED' && (x.uses_category_default === 1 || (x.base_price == null && (c as any)?.default_pricing_type === 'FIXED')) ? ((c as any)?.default_base_price ?? null) : x.base_price, currency: app.settings.get<string>('platform.currency'), defaultPriority: x.default_priority, deliveryProofType: x.delivery_proof_type, requiresInspection: !!x.requires_inspection, requiresVehicle: !!x.requires_vehicle, supportsWaiting: !!x.supports_waiting, seasonalEnabled: !!x.seasonal_enabled, seasonStartAt: x.season_start_at, seasonEndAt: x.season_end_at, isActive: !!x.is_active };
       if (full) {
         const fields = parseJson<FormField[]>(x.form_schema, []) ?? [];
