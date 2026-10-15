@@ -1859,3 +1859,27 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="dark"] .service-editor-modal .service-editor-section{background:var(--theme-surface);border-color:var(--theme-line)}
 @media(max-width:520px){.order-card-premium{padding:15px!important}.order-card-service-icon{width:64px!important;height:64px!important;flex-basis:64px!important}.order-card-title>b{font-size:16px!important}.order-card-total-row strong{font-size:19px}.tracking-reference-code-row h2{font-size:21px!important}}
 .order-card-premium .order-progress{display:none!important}
+
+/* v2.62 — softened reference-inspired corners and live business status badge */
+.customer-shell .app-topbar{border-radius:0 0 24px 24px;overflow:visible}
+.customer-shell .brand-lockup>span:last-child{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.customer-shell .business-open-badge{display:inline-flex;align-items:center;gap:5px;width:max-content;max-width:100%;padding:3px 12px 4px 10px;border-radius:2px 999px 999px 2px;background:linear-gradient(135deg,#e8f8ed,#d6f2df);color:#167344;font-size:11px;font-weight:900;line-height:1.25;box-shadow:0 2px 7px rgba(18,105,61,.09)}
+.customer-shell .business-open-badge::before{content:"";width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:#22a45b;box-shadow:0 0 0 3px rgba(34,164,91,.13)}
+.customer-shell .business-open-badge.is-closed{background:linear-gradient(135deg,#fff0ed,#ffe1dc);color:#b42335;box-shadow:0 2px 7px rgba(180,35,53,.08)}
+.customer-shell .business-open-badge.is-closed::before{background:#d92d45;box-shadow:0 0 0 3px rgba(217,45,69,.12)}
+.customer-shell .customer-category-showcase-top .customer-category-tile,
+.customer-shell .customer-category-showcase-top .all-categories-tile{border-radius:18px 18px 22px 22px;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.customer-shell .customer-category-showcase-top .customer-category-art{border-radius:16px;width:48px;height:48px;flex-basis:48px;background:linear-gradient(145deg,#f0f8f3,#e1f0e7);box-shadow:inset 0 0 0 1px rgba(23,107,77,.04)}
+.customer-shell .customer-category-showcase-top .all-categories-tile{position:relative;border:1px solid #dcebe1;background:linear-gradient(145deg,#ffffff,#f0f8f3);box-shadow:0 4px 12px rgba(23,107,77,.08)}
+.customer-shell .customer-category-showcase-top .all-categories-check{width:34px;height:34px;border-radius:13px 13px 17px 17px;background:linear-gradient(145deg,#e5f5eb,#cfead9);color:#176b4d;font-size:21px;box-shadow:inset 0 0 0 1px rgba(23,107,77,.08)}
+.customer-shell .customer-category-showcase-top .customer-category-tile:active,
+.customer-shell .customer-category-showcase-top .all-categories-tile:active{transform:scale(.96)}
+.customer-shell .customer-category-showcase-top .customer-category-tile b,
+.customer-shell .customer-category-showcase-top .all-categories-tile b{font-size:10px;line-height:1.35;font-weight:800}
+.customer-shell .campaign-card{border-radius:24px;overflow:hidden}
+.customer-shell .campaign-card .campaign-image-wrap,.customer-shell .campaign-card .campaign-image{border-radius:24px}
+.customer-shell .all-offers-button{width:auto;min-width:70px;min-height:36px;padding:8px 13px;border:1px solid rgba(23,107,77,.2);border-radius:999px 999px 999px 5px;background:linear-gradient(135deg,#176b4d,#25885f)!important;color:#fff!important;font-size:11px;font-weight:900;box-shadow:0 5px 13px rgba(23,107,77,.2)!important;backdrop-filter:blur(5px)}
+.customer-shell .all-offers-button:active{transform:translateY(-50%) scale(.96)}
+.customer-shell .khadamat-news-ticker{border-radius:3px 22px 22px 3px;box-shadow:0 4px 14px rgba(23,107,77,.07)}
+@media(max-width:420px){.customer-shell .business-open-badge{font-size:10px;padding:3px 9px}.customer-shell .customer-category-showcase-top .customer-category-art{width:44px;height:44px;flex-basis:44px}.customer-shell .all-offers-button{min-width:65px;padding:7px 10px;font-size:10px}}
+@media(prefers-color-scheme:dark){.customer-shell .business-open-badge{background:linear-gradient(135deg,#123c2b,#174b34);color:#b8f0c8}.customer-shell .business-open-badge.is-closed{background:linear-gradient(135deg,#4a2025,#5b252c);color:#ffc4c7}.customer-shell .customer-category-showcase-top .all-categories-tile{background:linear-gradient(145deg,var(--surface,#202522),var(--card,#252d28));border-color:var(--border,#3c4941)}.customer-shell .customer-category-showcase-top .all-categories-check{background:#234c38;color:#c5f3d4}}

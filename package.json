@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.61.0",
-  "description": "تحسين صفحات الطلبات والمظهر وتسهيل إدارة الخدمات",
+  "version": "2.62.0",
+  "description": "تحسين بصري للواجهة الرئيسية وحالة العمل",
   "private": true,
   "type": "module",
   "engines": {

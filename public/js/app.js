@@ -676,14 +676,43 @@ function applyBrandConfig() { const name = String(state.config?.appName || 'خد
     const symbol = String(state.config?.appSymbol || 'خ').trim() || 'خ';
     mark.textContent = symbol.slice(0, 8);
 } document.title = `${name} | ${page === 'customer' ? 'العميل' : page === 'provider' ? 'مقدم الخدمة' : 'الإدارة'}`; }
-function shell(content, title = 'خدمات') { const home = state.user ? roleHome(state.user.role) : '/'; const brandName = esc(String(state.config?.appName || 'خدمات')); const brandTagline = page === 'customer' ? customerAreaMarkup() : esc(String(state.config?.appTagline || 'كل خدمة تحتاجها في مكان واحد')); const symbol = String(state.config?.appSymbol || 'خ'); root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''} ${page === 'customer' ? 'customer-shell' : ''} ${page === 'provider' ? 'provider-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="${brandName}"><span class="brand-mark" aria-hidden="true">${symbol === 'خ' ? '<svg viewBox="0 0 40 40"><path d="M8 12h11a5 5 0 0 1 0 10h-2a5 5 0 0 0 0 10h7M32 8v7a5 5 0 0 1-5 5h-2a5 5 0 0 0 0 10h7"/><circle cx="8" cy="12" r="3"/><circle cx="32" cy="8" r="3"/><circle cx="24" cy="32" r="3"/></svg>' : esc(symbol)}</span><span><strong>${brandName}</strong><small>${brandTagline}</small></span></a>${page === 'customer' ? '<button class="customer-area-arrow" id="customerAreaToggle" type="button" aria-label="تغيير المنطقة">⌄</button><button class="customer-header-icon" id="customerSearchToggle" type="button" aria-label="البحث عن خدمة">⌕</button>' : ''}<div class="row top-actions">${page === 'customer' ? '<a class="btn secondary small customer-contact-top-btn" href="tel:+967778100022" aria-label="التواصل مع فريق خدمات" title="التواصل مع فريق خدمات">☎</a>' : ''}${state.user ? `<button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button" aria-label="الإشعارات">🔔 <span id="notificationCount"></span></button>${page !== 'customer' ? '<button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>' : ''}<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button>${page !== 'customer' ? '<button class="btn secondary small logout-btn" id="logout">خروج</button>' : ''}` : (page === 'customer' ? '<button class="btn small" id="guestLoginBtn" type="button">دخول</button>' : '')}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('customerAreaToggle')?.addEventListener('click', openCustomerAreaPicker); document.getElementById('customerSearchToggle')?.addEventListener('click', () => { const searchBox = document.querySelector('.manual-service-fallback'); if (searchBox) {
+function customerBusinessOpenStatus() {
+    const cfg = state.config || {};
+    const read = (keys, fallback) => { for (const k of keys) {
+        const v = cfg[k];
+        if (typeof v === 'string' && /^\d{1,2}:\d{2}$/.test(v.trim()))
+            return v.trim();
+    } return fallback; };
+    const start = read(['businessOpenTime', 'openingTime', 'openTime', 'workingHoursStart'], '08:00');
+    const end = read(['businessCloseTime', 'closingTime', 'closeTime', 'workingHoursEnd'], '22:00');
+    const toMin = (v) => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
+    let now = new Date();
+    const tz = String(cfg.timezone || cfg.timeZone || 'Asia/Aden');
+    try {
+        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+        const h = Number(parts.find(x => x.type === 'hour')?.value || 0), m = Number(parts.find(x => x.type === 'minute')?.value || 0);
+        now = new Date(2000, 0, 1, h, m);
+    }
+    catch { }
+    const current = now.getHours() * 60 + now.getMinutes(), a = toMin(start), b = toMin(end);
+    const open = a === b ? true : (a < b ? current >= a && current < b : current >= a || current < b);
+    return { open, start, end, text: open ? 'مفتوح' : 'مغلق' };
+}
+let customerBusinessBadgeTimer;
+function refreshCustomerBusinessBadge() { const el = document.getElementById('businessOpenBadge'); if (!el)
+    return; const status = customerBusinessOpenStatus(); el.textContent = status.text; el.classList.toggle('is-closed', !status.open); el.setAttribute('aria-label', `حالة العمل: ${status.text}، ساعات العمل ${status.start} إلى ${status.end}`); }
+function shell(content, title = 'خدمات') { const home = state.user ? roleHome(state.user.role) : '/'; const brandName = esc(String(state.config?.appName || 'خدمات')); const brandTagline = page === 'customer' ? customerAreaMarkup() : esc(String(state.config?.appTagline || 'كل خدمة تحتاجها في مكان واحد')); const symbol = String(state.config?.appSymbol || 'خ'); root.innerHTML = `<main class="shell ${page === 'admin' ? 'admin-page admin-shell' : ''} ${page === 'customer' ? 'customer-shell' : ''} ${page === 'provider' ? 'provider-shell' : ''}"><div class="top app-topbar"><a class="brand brand-lockup" href="${home}" aria-label="${brandName}"><span class="brand-mark" aria-hidden="true">${symbol === 'خ' ? '<svg viewBox="0 0 40 40"><path d="M8 12h11a5 5 0 0 1 0 10h-2a5 5 0 0 0 0 10h7M32 8v7a5 5 0 0 1-5 5h-2a5 5 0 0 0 0 10h7"/><circle cx="8" cy="12" r="3"/><circle cx="32" cy="8" r="3"/><circle cx="24" cy="32" r="3"/></svg>' : esc(symbol)}</span><span><strong>${brandName}</strong><small>${brandTagline}</small>${page === 'customer' ? '<span class="business-open-badge" id="businessOpenBadge" aria-live="polite"></span>' : ''}</span></a>${page === 'customer' ? '<button class="customer-area-arrow" id="customerAreaToggle" type="button" aria-label="تغيير المنطقة">⌄</button><button class="customer-header-icon" id="customerSearchToggle" type="button" aria-label="البحث عن خدمة">⌕</button>' : ''}<div class="row top-actions">${page === 'customer' ? '<a class="btn secondary small customer-contact-top-btn" href="tel:+967778100022" aria-label="التواصل مع فريق خدمات" title="التواصل مع فريق خدمات">☎</a>' : ''}${state.user ? `<button class="btn secondary small notification-top-btn" id="notificationsBtn" type="button" aria-label="الإشعارات">🔔 <span id="notificationCount"></span></button>${page !== 'customer' ? '<button class="btn secondary small about-btn" id="aboutBtn" type="button">حول التطبيق</button>' : ''}<button class="btn secondary small account-btn" id="accountBtn" type="button">حسابي</button>${page !== 'customer' ? '<button class="btn secondary small logout-btn" id="logout">خروج</button>' : ''}` : (page === 'customer' ? '<button class="btn small" id="guestLoginBtn" type="button">دخول</button>' : '')}</div></div>${content}</main>`; document.getElementById('aboutBtn')?.addEventListener('click', openAbout); document.getElementById('customerAreaToggle')?.addEventListener('click', openCustomerAreaPicker); document.getElementById('customerSearchToggle')?.addEventListener('click', () => { const searchBox = document.querySelector('.manual-service-fallback'); if (searchBox) {
     searchBox.classList.toggle('is-visible');
     if (searchBox.classList.contains('is-visible')) {
         document.getElementById('search')?.focus();
         searchBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 } }); document.getElementById('guestLoginBtn')?.addEventListener('click', () => authBox('CUSTOMER')); document.getElementById('logout')?.addEventListener('click', logout); document.getElementById('notificationsBtn')?.addEventListener('click', openNotifications); document.getElementById('accountBtn')?.addEventListener('click', openAccount); if (state.user)
-    refreshNotificationBadge().catch(() => { }); applyFieldPlaceholders(root); applyBrandConfig(); }
+    refreshNotificationBadge().catch(() => { }); applyFieldPlaceholders(root); applyBrandConfig(); if (page === 'customer') {
+    refreshCustomerBusinessBadge();
+    if (customerBusinessBadgeTimer === undefined)
+        customerBusinessBadgeTimer = window.setInterval(refreshCustomerBusinessBadge, 60000);
+} }
 async function openAccount() {
     if (!state.user) {
         authBox('CUSTOMER');
