@@ -23,10 +23,10 @@ test('Offer imagery is compact and release asset cache versions match current re
   assert.ok(css.includes('.customer-shell .campaign-card .campaign-image{aspect-ratio:16/9;object-fit:cover}') || css.includes('.customer-shell .campaign-card .campaign-image{height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:10px;grid-row:auto}'));
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.38'), file);
-    assert.ok(html.includes('app.css?v=2.38'), file);
+    assert.ok(html.includes('app.js?v=2.58'), file);
+    assert.ok(html.includes('app.css?v=2.58'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-38'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-58'));
 });
 
 test('Customer home follows the latest order: ticker, quick access, categories, offers, then services', () => {

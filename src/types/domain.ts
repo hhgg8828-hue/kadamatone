@@ -42,7 +42,7 @@ export interface CategoryRow {
 }
 export interface ServiceRow {
   id: string; category_id: string; slug: string; name_i18n: string; description_i18n: string | null; icon: string | null;
-  keywords: string; pricing_type: PricingType; base_price: number | null; form_schema: string; cancellation_policy_id: string | null;
+  keywords: string; pricing_type: PricingType; base_price: number | null; uses_category_default?: 0 | 1; form_schema: string; cancellation_policy_id: string | null;
   default_priority: Priority; delivery_proof_type: 'NONE' | 'PIN' | 'RECIPIENT_CONFIRMATION' | 'PHOTO'; seasonal_enabled: 0 | 1; season_start_at: string | null; season_end_at: string | null; requires_inspection: 0 | 1; requires_vehicle: 0 | 1; supports_waiting: 0 | 1; sort_order: number; is_active: 0 | 1; created_at: string; updated_at: string;
 }
 export type LocalityType = 'COUNTRY' | 'GOVERNORATE' | 'CITY' | 'DISTRICT' | 'DIRECTORATE' | 'ISOLATION' | 'VILLAGE' | 'NEIGHBORHOOD';

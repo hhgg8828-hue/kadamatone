@@ -15,6 +15,6 @@ test('confirmation invoice and summaries multiply unit price by selected quantit
 });
 test('server stores fixed-price snapshot multiplied by validated quantity', () => {
     assert.match(orders, /function quantityForPrice/);
-    assert.match(orders, /Number\(svc\.base_price\) \* quantityForPrice\(fields, formData\)/);
+    assert.match(orders, /Number\(effectiveUnitPrice\) \* quantityForPrice\(fields, formData\)/);
 });
 //# sourceMappingURL=v2_53_quantity_pricing.test.js.map

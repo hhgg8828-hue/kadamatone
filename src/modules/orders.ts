@@ -165,6 +165,11 @@ export function registerOrderRoutes(app: App, r: Router): void {
     if (!svc) throw E.notFound('الخدمة غير موجودة أو غير متاحة', 'SERVICE_NOT_FOUND');
     const fields = parseJson<FormField[]>(svc.form_schema, []) ?? [];
     const formData = validateFormData(fields, b.formData);
+    const serviceCategory: any = catalog.all().byCategory.get(svc.category_id);
+    const effectiveUnitPrice = svc.pricing_type === 'FIXED' && (svc.uses_category_default === 1 || svc.base_price == null) && serviceCategory?.default_pricing_type === 'FIXED' ? serviceCategory.default_base_price ?? null : svc.base_price;
+    if (svc.pricing_type === 'FIXED' && (effectiveUnitPrice === null || !Number.isFinite(Number(effectiveUnitPrice)) || Number(effectiveUnitPrice) < 0)) {
+      throw E.unprocessable('سعر هذه الخدمة غير محدد حاليًا. يرجى التواصل مع الإدارة قبل تأكيد الطلب.', 'SERVICE_PRICE_UNAVAILABLE');
+    }
     if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now()) throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
     const idemKey = readIdempotencyKey(ctx.req.headers['idempotency-key']);
 
@@ -263,7 +268,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
                 pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, code, ctx.user!.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id,
-        b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? Number(svc.base_price) * quantityForPrice(fields, formData) : null, app.settings.get<string>('platform.currency'),
+        b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? Number(effectiveUnitPrice) * quantityForPrice(fields, formData) : null, app.settings.get<string>('platform.currency'),
         b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName||null, b.recipientPhone||null, b.recipientUserId||null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', nowIso);
       db.run('INSERT INTO order_contact_confirmations(order_id,status,attempt_count,created_at,updated_at) VALUES(?,?,?,?,?)',id,'PENDING',0,nowIso,nowIso);

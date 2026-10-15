@@ -1743,3 +1743,18 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="dark"] .customer-shell .reference-news-ticker .news-ticker-track span{color:#99f6e4}
 :root[data-theme="dark"] .brand-lockup strong,:root[data-theme="dark"] .app-brand strong,:root[data-theme="dark"] .customer-shell .brand-lockup strong{color:#5eead4}
 :root[data-theme="dark"] .customer-shell .customer-category-showcase-top .customer-category-tile b{color:var(--theme-text)}
+
+/* V2.58: final polish for filters, temporary news actions, and form contrast. */
+.customer-shell .customer-service-filters button{font-size:15px;font-weight:800;min-height:43px;padding-inline:13px}
+.customer-shell .customer-category-showcase-top .customer-category-tile b{font-size:13px}
+.customer-shell .khadamat-news-ticker[data-temp-id]{cursor:pointer;box-shadow:0 2px 14px rgba(13,148,136,.14)}
+.customer-shell .khadamat-news-ticker[data-temp-id]:focus-visible{outline:3px solid #0d9488;outline-offset:3px}
+:root[data-theme="dark"] input::placeholder,:root[data-theme="dark"] textarea::placeholder{color:#b5c0d0;opacity:1}
+:root[data-theme="dark"] .appearance-choice-group label{color:var(--theme-text);border-color:var(--theme-line)}
+
+/* v2.59: checkout recommendations are real catalog categories/services, not placeholder stores. */
+.checkout-extra-services-title{margin:14px 0 8px;font-size:15px;color:var(--text,#18352d)}
+.checkout-category-tile{border:1px solid var(--border,#dce8e2);background:var(--surface,#fff);color:var(--text,#18352d);cursor:pointer;text-align:center;font:inherit}
+.checkout-category-tile small{display:block;margin-top:5px;color:var(--muted,#687b73);font-size:12px}
+.checkout-extra-service-list{display:grid;gap:6px}
+:root[data-theme="dark"] .checkout-category-tile{background:var(--surface,#202a26);color:var(--text,#f0f6f2);border-color:var(--border,#3d4c45)}
