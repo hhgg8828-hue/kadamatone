@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.59.0",
-  "description": "استكمال التسعير حسب التصنيف واقتراح الخدمات الفعلية",
+  "version": "2.61.0",
+  "description": "تحسين صفحات الطلبات والمظهر وتسهيل إدارة الخدمات",
   "private": true,
   "type": "module",
   "engines": {
