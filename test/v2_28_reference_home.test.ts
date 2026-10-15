@@ -48,10 +48,10 @@ test('V2.28 keeps the concise order confirmation and executes only after confirm
 test('V2.28 asset versions and service worker cache stay aligned', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.63'), file);
-    assert.ok(html.includes('app.css?v=2.63'), file);
+    assert.ok(html.includes('app.js?v=2.66.1'), file);
+    assert.ok(html.includes('app.css?v=2.66.1'), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-63'));
+  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-66-1'));
 });
 
 test('V2.28 account menu mirrors the reference account screen and routes each main section', () => {

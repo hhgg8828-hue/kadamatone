@@ -66,9 +66,9 @@ test('customer offer filters and favorites are interactive and saved locally', (
 });
 
 test('customer shell uses versioned 2.19 assets to refresh cached layout', () => {
-  assert.match(customerShell, /app\.css\?v=2\.38/);
-  assert.match(customerShell, /app\.js\?v=2\.38/);
-  assert.match(customerShell, /sw\.js\?v=2\.38/);
+  assert.match(customerShell, /app\.css\?v=2\.66\.1/);
+  assert.match(customerShell, /app\.js\?v=2\.66\.1/);
+  assert.match(customerShell, /sw\.js\?v=2\.66\.1/);
 });
 
 

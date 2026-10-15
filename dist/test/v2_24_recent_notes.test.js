@@ -33,7 +33,7 @@ test('2.24 campaign category actions are accepted by create/update API and savin
 test('2.24 assets use a new cache version and back navigation asks before leaving', () => {
     const sw = fs.readFileSync('public/sw.js', 'utf8');
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    assert.ok(sw.includes('khadamat-shell-v2-38'));
+    assert.ok(sw.includes('khadamat-shell-v2-66-1'));
     assert.ok(app.includes('هل ترغب في الخروج؟'));
 });
 //# sourceMappingURL=v2_24_recent_notes.test.js.map

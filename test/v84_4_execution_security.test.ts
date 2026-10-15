@@ -78,6 +78,6 @@ test('V84.4: مزامنة الطلبات المفتوحة لمقدم الخدم�
 });
 
 test('V84.4: واجهات PWA وذاكرة التخزين المؤقت تشير إلى الإصدار الحالي', () => {
-  for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.38'), file);
-  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-38'));
+  for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.66.1'), file);
+  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-66-1'));
 });

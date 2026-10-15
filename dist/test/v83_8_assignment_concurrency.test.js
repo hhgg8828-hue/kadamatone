@@ -52,8 +52,8 @@ test('V83.8: لا يمكن لمقدمين قبول الطلب نفسه بنجا�
 });
 test('V83.8: واجهات PWA وذاكرة التخزين المؤقت تحمل رقم الإصدار الحالي', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.38'), file);
+        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.66.1'), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-38'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-66-1'));
 });
 //# sourceMappingURL=v83_8_assignment_concurrency.test.js.map
