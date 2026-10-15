@@ -1986,17 +1986,17 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 .customer-shell .customer-area-names b{font-size:14px;line-height:1.35;color:var(--theme-text,#17231f)}
 .customer-shell .customer-area-arrow{min-width:42px;min-height:42px;border:1.5px solid var(--kh-accent-gold);border-radius:12px;background:var(--theme-surface,#fff);color:var(--theme-text,#17231f);font-size:22px}
 .customer-shell .customer-header-icon{color:var(--theme-text,#17231f);border:1px solid var(--theme-line,#e5e7eb);background:var(--theme-surface,#fff);min-width:42px;min-height:42px;border-radius:12px;font-size:25px}
-.customer-shell .brand-lockup strong{color:var(--kh-accent-red)}
-.customer-shell .brand-lockup .brand-mark{color:var(--kh-accent-red)}
+.customer-shell .brand-lockup strong{color:var(--primary,#176b4d)}
+.customer-shell .brand-lockup .brand-mark{color:var(--primary,#176b4d)}
 /* Account entry and account menu: deep black cards, white labels, red user icon. */
 .customer-shell .account-btn{background:#090909!important;border:1px solid #252525!important;color:#fff!important;border-radius:13px!important}
-.customer-shell .account-btn::before{content:"♙";display:inline-block;margin-inline-end:7px;color:var(--kh-accent-red);font-size:20px;vertical-align:-2px}
+.customer-shell .account-btn::before{content:"♙";display:inline-block;margin-inline-end:7px;color:var(--primary,#176b4d);font-size:20px;vertical-align:-2px}
 .customer-account-home{color:var(--theme-text)}
 .customer-account-menu-row{background:var(--theme-surface)!important;border-color:var(--theme-line)!important;color:var(--theme-text)!important}
 .customer-account-menu-row b,.customer-account-menu-row .customer-account-menu-chevron{color:var(--theme-text)!important}
-.customer-account-menu-icon{color:var(--kh-accent-red)!important;background:color-mix(in srgb,var(--kh-accent-red) 10%,var(--theme-surface))!important}
+.customer-account-menu-icon{color:var(--primary,#176b4d)!important;background:color-mix(in srgb,var(--kh-accent-red) 10%,var(--theme-surface))!important}
 .customer-account-area{border:1.5px solid var(--kh-accent-gold)!important;background:var(--theme-surface)!important;color:var(--theme-text)!important}
-.customer-account-area-pin{color:var(--kh-accent-red)!important}
+.customer-account-area-pin{color:var(--primary,#176b4d)!important}
 .customer-account-area-arrow{color:var(--theme-text)!important}
 /* Region selection: red map pin, gold outlined choice, readable selected state. */
 .customer-area-picker .customer-area-option{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:11px 13px;border:1.5px solid var(--kh-accent-gold);border-radius:13px;background:var(--theme-surface);color:var(--theme-text);text-align:right}
@@ -2014,10 +2014,10 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 .customer-shell.orders-view #ordersSection>.section-heading{justify-content:center;text-align:center;margin:12px 0 18px}
 .customer-shell.orders-view #ordersSection>.section-heading h2{font-size:25px;font-weight:900}
 .customer-shell.orders-view .order-card-premium{border:0!important;border-radius:25px!important;background:var(--theme-surface)!important;color:var(--theme-text)!important;box-shadow:0 7px 26px rgba(0,0,0,.06)!important}
-.customer-shell.orders-view .order-card-total-row{color:var(--kh-accent-red)}
-.customer-shell.orders-view .order-card-total-row strong{color:var(--kh-accent-red)}
+.customer-shell.orders-view .order-card-total-row{color:var(--primary,#176b4d)}
+.customer-shell.orders-view .order-card-total-row strong{color:var(--primary,#176b4d)}
 .customer-shell.orders-view .order-card-service-icon{background:var(--theme-bg)!important}
-.customer-shell.orders-view .order-card-delivery{background:#fce7ee;color:var(--kh-accent-red)}
+.customer-shell.orders-view .order-card-delivery{background:#fce7ee;color:var(--primary,#176b4d)}
 .customer-shell.orders-view .order-card-repeat{margin-top:13px!important}
 .customer-shell.orders-view .order-repeat-btn{background:#ffad3e!important;color:#fff!important;border:0!important}
 /* Category artwork stays line-drawn on a near-black tile; selection fills the icon accent. */
@@ -2030,7 +2030,7 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="dark"] .customer-shell input,:root[data-theme="dark"] .customer-shell textarea,:root[data-theme="dark"] .customer-shell select,:root[data-theme="dark"] .customer-shell .field input,:root[data-theme="dark"] .customer-shell .field select,:root[data-theme="dark"] .customer-shell .field textarea{background:#090909!important;color:#fff!important;border-color:#333!important}
 :root[data-theme="dark"] .customer-shell .customer-bottom-nav{background:#090909!important;border-color:#282828!important;color:#fff!important}
 :root[data-theme="dark"] .customer-shell .customer-bottom-nav button{color:#c7c7c7!important}
-:root[data-theme="dark"] .customer-shell .customer-bottom-nav button.active{color:var(--kh-accent-red)!important}
+:root[data-theme="dark"] .customer-shell .customer-bottom-nav button.active{color:var(--primary,#176b4d)!important}
 :root[data-theme="dark"] .customer-shell .customer-sticky-discovery{background:#090909!important;border-bottom:1px solid #282828;box-shadow:none}
 :root[data-theme="dark"] .customer-shell.orders-view .customer-sticky-discovery .section-tab{background:#101010;color:#fff;border:1px solid #292929}
 :root[data-theme="dark"] .customer-shell.orders-view .customer-sticky-discovery .section-tab.active{background:#c91445;color:#fff;border-color:#c91445}
@@ -2050,8 +2050,8 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="light"] .customer-shell .customer-category-art{background:#f7f8f8;color:#17231f}
 :root[data-theme="light"] .customer-shell .customer-category-tile.selected .customer-category-art{background:#e7f5ec;color:var(--kh-accent-green)}
 :root[data-theme="light"] .customer-shell .customer-bottom-nav{background:#f5f5f5;color:#6b7280}
-:root[data-theme="light"] .customer-shell .customer-bottom-nav button.active{color:var(--kh-accent-red)}
-:root[data-theme="light"] .customer-shell .order-card-total-row,:root[data-theme="light"] .customer-shell .order-card-total-row strong{color:var(--kh-accent-red)}
+:root[data-theme="light"] .customer-shell .customer-bottom-nav button.active{color:var(--primary,#176b4d)}
+:root[data-theme="light"] .customer-shell .order-card-total-row,:root[data-theme="light"] .customer-shell .order-card-total-row strong{color:var(--primary,#176b4d)}
 /* Keep system mode synchronized after OS theme changes. */
 @media(prefers-reduced-motion:reduce){.customer-shell *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 /* Modal content is mounted at body level, so theme it independently of .customer-shell. */
@@ -2062,22 +2062,6 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="light"] .customer-account-home,:root[data-theme="light"] .customer-account-menu-row,:root[data-theme="light"] .customer-account-area,:root[data-theme="light"] .customer-area-picker .customer-area-option{background:#fff;color:#17231f}
 :root[data-theme="light"] .customer-account-menu-row b,:root[data-theme="light"] .customer-account-menu-chevron{color:#17231f}
 
-/* v2.68: unified navy dark theme across customer, provider, admin, dialogs and forms. */
-:root[data-theme="dark"]{--theme-bg:#080f1c;--theme-surface:#101b2b;--theme-line:#26364b;--theme-text:#f4f7fb;--theme-muted:#b6c2d2;--kh-navy-bg:#080f1c;--kh-navy-card:#101b2b;--kh-navy-raised:#142238;--kh-navy-line:#293b52;--kh-accent-red:#d92f58;--kh-accent-gold:#d9ad62;color-scheme:dark}
-:root[data-theme="dark"] body,:root[data-theme="dark"] #app,:root[data-theme="dark"] .shell,:root[data-theme="dark"] .admin-page,:root[data-theme="dark"] .admin-shell,:root[data-theme="dark"] .provider-shell,:root[data-theme="dark"] .customer-shell{background:var(--kh-navy-bg)!important;color:var(--theme-text)!important}
-:root[data-theme="dark"] .shell .card,:root[data-theme="dark"] .shell .panel,:root[data-theme="dark"] .shell .section-card,:root[data-theme="dark"] .shell .modal-content,:root[data-theme="dark"] .shell .table-wrap,:root[data-theme="dark"] .shell .stat-card,:root[data-theme="dark"] .shell .admin-card,:root[data-theme="dark"] .shell .provider-card,:root[data-theme="dark"] .shell .campaign-card,:root[data-theme="dark"] .shell .quick-assist-reference,:root[data-theme="dark"] .shell .quick-assist-card,:root[data-theme="dark"] .shell .customer-offers,:root[data-theme="dark"] .shell .manual-service-fallback,:root[data-theme="dark"] .shell .priority-card,:root[data-theme="dark"] .shell .service-card{background:var(--kh-navy-card)!important;color:var(--theme-text)!important;border-color:var(--kh-navy-line)!important;box-shadow:0 7px 22px rgba(0,0,0,.16)}
-:root[data-theme="dark"] .shell input,:root[data-theme="dark"] .shell textarea,:root[data-theme="dark"] .shell select,:root[data-theme="dark"] .shell option,:root[data-theme="dark"] .shell .field input,:root[data-theme="dark"] .shell .field textarea,:root[data-theme="dark"] .shell .field select,:root[data-theme="dark"] .shell .search-box,:root[data-theme="dark"] .shell .search-box input{background:#0d1726!important;color:#f4f7fb!important;border-color:#33465e!important;color-scheme:dark}
-:root[data-theme="dark"] .shell h1,:root[data-theme="dark"] .shell h2,:root[data-theme="dark"] .shell h3,:root[data-theme="dark"] .shell h4,:root[data-theme="dark"] .shell label,:root[data-theme="dark"] .shell th,:root[data-theme="dark"] .shell td,:root[data-theme="dark"] .shell .brand-lockup strong,:root[data-theme="dark"] .shell .customer-service-copy b{color:#f4f7fb!important}
-:root[data-theme="dark"] .shell p,:root[data-theme="dark"] .shell small,:root[data-theme="dark"] .shell .muted,:root[data-theme="dark"] .shell .brand-lockup small{color:#b6c2d2}
-:root[data-theme="dark"] .shell button.secondary,:root[data-theme="dark"] .shell .btn.secondary,:root[data-theme="dark"] .shell .customer-header-icon,:root[data-theme="dark"] .shell .customer-area-arrow,:root[data-theme="dark"] .shell .customer-contact-top-btn,:root[data-theme="dark"] .shell .notification-top-btn{background:#142238!important;color:#f4f7fb!important;border-color:#344963!important}
-:root[data-theme="dark"] .shell .btn:not(.secondary),:root[data-theme="dark"] .shell .customer-city-change{background:#9e2141;color:#fff;border-color:#b82a4c}
-:root[data-theme="dark"] .shell table tr,:root[data-theme="dark"] .shell .list-row,:root[data-theme="dark"] .shell .customer-service-row,:root[data-theme="dark"] .shell .customer-account-menu-row{border-color:#293b52!important}
-:root[data-theme="dark"] .modal,:root[data-theme="dark"] #modal,:root[data-theme="dark"] .modal-backdrop,:root[data-theme="dark"] .modal-panel,:root[data-theme="dark"] .modal-content,:root[data-theme="dark"] .customer-area-picker,:root[data-theme="dark"] .customer-header-menu,:root[data-theme="dark"] .customer-header-location-menu{background:#0b1422!important;color:#f4f7fb!important;border-color:#293b52!important}
-:root[data-theme="dark"] .quick-assist-reference,:root[data-theme="dark"] .quick-assist-card,:root[data-theme="dark"] .customer-offers,:root[data-theme="dark"] .campaign-strip-wrap,:root[data-theme="dark"] .campaign-card,:root[data-theme="dark"] .customer-empty-banner{background:#101b2b!important;color:#f4f7fb!important;border-color:#293b52!important}
-:root[data-theme="dark"] .customer-shell{--theme-bg:#080f1c;--theme-surface:#101b2b;--theme-line:#293b52;--theme-text:#f4f7fb;--theme-muted:#b6c2d2;--surface:#101b2b;--card:#101b2b;--border:#293b52;--text:#f4f7fb;--muted:#b6c2d2;background:#080f1c!important}
-:root[data-theme="dark"] .customer-shell .customer-category-tile,:root[data-theme="dark"] .customer-shell .all-categories-tile,:root[data-theme="dark"] .customer-shell .customer-category-art,:root[data-theme="dark"] .customer-shell .customer-service-row,:root[data-theme="dark"] .customer-shell .customer-service-logo,:root[data-theme="dark"] .customer-shell .customer-bottom-nav,:root[data-theme="dark"] .customer-shell .customer-sticky-discovery,:root[data-theme="dark"] .customer-shell .order-card-premium,:root[data-theme="dark"] .customer-shell .order-card-service-icon{background:#101b2b!important;color:#f4f7fb!important;border-color:#293b52!important}
-:root[data-theme="dark"] .customer-shell .quick-assist-reference-head,:root[data-theme="dark"] .customer-shell .quick-assist-input-row,:root[data-theme="dark"] .customer-shell .campaign-strip,:root[data-theme="dark"] .customer-shell .campaign-image-placeholder{background:#101b2b!important;color:#f4f7fb!important}
-:root[data-theme="light"] body,:root[data-theme="light"] #app,:root[data-theme="light"] .shell{color-scheme:light}
 /* Sticky, safe-area-aware app header with harmonized icon controls. */
 .app-topbar{position:sticky;top:0;z-index:60;padding-top:max(8px,env(safe-area-inset-top));min-height:68px;display:flex;align-items:center;gap:10px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .customer-shell .app-topbar{background:color-mix(in srgb,var(--theme-bg,#fff) 94%,transparent);border-bottom:1px solid var(--theme-line,#e5e7eb);margin-bottom:10px}
@@ -2098,14 +2082,14 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 .customer-shell .customer-bottom-nav{padding-bottom:max(7px,env(safe-area-inset-bottom))}
 .customer-header-menu,.customer-header-location-menu{direction:rtl}
 .customer-contact-option{width:100%;display:flex;justify-content:center;align-items:center;margin-top:10px;text-decoration:none;min-height:48px}
-.customer-address-add{width:100%;min-height:48px;margin:8px 0 18px;border:1px solid var(--kh-accent-gold)}
+.customer-address-add{width:100%;min-height:48px;margin:8px 0 18px;border:1px solid var(--accent,#d6a84f)}
 .customer-header-addresses{display:grid;gap:8px;margin:8px 0 16px}
 .customer-header-address{width:100%;display:flex;align-items:center;gap:10px;text-align:right;padding:12px;border:1px solid var(--theme-line,#e5e7eb);border-radius:14px;background:var(--theme-surface,#fff);color:var(--theme-text,#17231f)}
-.customer-header-address>span:first-child{font-size:20px;color:var(--kh-accent-red)}
+.customer-header-address>span:first-child{font-size:20px;color:var(--primary,#176b4d)}
 .customer-header-address>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px}
 .customer-header-address small{color:var(--theme-muted,#667085)}
 .customer-address-check{font-size:20px;color:var(--kh-accent-green)}
-.customer-city-change{width:100%;min-height:48px;border:1px solid var(--kh-accent-red);border-radius:13px;font-weight:800}
+.customer-city-change{width:100%;min-height:48px;border:1px solid var(--primary,#176b4d);border-radius:13px;font-weight:800}
 .customer-address-footnote{font-size:12px;line-height:1.7;margin-bottom:0}
 @media(max-width:480px){.app-topbar{gap:6px}.customer-shell .brand-lockup strong{font-size:17px}.customer-shell .customer-area-arrow,.customer-shell .customer-header-icon,.customer-shell .customer-contact-top-btn,.customer-shell .notification-top-btn{height:38px!important;min-height:38px!important;width:38px;min-width:38px;flex-basis:38px}.customer-shell .brand-mark{width:34px;height:34px;flex:0 0 34px}}
 @media(prefers-reduced-motion:reduce){.customer-bottom-nav{transition:none!important}}
