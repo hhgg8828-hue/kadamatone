@@ -18,6 +18,6 @@ test('فلتر الأقرب يتطلب إحداثيات صالحة ولا يصن
 });
 test('فلتر الأحدث يعتمد على تاريخ إنشاء حقيقي مرسل من الخادم',()=>{
   assert.match(catalog,/createdAt:\s*\(x as any\)\.created_at/);
-  assert.match(app,/data-service-created="\$\{esc\(sv\.createdAt\|\|sv\.created_at\|\|sv\.updatedAt\|\|sv\.updated_at\|\|''\)\}"/);
+  assert.match(app, /data-service-created=.*sv\.createdAt.*sv\.created_at/);
   assert.match(app,/key==='new'&&isNew/);
 });

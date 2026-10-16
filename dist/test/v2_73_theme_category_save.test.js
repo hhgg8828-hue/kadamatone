@@ -4,10 +4,10 @@ import test from 'node:test';
 const app = fs.readFileSync('public/js/app.js', 'utf8');
 const css = fs.readFileSync('public/css/app.css', 'utf8');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-test('v2.73: customer category selection filters services in place instead of opening a separate picker', () => {
-    assert.match(app, /const applyHomeCategory = \(slug\)/);
+test('v2.80: category modal does not leave a stale category restriction on home service filters', () => {
+    assert.match(app, /localStorage\.removeItem\('khadamat\.home\.selectedCategory\.v1'\)/);
     assert.match(app, /applyServiceFilter\(activeHomeServiceFilter\)/);
-    assert.match(app, /categoryMatch = !selectedHomeCategorySlug/);
+    assert.match(app, /const filterMatch\s*=\s*key\s*===\s*'all'/);
     assert.match(app, /data-service-filter-empty/);
 });
 test('v2.73: service save has duplicate-submit protection, timeout recovery and success feedback', () => {

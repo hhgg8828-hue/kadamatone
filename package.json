@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.79",
-  "description": "إصلاح عرض التصنيفات والخدمات في نوافذ منبثقة مع تبديل المربعات والأسطر",
+  "version": "2.81",
+  "description": "إصلاح توافق اختبار فلاتر الخدمات مع أنواع Node.js والتحقق من البناء",
   "private": true,
   "type": "module",
   "engines": {
