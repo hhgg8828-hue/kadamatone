@@ -19,7 +19,7 @@ export interface CreateOrderInput {
 }
 const createOrderSchema: Schema = s.obj({
   serviceId: s.str({ min: 1, max: 64 }),
-  description: s.str({ min: 5, max: 1000 }),
+  description: s.str({ min: 1, max: 1000 }),
   location: { ...locationSchema, optional: true } as Schema,
   areaId: s.str({ max: 64, optional: true }),
   addressId: s.str({ max: 64, optional: true }),

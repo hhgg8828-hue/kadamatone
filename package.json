@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.68.0",
-  "description": "تحسين التنقل والكتالوج والإشعارات وواجهة الطلبات",
+  "version": "2.67.0",
+  "description": "متاجر الطلب المرتبطة بكتالوج حقيقي وتحسين التتبع والمظهر",
   "private": true,
   "type": "module",
   "engines": {
