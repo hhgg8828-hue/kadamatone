@@ -2594,6 +2594,7 @@ html,body { max-width:100%; overflow-x:clip; }
 @media(max-width:520px){.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-9px;bottom:-6px;}}
 
 /* v2.83: provider portal dark surfaces and service execution-option cards */
+/* v2.84: session persistence is handled by the shared authentication lifecycle. */
 :root[data-theme="dark"] .provider-quick-nav{background:#1b2a40!important;border-color:#344861!important;box-shadow:none!important}
 :root[data-theme="dark"] .provider-quick-nav a{background:#22334b!important;background-image:none!important;color:#eef4fc!important;border-color:#3b536e!important}
 :root[data-theme="dark"] .provider-quick-nav a:hover{background:#2a405d!important;border-color:#54708f!important}
@@ -2604,3 +2605,16 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .service-editor-checks label,:root[data-theme="dark"] .service-field-required,:root[data-theme="dark"] .quantity-support-setting{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
 :root[data-theme="dark"] .service-editor-checks label input,:root[data-theme="dark"] .service-field-required input,:root[data-theme="dark"] .quantity-support-setting input{accent-color:#70d6a8}
 :root[data-theme="dark"] .quantity-support-setting small{color:#b9c7da!important}
+
+/* v2.84: editable quantities and independent detail forms for extra invoice services. */
+.checkout-extra-qty{display:inline-flex;align-items:center;justify-content:center;gap:6px;direction:ltr;white-space:nowrap}
+.checkout-extra-qty button{width:28px;height:28px;border:1px solid var(--border,#d8e2dc);border-radius:8px;background:var(--card,#fff);color:var(--text,#24332b);font-weight:800;cursor:pointer}
+.checkout-extra-qty span{min-width:18px;text-align:center;font-weight:800}
+.checkout-additional-details{display:grid;gap:10px;margin:12px 0}
+.checkout-extra-detail-card{padding:12px;border:1px solid var(--border,#d8e2dc);border-radius:12px;background:var(--surface,#f8faf9);color:var(--text,#24332b)}
+.checkout-extra-detail-card h3{font-size:14px;margin:0 0 10px}
+.checkout-extra-detail-card .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:600px){.checkout-extra-detail-card .grid{grid-template-columns:1fr}.checkout-extra-qty{gap:3px}.checkout-extra-qty button{width:25px;height:25px}}
+:root[data-theme="dark"] .checkout-extra-qty button{background:#22334b!important;color:#eef4fc!important;border-color:#405875!important}
+:root[data-theme="dark"] .checkout-extra-detail-card{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
+:root[data-theme="dark"] .checkout-extra-detail-card .field label{color:#eef4fc!important}

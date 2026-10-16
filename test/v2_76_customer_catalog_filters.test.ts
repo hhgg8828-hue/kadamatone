@@ -6,7 +6,7 @@ test('v2.76: customer filters persist and match favorite/new/nearby behavior', (
   const app = fs.readFileSync('public/app.ts', 'utf8');
   assert.match(app, /khadamat\.home\.serviceFilter\.v1/);
   assert.match(app, /evaluateServiceFilter\(filterServices,key/);
-  assert.match(app, /recentWindowMs:newServiceWindowMs/);
+  assert.ok(!/newServiceWindowMs/.test(app));
   assert.match(app, /providers\/nearby\?serviceId=/);
   assert.match(app, /khadamat\.home\.selectedCategory\.v1/);
   assert.match(app, /startCustomerCatalogPolling/);

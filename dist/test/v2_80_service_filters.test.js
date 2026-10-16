@@ -13,9 +13,10 @@ test('v2.80: nearby filter only shows services with a real finite distance and s
     assert.match(app, /providers\/nearby\?serviceId=/);
     assert.match(app, /لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب/);
 });
-test('v2.82: new means created within the last 30 days; edits to old services do not make them new', () => {
-    assert.match(app, /const newServiceWindowMs=30\*24\*60\*60\*1000/);
-    assert.match(fs.readFileSync('public/service-filter-logic.js', 'utf8'), /now - date <= recentWindowMs/);
+test('v2.84: new services filter uses actual creation dates and newest-first ordering without an invented cutoff', () => {
+    assert.ok(!/newServiceWindowMs/.test(app));
+    assert.match(fs.readFileSync('public/service-filter-logic.js', 'utf8'), /return date !== null/);
+    assert.ok(!/recentWindowMs/.test(fs.readFileSync('public/service-filter-logic.js', 'utf8')));
     assert.match(app, /sv\.createdAt\|\|sv\.created_at\|\|''/);
     assert.ok(!/data-service-created="\$\{esc\(sv\.createdAt\|\|sv\.created_at\|\|sv\.updatedAt/.test(app));
 });

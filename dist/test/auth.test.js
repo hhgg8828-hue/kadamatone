@@ -147,18 +147,32 @@ describe('Tokens & Sessions', () => {
         t.app.clock.now = real;
         assert.equal(r.status, 401);
     });
-    test('Refresh: تدوير التوكن + رفض إعادة الاستخدام + إبطال العائلة', async () => {
+    test('Refresh: تدوير التوكن + رفض إعادة الاستخدام بعد نافذة التزامن + إبطال العائلة', async () => {
         const u = await registerUser(api);
         const h = { 'X-Requested-With': 'khadamat' };
         const r1 = await api('POST', '/api/v1/auth/refresh', { cookie: u.cookie, headers: h });
         assert.equal(r1.status, 200);
         assert.ok(r1.body.accessToken);
         assert.notEqual(r1.cookie, u.cookie);
-        const reuse = await api('POST', '/api/v1/auth/refresh', { cookie: u.cookie, headers: h }); // توكن قديم
+        const real = t.app.clock.now;
+        t.app.clock.now = () => Date.now() + 31_000;
+        const reuse = await api('POST', '/api/v1/auth/refresh', { cookie: u.cookie, headers: h }); // توكن قديم بعد انتهاء نافذة التزامن
         assert.equal(reuse.status, 401);
         assert.equal(reuse.body.error.code, 'SESSION_REUSED');
         const afterReuse = await api('POST', '/api/v1/auth/refresh', { cookie: r1.cookie, headers: h }); // العائلة كلها أُبطلت
+        t.app.clock.now = real;
         assert.equal(afterReuse.status, 401);
+    });
+    test('Refresh: إعادة استخدام متزامنة مباشرة لا تبطل الجلسة الجديدة', async () => {
+        const u = await registerUser(api);
+        const h = { 'X-Requested-With': 'khadamat' };
+        const r1 = await api('POST', '/api/v1/auth/refresh', { cookie: u.cookie, headers: h });
+        assert.equal(r1.status, 200);
+        const raced = await api('POST', '/api/v1/auth/refresh', { cookie: u.cookie, headers: h });
+        assert.equal(raced.status, 401);
+        assert.equal(raced.body.error.code, 'SESSION_ROTATED');
+        const next = await api('POST', '/api/v1/auth/refresh', { cookie: r1.cookie, headers: h });
+        assert.equal(next.status, 200, 'الجلسة الجديدة تبقى صالحة بعد طلب متزامن للتوكن القديم');
     });
     test('Refresh بدون ترويسة X-Requested-With → 403 (CSRF)', async () => {
         const u = await registerUser(api);

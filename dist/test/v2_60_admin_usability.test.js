@@ -29,7 +29,8 @@ test('توصيات تأكيد الطلب تظهر كبطاقات أفقية مص
 });
 test('الفلاتر تعتمد على المفضلة والتاريخ والمسافة الحقيقية', () => {
     assert.match(app, /evaluateServiceFilter\(filterServices,key/);
-    assert.match(app, /recentWindowMs:newServiceWindowMs/);
+    assert.ok(!/newServiceWindowMs/.test(app));
+    assert.match(readFileSync('public/service-filter-logic.js', 'utf8'), /return date !== null/);
     assert.match(app, /locationAvailable:!!loc/);
     assert.match(app, /data-service-created=.*sv\.createdAt.*sv\.created_at/);
 });

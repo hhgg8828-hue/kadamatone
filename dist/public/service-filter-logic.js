@@ -2,7 +2,6 @@
 export function evaluateServiceFilter(services, key, favoriteIds, options = {}) {
   const favorites = new Set(Array.from(favoriteIds, String));
   const now = options.now ?? Date.now();
-  const recentWindowMs = options.recentWindowMs ?? 30 * 24 * 60 * 60 * 1000;
   const inCategory = service => !options.selectedCategorySlug || String(service.categorySlug || '') === options.selectedCategorySlug;
   const validDate = service => {
     const date = Date.parse(String(service.createdAt || ''));
@@ -18,7 +17,7 @@ export function evaluateServiceFilter(services, key, favoriteIds, options = {}) 
     if (key === 'favorite') return favorites.has(String(service.id));
     if (key === 'new') {
       const date = validDate(service);
-      return date !== null && now - date <= recentWindowMs;
+      return date !== null;
     }
     return Number.isFinite(distance(service));
   });

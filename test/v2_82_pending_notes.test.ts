@@ -22,7 +22,7 @@ test('V2.82: customer service filters are exact and ordered from real fields',()
     assert.equal(result.matches.length,ids.length);
   }
   assert.deepEqual(evaluateServiceFilter(services,'favorite',['newest','middle','newer'],{now:NOW}).matches.map(x=>x.id),['newest','middle','newer']);
-  assert.deepEqual(evaluateServiceFilter(services,'new',[],{now:NOW,recentWindowMs:30*86400000}).matches.map(x=>x.id),['newest','newer','no-distance','middle']);
+  assert.deepEqual(evaluateServiceFilter(services,'new',[],{now:NOW}).matches.map(x=>x.id),['newest','newer','no-distance','middle','old']);
   assert.deepEqual(evaluateServiceFilter(services,'nearby',[],{now:NOW,locationAvailable:true}).matches.map(x=>x.id),['middle','newer','missing-date','newest','old']);
   assert.deepEqual(evaluateServiceFilter(services,'nearby',[],{now:NOW,locationAvailable:false}).matches,[]);
   assert.deepEqual(evaluateServiceFilter(services,'favorite',['newest','newer','old'],{now:NOW,selectedCategorySlug:'farm'}).matches.map(x=>x.id),['newer']);
@@ -75,6 +75,7 @@ test('V2.82: additional services are server-validated and become invoice/executi
     const primary=services.find((x:any)=>x.slug==='water-tank-delivery')||services[0];
     const extra=services.find((x:any)=>x.id!==primary.id&&x.isActive!==false);
     assert.ok(primary&&extra);
+    t.app.db.run('UPDATE services SET form_schema=? WHERE id=?',JSON.stringify([{key:'quantity',type:'number',label:{ar:'الكمية',en:'Quantity'},required:false,min:1,max:999}]),extra.id);t.app.catalog.invalidate();
     const created=await t.api('POST','/api/v1/orders',{token:customer.body.accessToken,body:{serviceId:primary.id,description:'طلب توصيل مياه مع خدمة إضافية',contactPhone:'+967771234567',additionalServices:[{serviceId:extra.id,quantity:2}]}});
     assert.equal(created.status,201,created.text);
     const saved=t.app.db.get<any>('SELECT description,form_data FROM orders WHERE id=?',created.body.order.id);

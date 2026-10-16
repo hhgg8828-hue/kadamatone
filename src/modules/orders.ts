@@ -15,7 +15,7 @@ import { executionEvent } from './execution.js';
 
 export interface CreateOrderInput {
   serviceId: string; description: string; location: LocationInput; areaId?: string; addressId?: string; contactPhone: string; recipientName?: string; recipientPhone?: string; recipientUserId?: string;
-  scheduledAt?: string; priority?: Priority; formData?: Record<string, unknown>; notes?: string; attachmentFileIds?: string[]; assistantSessionId?: string; tasks?: Array<{title:string;taskType?:string;details?:string}>; additionalServices?: Array<{serviceId:string;quantity?:number}>;
+  scheduledAt?: string; priority?: Priority; formData?: Record<string, unknown>; notes?: string; attachmentFileIds?: string[]; assistantSessionId?: string; tasks?: Array<{title:string;taskType?:string;details?:string}>; additionalServices?: Array<{serviceId:string;quantity?:number;formData?:Record<string,unknown>}>;
 }
 const createOrderSchema: Schema = s.obj({
   serviceId: s.str({ min: 1, max: 64 }),
@@ -30,7 +30,7 @@ const createOrderSchema: Schema = s.obj({
   notes: s.str({ max: 500, optional: true }),
   attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 10, optional: true }),
   tasks: s.arr(s.obj({title:s.str({min:2,max:200}),taskType:s.str({min:2,max:50,optional:true}),details:s.str({max:1000,optional:true})}),{max:20,optional:true}),
-  additionalServices: s.arr(s.obj({serviceId:s.str({min:1,max:64}),quantity:s.int({min:1,max:999,optional:true})}),{max:10,optional:true}),
+  additionalServices: s.arr(s.obj({serviceId:s.str({min:1,max:64}),quantity:s.int({min:1,max:999,optional:true}),formData:s.any({optional:true})}),{max:10,optional:true}),
   recipientName: s.str({ max: 80, optional: true }), recipientPhone: s.str({ max: 24, optional: true }), recipientUserId: s.str({ max: 64, optional: true }), assistantSessionId: s.str({ max: 64, optional: true }),
 });
 
@@ -143,14 +143,15 @@ function genCode(db: App['db'], now: Date): string {
   return `KH-${year}-${String(n).padStart(6, '0')}`;
 }
 
+function isQuantityFormField(f: FormField): boolean {
+  const key = String(f.key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const label = String(f.label?.ar || '');
+  const byKey = /^(quantity|qty|count|workers|workercount|workerscount|passenger|passengers|passengercount|passengercounts|people|peoplecount|persons|personscount|rider|riders|riderscount|units|unitcount|itemsquantity|numberofpeople|numberofpassengers)$/.test(key);
+  const byLabel = /الكمية|عدد القطع|عدد العمال|عدد العاملين|عدد الركاب|عدد الأفراد|عدد الأشخاص|عدد المسافرين/.test(label);
+  return f.type === 'number' && (byKey || byLabel);
+}
 function quantityForPrice(fields: FormField[], formData: Record<string, unknown>): number {
-  const field = fields.find((f) => {
-    const key = String(f.key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const label = String(f.label?.ar || '');
-    const byKey = /^(quantity|qty|count|workers|workercount|workerscount|passenger|passengers|passengercount|people|peoplecount|persons|personscount|rider|riders|riderscount|units|unitcount|itemsquantity|numberofpeople|numberofpassengers)$/.test(key);
-    const byLabel = /الكمية|عدد القطع|عدد العمال|عدد العاملين|عدد الركاب|عدد الأفراد|عدد الأشخاص|عدد المسافرين/.test(label);
-    return f.type === 'number' && (byKey || byLabel);
-  });
+  const field = fields.find(isQuantityFormField);
   if (!field) return 1;
   const value = Number(formData[field.key] ?? 1);
   if (!Number.isFinite(value) || value < 1) return 1;
@@ -174,7 +175,24 @@ export function registerOrderRoutes(app: App, r: Router): void {
     }
     const requestedAdditional=b.additionalServices||[];
     const seenAdditional=new Set<string>();
-    const extraServices=requestedAdditional.map((item)=>{if(item.serviceId===svc.id||seenAdditional.has(item.serviceId))throw E.unprocessable('لا يمكن إضافة الخدمة نفسها أكثر من مرة إلى الطلب','DUPLICATE_ADDITIONAL_SERVICE');seenAdditional.add(item.serviceId);const extra=catalog.getActiveService(item.serviceId);if(!extra)throw E.unprocessable('إحدى الخدمات الإضافية لم تعد متاحة','ADDITIONAL_SERVICE_UNAVAILABLE');const price=effectivePriceFor(extra);if(extra.pricing_type==='FIXED'&&price===null)throw E.unprocessable('سعر إحدى الخدمات الإضافية غير محدد؛ أزلها أو تواصل مع الإدارة','ADDITIONAL_SERVICE_PRICE_UNAVAILABLE');const serialized=catalog.serializeService(extra,ctx.locale);return {serviceId:extra.id,name:serialized.name,quantity:Math.max(1,Math.min(999,Math.floor(Number(item.quantity||1)))),pricingType:extra.pricing_type,unitPrice:price,currency:serialized.currency||app.settings.get<string>('platform.currency')};});
+    const extraServices=requestedAdditional.map((item)=>{
+      if(item.serviceId===svc.id||seenAdditional.has(item.serviceId))throw E.unprocessable('لا يمكن إضافة الخدمة نفسها أكثر من مرة إلى الطلب','DUPLICATE_ADDITIONAL_SERVICE');
+      seenAdditional.add(item.serviceId);
+      const extra=catalog.getActiveService(item.serviceId);
+      if(!extra)throw E.unprocessable('إحدى الخدمات الإضافية لم تعد متاحة','ADDITIONAL_SERVICE_UNAVAILABLE');
+      const extraFields=parseJson<FormField[]>(extra.form_schema,[])??[];
+      const quantityField=extraFields.find(isQuantityFormField);
+      const requestedQuantity=Number(item.quantity??1);
+      if(!quantityField&&requestedQuantity!==1)throw E.unprocessable('هذه الخدمة لا تدعم تحديد الكمية؛ يجب طلب وحدة واحدة فقط','SERVICE_DOES_NOT_SUPPORT_QUANTITY');
+      if(!Number.isInteger(requestedQuantity)||requestedQuantity<1||requestedQuantity>999)throw E.unprocessable('كمية الخدمة الإضافية يجب أن تكون عددًا صحيحًا من 1 إلى 999','INVALID_SERVICE_QUANTITY');
+      const extraInput={...(item.formData&&typeof item.formData==='object'&&!Array.isArray(item.formData)?item.formData as Record<string,unknown>:{})};
+      if(quantityField)extraInput[quantityField.key]=requestedQuantity;
+      const extraFormData=validateFormData(extraFields,extraInput);
+      const price=effectivePriceFor(extra);
+      if(extra.pricing_type==='FIXED'&&price===null)throw E.unprocessable('سعر إحدى الخدمات الإضافية غير محدد؛ أزلها أو تواصل مع الإدارة','ADDITIONAL_SERVICE_PRICE_UNAVAILABLE');
+      const serialized=catalog.serializeService(extra,ctx.locale);
+      return {serviceId:extra.id,name:serialized.name,quantity:quantityField?requestedQuantity:1,formData:extraFormData,pricingType:extra.pricing_type,unitPrice:price,currency:serialized.currency||app.settings.get<string>('platform.currency')};
+    });
     if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now()) throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
     const idemKey = readIdempotencyKey(ctx.req.headers['idempotency-key']);
 

@@ -205,6 +205,13 @@ export function registerAuthRoutes(app, r) {
             if (!row)
                 return { error: E.unauthorized('جلسة غير صالحة', 'INVALID_SESSION') };
             if (row.revoked_at) {
+                // Parallel tabs can submit the same refresh cookie before the first rotated Set-Cookie is observed.
+                // Treat a just-rotated token as a short concurrency race, not theft; the old token itself is still rejected.
+                const current = db.get('SELECT created_at FROM refresh_tokens WHERE family_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1', row.family_id);
+                const currentAgeMs = current ? app.clock.now() - Date.parse(current.created_at) : Number.POSITIVE_INFINITY;
+                if (current && currentAgeMs >= 0 && currentAgeMs <= 30_000) {
+                    return { error: E.unauthorized('تم تجديد الجلسة في نافذة أخرى؛ أعد المحاولة', 'SESSION_ROTATED') };
+                }
                 db.run('UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE family_id = ?', iso(app.clock.now()), row.family_id);
                 app.audit.log({ ctx, actor: { id: row.user_id, role: 'SYSTEM' }, action: 'auth.refresh_reuse_detected', entityType: 'user', entityId: row.user_id });
                 return { error: E.unauthorized('جلسة غير صالحة', 'SESSION_REUSED') };

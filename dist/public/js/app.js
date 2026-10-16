@@ -418,6 +418,65 @@ async function flushOrderQueue() { if (!navigator.onLine || !state.token)
 } localStorage.setItem(OFFLINE_QUEUE, JSON.stringify(left)); if (q.length !== left.length)
     toast('تمت المزامنة', 'تم إرسال الطلبات المحفوظة بعد عودة الإنترنت.'); }
 window.addEventListener('online', () => { flushOrderQueue().catch(() => { }); flushMessageOutbox().catch(() => { }); });
+let refreshPromise = null;
+async function requestRefresh() {
+    let response;
+    try {
+        response = await fetch('/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'khadamat' }, body: '{}', cache: 'no-store' });
+    }
+    catch {
+        return { result: 'temporary' };
+    }
+    const body = await response.json().catch(() => ({}));
+    if (response.ok && body?.accessToken && body?.user) {
+        saveSession(body);
+        return { result: 'ok', body };
+    }
+    if (response.status === 401) {
+        const code = String(body?.error?.code || '');
+        if (code === 'SESSION_ROTATED')
+            return { result: 'temporary', body };
+        return { result: 'invalid', body };
+    }
+    return { result: 'temporary', body };
+}
+async function refreshSession() {
+    if (refreshPromise)
+        return refreshPromise;
+    const tokenBefore = state.token;
+    refreshPromise = (async () => {
+        let outcome = await requestRefresh();
+        if (outcome.result === 'temporary' && String(outcome.body?.error?.code || '') === 'SESSION_ROTATED') {
+            // Another tab may have rotated the shared HttpOnly cookie. Give its response time to land, then retry once.
+            await new Promise(resolve => window.setTimeout(resolve, 180));
+            outcome = await requestRefresh();
+        }
+        if (outcome.result === 'ok')
+            return 'ok';
+        // A different tab may already have persisted the newly rotated access token.
+        try {
+            const raw = localStorage.getItem(SESSION_KEY);
+            if (raw) {
+                const latest = JSON.parse(raw);
+                if (latest?.accessToken && latest.accessToken !== tokenBefore && latest?.user) {
+                    state.token = latest.accessToken;
+                    state.user = latest.user;
+                    return 'ok';
+                }
+            }
+        }
+        catch { }
+        if (outcome.result === 'invalid') {
+            localStorage.removeItem(SESSION_KEY);
+            sessionStorage.removeItem(SESSION_KEY);
+            state.token = null;
+            state.user = null;
+            return 'invalid';
+        }
+        return 'temporary';
+    })().finally(() => { refreshPromise = null; });
+    return refreshPromise;
+}
 async function api(path, opts = {}, retry = true) { const started = performance.now(); const h = new Headers(opts.headers || {}); h.set('Content-Type', 'application/json'); if (state.token)
     h.set('Authorization', `Bearer ${state.token}`); let r; try {
     r = await fetch('/api/v1' + path, { ...opts, headers: h });
@@ -426,20 +485,14 @@ catch (e) {
     recordApiTiming(path, performance.now() - started, 0);
     throw e;
 } const j = await r.json().catch(() => ({})); recordApiTiming(path, performance.now() - started, r.status); if (r.status === 401 && retry && path !== '/auth/refresh' && localStorage.getItem(SESSION_KEY)) {
-    try {
-        const refreshed = await fetch('/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'khadamat' }, body: '{}' });
-        const rj = await refreshed.json().catch(() => ({}));
-        if (refreshed.ok && rj.accessToken) {
-            saveSession(rj);
-            return api(path, opts, false);
-        }
-    }
-    catch { }
-    localStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(SESSION_KEY);
-    state.token = null;
-    state.user = null;
-    throw new Error('انتهت الجلسة، يرجى تسجيل الدخول من جديد');
+    const refreshed = await refreshSession();
+    if (refreshed === 'ok')
+        return api(path, opts, false);
+    if (refreshed === 'invalid')
+        throw new Error('انتهت صلاحية الجلسة أو أُلغيت، يرجى تسجيل الدخول من جديد');
+    const err = new Error('تعذر التحقق من الجلسة بسبب الاتصال بالخادم. بقي حسابك محفوظًا؛ تحقق من الإنترنت وحاول مجددًا.');
+    err.code = 'SESSION_CHECK_TEMPORARY';
+    throw err;
 } if (!r.ok) {
     const err = new Error(j?.error?.message || 'حدث خطأ');
     err.code = j?.error?.code;
@@ -457,15 +510,11 @@ async function openPrivateFile(path) {
     try {
         let r = await fetch(path, { headers: state.token ? { Authorization: `Bearer ${state.token}` } : {} });
         if (r.status === 401) {
-            try {
-                const refreshed = await fetch('/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'khadamat' }, body: '{}' });
-                const j = await refreshed.json().catch(() => ({}));
-                if (refreshed.ok && j.accessToken) {
-                    saveSession(j);
-                    r = await fetch(path, { headers: { Authorization: `Bearer ${state.token}` } });
-                }
-            }
-            catch { }
+            const refreshed = await refreshSession();
+            if (refreshed === 'ok')
+                r = await fetch(path, { headers: { Authorization: `Bearer ${state.token}` } });
+            else if (refreshed === 'temporary')
+                throw new Error('تعذر التحقق من الجلسة مؤقتًا بسبب الاتصال. لم يتم تسجيل خروجك؛ حاول مجددًا.');
         }
         if (!r.ok)
             throw new Error(r.status === 401 ? 'انتهت الجلسة، يرجى تسجيل الدخول من جديد' : 'تعذر فتح الملف');
@@ -2007,9 +2056,8 @@ function renderCustomer() {
             return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
         } const cacheKey = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}:${String(card.dataset.serviceCard || '')}`; return nearbyServiceDistanceCache.get(cacheKey) ?? Infinity; };
         const now = Date.now();
-        const newServiceWindowMs = 30 * 24 * 60 * 60 * 1000;
         const filterServices = cards.map((card, index) => { const sv = state.services.find((v) => String(v.id) === String(card.dataset.serviceCard)); const id = String(card.dataset.serviceCard || ''); const createdAt = String(card.dataset.serviceCreated || ''); const d = key === 'nearby' ? distance(card) : Infinity; return { id, createdAt, latitude: sv?.latitude ?? sv?.lat ?? sv?.location?.lat, longitude: sv?.longitude ?? sv?.lng ?? sv?.location?.lng, distanceKm: d, originalIndex: Number(card.dataset.serviceIndex || index), card }; });
-        const filterResult = evaluateServiceFilter(filterServices, key, fav, { now, recentWindowMs: newServiceWindowMs, locationAvailable: !!loc });
+        const filterResult = evaluateServiceFilter(filterServices, key, fav, { now, locationAvailable: !!loc });
         const visibleIds = new Set(filterResult.matches.map(x => x.id));
         const rankIndex = new Map(filterResult.ordered.map((x, i) => [x.id, i]));
         const ranked = cards.map(card => { const id = String(card.dataset.serviceCard || ''); const match = filterServices.find(x => x.id === id); return { card, show: visibleIds.has(id), d: match?.distanceKm ?? Infinity, created: Number.isFinite(Date.parse(card.dataset.serviceCreated || '')) ? Date.parse(card.dataset.serviceCreated || '') : 0, categoryMatch: true, rank: rankIndex.get(id) ?? Number.MAX_SAFE_INTEGER }; }).sort((a, b) => a.rank - b.rank);
@@ -2053,7 +2101,7 @@ function renderCustomer() {
                 empty.setAttribute('role', 'status');
                 list.appendChild(empty);
             }
-            empty.textContent = key === 'nearby' && nearbyDistanceLookupRunning ? 'جارٍ ترتيب الخدمات حسب قرب مقدمي الخدمة…' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال آخر 30 يومًا.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
+            empty.textContent = key === 'nearby' && nearbyDistanceLookupRunning ? 'جارٍ ترتيب الخدمات حسب قرب مقدمي الخدمة…' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات لها تاريخ إضافة مسجل لعرضها حسب الأحدث.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
         }
         else
             empty?.remove();
@@ -2944,7 +2992,7 @@ async function openOrderForm(serviceId, initial = null) {
       <section class="checkout-reference-recommendations"><div class="checkout-reference-section-title"><b>يمكنك أيضًا الطلب من التصنيفات التالية</b></div><div id="checkoutStoreList">جارٍ تحميل التصنيفات…</div><div class="checkout-extra-services-title"><b>قد تعجبك هذه الخدمات أيضًا</b></div><div id="checkoutRelatedServices"></div><div class="checkout-stores-title"><b>يمكنك أيضًا الطلب من الأقسام التالية</b></div><div class="checkout-store-rail-layout"><button type="button" class="checkout-all-stores-fixed" id="checkoutAllStores">عرض الكل</button><div id="checkoutRestaurantStores"><span class="muted">جارٍ تحميل الأقسام…</span></div></div><div id="checkoutCategoryServicesInline" class="checkout-category-services-inline hide-section"></div></section>
       <section class="checkout-reference-totals"><div class="checkout-total-row"><span>الإجمالي</span><b id="checkoutSubtotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</b></div><div class="checkout-total-row"><span>التوصيل</span><b id="checkoutDeliveryFee">${Number.isFinite(Number(initial?.deliveryFee)) ? esc(String(Number(initial.deliveryFee))) : '—'} ر.ي</b></div><div class="checkout-total-row checkout-grand-total"><span>الإجمالي الكلي</span><b id="checkoutGrandTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal + deliveryFee)) : 'يحدد لاحقًا'} ر.ي</b></div></section>
       ${(state.campaigns || []).filter((c) => c.title).slice(0, 1).map((c) => `<section class="checkout-reference-subscription">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}">` : ''}<div><b>${esc(c.title)}</b>${c.description ? `<p>${esc(c.description)}</p>` : ''}</div>${c.buttonLabel ? `<button type="button" class="checkout-reference-ad-button">${esc(c.buttonLabel)}</button>` : ''}</section>`).join('')}
-      <!-- id="addReviewPharmacyProduct" id="saveReviewPharmacyProduct": pharmacy products are edited in the prior cart stage before confirmation. --><section class="checkout-reference-invoice"><header class="checkout-invoice-store-head"><button type="button" id="checkoutDeleteInvoice" aria-label="حذف تفاصيل المنتج">♧</button><div class="checkout-invoice-store-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><b>${esc(String(initial?.storeName || s.name))}</b><button type="button" id="toggleInvoice" aria-label="طي الفاتورة">⌃</button></header><div id="checkoutInvoiceBody"><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody id="checkoutInvoiceRows">${Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length ? initial.pharmacyProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>—</td><td>${esc(String(p.quantity || 1))}</td><td>—</td></tr>`).join('') : (() => { const qf = (s.formSchema || []).find((f) => isQuantityField(f)); const qty = Math.max(1, Math.floor(Number(qf ? fdReview.get(String(qf.key)) : 1) || 1)); const price = Number(s.basePrice); const valid = s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(price); const total = valid ? price * qty : NaN; return `<tr><td>${esc(s.name)}</td><td>${valid ? esc(String(price)) : '—'}</td><td>${qty}</td><td>${Number.isFinite(total) ? esc(String(total)) : '—'}</td></tr>`; })()}</tbody></table></div><div class="checkout-invoice-total"><b>الإجمالي</b><strong id="checkoutInvoiceTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</strong></div></div></section>
+      <!-- id="addReviewPharmacyProduct" id="saveReviewPharmacyProduct": pharmacy products are edited in the prior cart stage before confirmation. --><section class="checkout-reference-invoice"><header class="checkout-invoice-store-head"><button type="button" id="checkoutDeleteInvoice" aria-label="حذف تفاصيل المنتج">♧</button><div class="checkout-invoice-store-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><b>${esc(String(initial?.storeName || s.name))}</b><button type="button" id="toggleInvoice" aria-label="طي الفاتورة">⌃</button></header><div id="checkoutInvoiceBody"><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody id="checkoutInvoiceRows">${Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length ? initial.pharmacyProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>—</td><td>${esc(String(p.quantity || 1))}</td><td>—</td></tr>`).join('') : (() => { const qf = (s.formSchema || []).find((f) => isQuantityField(f)); const qty = Math.max(1, Math.floor(Number(qf ? fdReview.get(String(qf.key)) : 1) || 1)); const price = Number(s.basePrice); const valid = s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(price); const total = valid ? price * qty : NaN; return `<tr><td>${esc(s.name)}</td><td>${valid ? esc(String(price)) : '—'}</td><td>${qty}</td><td>${Number.isFinite(total) ? esc(String(total)) : '—'}</td></tr>`; })()}</tbody></table></div><div id="checkoutAdditionalDetails" class="checkout-additional-details"></div><div class="checkout-invoice-total"><b>الإجمالي</b><strong id="checkoutInvoiceTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</strong></div></div></section>
       <div class="checkout-reference-footer"><div class="checkout-reference-footer-total"><span>الإجمالي</span><b id="checkoutFooterTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</b></div><div class="checkout-reference-footer-buttons"><button type="button" class="btn" id="reviewConfirmOrder">تنفيذ الطلب</button><button type="button" class="btn secondary" id="reviewBackToEdit">تعديل السلة</button></div></div>`;
             const originalChildren = Array.from(orderForm.children);
             originalChildren.forEach(el => el.classList.add('order-review-hidden'));
@@ -2971,11 +3019,26 @@ async function openOrderForm(serviceId, initial = null) {
                 else
                     rows.push(`<tr><td>${esc(s.name)}</td><td>${primaryUnit === null ? '—' : esc(String(primaryUnit))}</td><td>${primaryQuantity}</td><td>${primaryTotal === null ? '—' : esc(String(primaryTotal))}</td></tr>`);
                 for (const extra of checkoutAdditionalServices) {
-                    const q = Math.max(1, Number(extra.quantity) || 1);
+                    const q = extra.supportsQuantity ? Math.max(1, Math.min(999, Number(extra.quantity) || 1)) : 1;
                     const price = extra.basePrice !== null && extra.basePrice !== undefined && Number.isFinite(Number(extra.basePrice)) && extra.pricingType === 'FIXED' ? Number(extra.basePrice) : null;
-                    rows.push(`<tr><td>${esc(extra.name)} <button type="button" class="text-link checkout-remove-extra" data-remove-extra="${esc(extra.id)}" aria-label="إزالة ${esc(extra.name)}">إزالة</button></td><td>${price === null ? 'يحدد لاحقًا' : esc(String(price))}</td><td>${q}</td><td>${price === null ? '—' : esc(String(price * q))}</td></tr>`);
+                    const quantityCell = extra.supportsQuantity ? `<div class="checkout-extra-qty"><button type="button" data-extra-qty="-1" data-extra-id="${esc(extra.id)}" aria-label="تقليل كمية ${esc(extra.name)}">−</button><span>${q}</span><button type="button" data-extra-qty="1" data-extra-id="${esc(extra.id)}" aria-label="زيادة كمية ${esc(extra.name)}">+</button></div>` : '1';
+                    rows.push(`<tr><td>${esc(extra.name)} <button type="button" class="text-link checkout-remove-extra" data-remove-extra="${esc(extra.id)}" aria-label="إزالة ${esc(extra.name)}">إزالة</button></td><td>${price === null ? 'يحدد لاحقًا' : esc(String(price))}</td><td>${quantityCell}</td><td>${price === null ? '—' : esc(String(price * q))}</td></tr>`);
                 }
                 tbody.innerHTML = rows.join('');
+                const detailsHost = document.getElementById('checkoutAdditionalDetails');
+                if (detailsHost)
+                    detailsHost.innerHTML = checkoutAdditionalServices.map(extra => { const fields = (extra.formSchema || []).filter((f) => !isQuantityField(f)); if (!fields.length)
+                        return ''; const renderExtraField = (f) => { const key = String(f.key || ''); const name = `extra_${extra.id}_${key}`; const value = extra.formData?.[key] ?? ''; const label = String(f.labelText || f.label?.ar || key); const req = f.required ? 'required' : ''; const placeholder = esc(f.placeholder || ''); if (f.type === 'textarea')
+                        return `<div class="field"><label>${esc(label)}${f.required ? ' *' : ''}</label><textarea data-extra-service-field="${esc(extra.id)}" data-extra-field-key="${esc(key)}" data-extra-field-type="textarea" name="${esc(name)}" ${req} placeholder="${placeholder}">${esc(String(value))}</textarea></div>`; if (f.type === 'select')
+                        return `<div class="field"><label>${esc(label)}${f.required ? ' *' : ''}</label><select data-extra-service-field="${esc(extra.id)}" data-extra-field-key="${esc(key)}" data-extra-field-type="select" name="${esc(name)}" ${req}><option value="">${f.required ? 'اختر الخيار' : 'بدون تحديد'}</option>${(f.options || []).map((o) => `<option value="${esc(o.value)}" ${String(value) === String(o.value) ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></div>`; if (f.type === 'boolean')
+                        return `<div class="field"><label>${esc(label)}${f.required ? ' *' : ''}</label><select data-extra-service-field="${esc(extra.id)}" data-extra-field-key="${esc(key)}" data-extra-field-type="boolean" name="${esc(name)}" ${req}><option value="">${f.required ? 'اختر نعم أو لا' : 'بدون تحديد'}</option><option value="true" ${value === true ? 'selected' : ''}>نعم</option><option value="false" ${value === false ? 'selected' : ''}>لا</option></select></div>`; return `<div class="field"><label>${esc(label)}${f.required ? ' *' : ''}</label><input data-extra-service-field="${esc(extra.id)}" data-extra-field-key="${esc(key)}" data-extra-field-type="${esc(f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text')}" name="${esc(name)}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" ${f.min !== undefined ? `min="${esc(f.min)}"` : ''} ${f.max !== undefined ? `max="${esc(f.max)}"` : ''} ${req} value="${esc(String(value))}" placeholder="${placeholder}"></div>`; }; return `<section class="checkout-extra-detail-card"><h3>تفاصيل ${esc(extra.name)}</h3><div class="grid">${fields.map(renderExtraField).join('')}</div></section>`; }).join('');
+                document.querySelectorAll('[data-extra-qty]').forEach(btn => btn.addEventListener('click', () => { const extra = checkoutAdditionalServices.find(x => x.id === btn.dataset.extraId); if (!extra || !extra.supportsQuantity)
+                    return; extra.quantity = Math.max(1, Math.min(999, Math.floor(Number(extra.quantity) || 1) + Number(btn.dataset.extraQty || 0))); updateCheckoutAdditionalServices(); }));
+                document.querySelectorAll('[data-extra-service-field]').forEach(el => { const saveValue = () => { const extra = checkoutAdditionalServices.find(x => x.id === el.dataset.extraServiceField); if (!extra)
+                    return; extra.formData = extra.formData || {}; const key = String(el.dataset.extraFieldKey || ''); const type = String(el.dataset.extraFieldType || 'text'); const raw = el.value; if (raw === '') {
+                    delete extra.formData[key];
+                    return;
+                } extra.formData[key] = type === 'number' ? Number(raw) : type === 'boolean' ? raw === 'true' : raw; }; el.addEventListener('input', saveValue); el.addEventListener('change', saveValue); });
                 const extrasFixed = checkoutAdditionalServices.every(x => x.pricingType === 'FIXED' && x.basePrice !== null && x.basePrice !== undefined && Number.isFinite(Number(x.basePrice)));
                 const totalKnown = primaryTotal !== null && extrasFixed;
                 const subtotal = totalKnown ? primaryTotal + checkoutAdditionalServices.reduce((sum, x) => sum + Number(x.basePrice) * Math.max(1, Number(x.quantity) || 1), 0) : null;
@@ -2990,16 +3053,27 @@ async function openOrderForm(serviceId, initial = null) {
                     grand.textContent = subtotal === null ? 'يحدد لاحقًا' : `${subtotal + deliveryFee} ر.ي`;
                 document.querySelectorAll('[data-remove-extra]').forEach(btn => btn.addEventListener('click', () => { checkoutAdditionalServices = checkoutAdditionalServices.filter(x => x.id !== btn.dataset.removeExtra); updateCheckoutAdditionalServices(); }));
             };
-            const addCheckoutAdditionalService = (id) => { const extra = state.services.find((x) => String(x.id) === String(id) && x.isActive !== false); if (!extra) {
+            const addCheckoutAdditionalService = async (id) => { const listed = state.services.find((x) => String(x.id) === String(id) && x.isActive !== false); if (!listed) {
                 toast('تعذر إضافة الخدمة', 'الخدمة لم تعد متاحة في الكتالوج.');
                 return;
-            } if (extra.id === s.id) {
+            } if (listed.id === s.id) {
                 toast('الخدمة موجودة بالفعل', 'هذه هي الخدمة الأساسية في الطلب.');
                 return;
-            } if (checkoutAdditionalServices.some(x => x.id === extra.id)) {
+            } if (checkoutAdditionalServices.some(x => x.id === listed.id)) {
                 toast('الخدمة مضافة بالفعل', 'يمكنك إزالة الخدمة من جدول الفاتورة إذا غيّرت رأيك.');
                 return;
-            } checkoutAdditionalServices.push({ id: extra.id, name: extra.name, pricingType: extra.pricingType, basePrice: extra.basePrice, currency: extra.currency || state.config.currency || 'ر.ي', quantity: 1 }); updateCheckoutAdditionalServices(); toast('أُضيفت إلى الطلب', `${extra.name} أُضيفت إلى الفاتورة الحالية دون استبدال الخدمة الأصلية.`); };
+            } try {
+                const response = await api('/services/' + encodeURIComponent(listed.id));
+                const extra = response.service || listed;
+                const formSchema = Array.isArray(extra.formSchema) ? extra.formSchema : [];
+                const supportsQuantity = formSchema.some((f) => isQuantityField(f));
+                checkoutAdditionalServices.push({ id: extra.id, name: extra.name, pricingType: extra.pricingType, basePrice: extra.basePrice, currency: extra.currency || state.config.currency || 'ر.ي', formSchema, formData: {}, supportsQuantity, quantity: 1 });
+                updateCheckoutAdditionalServices();
+                toast('أُضيفت إلى الطلب', `${extra.name} أُضيفت إلى الفاتورة الحالية دون استبدال الخدمة الأصلية.`);
+            }
+            catch (e) {
+                toast('تعذر تحميل تفاصيل الخدمة', 'تحقق من الاتصال ثم أعد المحاولة.');
+            } };
             updateCheckoutAdditionalServices();
             (() => {
                 const categoryEl = document.getElementById('checkoutStoreList');
@@ -3149,7 +3223,7 @@ async function openOrderForm(serviceId, initial = null) {
         const chosenPriority = String(s.defaultPriority || 'NORMAL');
         const scheduledAt = confirmedScheduledAt;
         const primaryDescription = String(fd.get('description') || '').trim() || String((s.formSchema || []).map((f) => ({ f, v: fd.get(String(f.key)) })).find((x) => /^(request|items|medicine|item|description|details|service_details)$/i.test(String(x.f.key)) && String(x.v || '').trim())?.v || '').trim();
-        const b = { serviceId, description: (primaryDescription || String(s.name)), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: chosenPriority, scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined, ...(checkoutAdditionalServices.length ? { additionalServices: checkoutAdditionalServices.map(x => ({ serviceId: x.id, quantity: Math.max(1, Number(x.quantity) || 1) })) } : {}), ...(initial?.assistantSessionId ? { assistantSessionId: initial.assistantSessionId } : {}) };
+        const b = { serviceId, description: (primaryDescription || String(s.name)), contactPhone: String(fd.get('contactPhone')), notes: String(fd.get('notes') || ''), formData, priority: chosenPriority, scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined, ...(checkoutAdditionalServices.length ? { additionalServices: checkoutAdditionalServices.map(x => ({ serviceId: x.id, quantity: x.supportsQuantity ? Math.max(1, Math.min(999, Number(x.quantity) || 1)) : 1, formData: x.formData || {} })) } : {}), ...(initial?.assistantSessionId ? { assistantSessionId: initial.assistantSessionId } : {}) };
         const selectedAreaId = String(document.getElementById('orderAreaId')?.value || '');
         if (selectedAreaId)
             b.areaId = selectedAreaId;
@@ -5355,6 +5429,26 @@ async function startGuestHome() {
 }
 api('/config').then((c) => { state.config = { ...state.config, ...c }; applyBrandConfig(); }).catch(() => { });
 const restored = restoreSession();
+let lastResumeSessionCheck = 0;
+async function resumeSessionIfNeeded() {
+    if (!state.token || !state.user || document.visibilityState === 'hidden')
+        return;
+    const now = Date.now();
+    if (now - lastResumeSessionCheck < 15000)
+        return;
+    lastResumeSessionCheck = now;
+    try {
+        const result = await api('/auth/me');
+        if (result?.user) {
+            state.user = result.user;
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ accessToken: state.token, user: state.user }));
+        }
+    }
+    catch { /* Network/server failures must not erase a recoverable session. */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible')
+    resumeSessionIfNeeded().catch(() => { }); });
+window.addEventListener('pageshow', () => resumeSessionIfNeeded().catch(() => { }));
 if (restored) {
     const role = state.user.role;
     const portalRole = page === 'admin' ? 'ADMIN' : page === 'provider' ? 'PROVIDER' : 'CUSTOMER';

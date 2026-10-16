@@ -19,6 +19,7 @@ test('فلتر الأقرب يتطلب إحداثيات صالحة ولا يصن
 test('فلتر الأحدث يعتمد على تاريخ إنشاء حقيقي مرسل من الخادم', () => {
     assert.match(catalog, /createdAt:\s*\(x as any\)\.created_at/);
     assert.match(app, /data-service-created=.*sv\.createdAt.*sv\.created_at/);
-    assert.match(app, /recentWindowMs:newServiceWindowMs/);
+    assert.ok(!/newServiceWindowMs/.test(app));
+    assert.match(readFileSync('public/service-filter-logic.js', 'utf8'), /return date !== null/);
 });
 //# sourceMappingURL=v2_63_service_filters.test.js.map

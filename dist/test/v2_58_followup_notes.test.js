@@ -14,7 +14,8 @@ test('nearby services require valid customer and service coordinates and sort by
     assert.match(app, /لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب/);
 });
 test('new service and campaign filters do not invent freshness when timestamps are missing', () => {
-    assert.match(app, /recentWindowMs:newServiceWindowMs/);
+    assert.ok(!/newServiceWindowMs/.test(app));
+    assert.match(readFileSync('public/service-filter-logic.js', 'utf8'), /return date !== null/);
     assert.ok(!/isNew\|\|\(!Number\.isFinite\(created\)&&i<2\)/.test(app));
 });
 test('temporary service ticker uses currently active services and opens its action', () => {
