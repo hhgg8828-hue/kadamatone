@@ -34,6 +34,6 @@ test('2.24 assets use a new cache version and back navigation asks before leavin
     const sw = fs.readFileSync('public/sw.js', 'utf8');
     const app = fs.readFileSync('public/app.ts', 'utf8');
     assert.ok(sw.match(/khadamat-shell-v\d+-\d+/));
-    assert.ok(app.includes('هل أنت متأكد أنك تريد الخروج من تطبيق خدمات؟'));
+    assert.ok(app.includes('هل أنت متأكد من الخروج من البرنامج؟'));
 });
 //# sourceMappingURL=v2_24_recent_notes.test.js.map

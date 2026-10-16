@@ -11,6 +11,7 @@ import type { Locale } from '../types/domain.js';
 export const TEMPLATES: Record<string, { ar: [string, string]; en: [string, string] }> = {
   ORDER_RECEIVED: { ar: ['تم استلام طلبك', 'طلبك رقم {code} قيد البحث عن مقدم خدمة مناسب.'], en: ['Order received', 'Your order {code} is being matched with a provider.'] },
   ORDER_CONFIRMATION_RESULT: { ar: ['تحديث تأكيد الطلب', 'تم تحديث متابعة طلبك {code}: {result}.'], en: ['Order confirmation update', 'The confirmation status for order {code} is now: {result}.'] },
+  ORDER_EXECUTION_SCHEDULED: { ar: ['تم تحديد موعد تنفيذ الطلب', 'تم تحديد موعد تنفيذ الطلب {code}: {scheduledAt}.'], en: ['Order scheduled', 'Order {code} is scheduled for {scheduledAt}.'] },
   NEW_ORDER_CONFIRMATION_ADMIN: { ar: ['طلب جديد يحتاج تأكيدًا', 'وصل الطلب {code}. افتح تأكيد الطلبات واتصل بالعميل لتأكيد التفاصيل.'], en: ['New order needs confirmation', 'Order {code} arrived. Open order confirmations and call the customer to verify the details.'] },
   NEW_OFFER: { ar: ['لديك طلب جديد', 'طلب «{service}» جديد في {area}. اقبله قبل غيرك.'], en: ['You have a new request', 'New “{service}” request in {area}.'] },
   ORDER_ACCEPTED: { ar: ['تم قبول طلبك من مقدم الخدمة', 'قبل {provider} تنفيذ طلبك رقم {code}.'], en: ['Your order was accepted', '{provider} accepted order {code}.'] },
@@ -127,6 +128,14 @@ export function registerNotificationRoutes(app: App, r: Router): void {
     const res = db.run('UPDATE notifications SET read_at = COALESCE(read_at, ?) WHERE id = ? AND user_id = ?', iso(app.clock.now()), ctx.params['id'], ctx.user!.id);
     if (!res.changes) throw E.notFound();
     return { ok: true };
+  });
+  // Anonymous stream carries only public catalog/settings change notifications.
+  // SseHub filters scopes so private notifications and order details are never exposed.
+  r.get('/events/public', (ctx: Ctx) => {
+    ctx.res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no', 'X-Content-Type-Options': 'nosniff' });
+    ctx.res.write('retry: 3000\n\nevent: ready\ndata: {"scope":"public-catalog"}\n\n');
+    app.sse.addPublic(ctx.res);
+    ctx.raw = true;
   });
   // SSE: تذكرة قصيرة العمر لمرة واحدة (EventSource لا يدعم ترويسة Authorization)
   r.post('/events/ticket', auth, (ctx: Ctx) => {

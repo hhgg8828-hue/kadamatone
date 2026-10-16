@@ -95,6 +95,26 @@ export function registerAdminOperationsRoutes(app: App, r: Router): void {
     return {order:o,history,assignments,timeline};
   });
 
+  // Admin execution scheduling is deliberately separate from the contact/callback queue.
+  r.patch('/admin/operations/orders/:id/schedule', auth, adminLevel('SUPPORT'), (ctx:Ctx) => {
+    const b=parse<any>(s.obj({scheduledAt:s.str({min:1,max:40}),note:s.str({max:1000,optional:true})}),ctx.body);
+    const scheduledMs=Date.parse(b.scheduledAt);
+    if(!Number.isFinite(scheduledMs)||scheduledMs<=app.clock.now())throw E.unprocessable('اختر موعد تنفيذ في المستقبل','INVALID_EXECUTION_SCHEDULE');
+    const order=db.get<any>('SELECT id,code,customer_id,provider_id,status,scheduled_at,version FROM orders WHERE id=?',ctx.params.id);
+    if(!order)throw E.notFound('الطلب غير موجود');
+    if(['CANCELLED','COMPLETED','DISPUTED','ON_THE_WAY','IN_PROGRESS'].includes(order.status))throw E.conflict('لا يمكن تغيير موعد تنفيذ طلب أُلغي أو اكتمل أو بدأ تنفيذه','ORDER_NOT_RESCHEDULABLE');
+    const scheduledAt=new Date(scheduledMs).toISOString();const now=iso(app.clock.now());
+    const updated=db.run('UPDATE orders SET scheduled_at=?,updated_at=?,version=version+1 WHERE id=? AND version=?',scheduledAt,now,order.id,order.version);
+    if(!updated.changes)throw E.conflict('تغيّرت بيانات الطلب من عملية أخرى؛ أعد فتح الطلب وحاول مجددًا','ORDER_VERSION_CONFLICT');
+    db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)',order.id,order.status,order.status,ctx.user!.id,'ADMIN',`تم تعديل موعد تنفيذ الطلب إلى ${scheduledAt}${b.note?.trim()?` — ${b.note.trim()}`:''}`,now);
+    app.audit.log({ctx,action:'order.execution_schedule',entityType:'order',entityId:order.id,before:{scheduledAt:order.scheduled_at},after:{scheduledAt,note:b.note?.trim()||null}});
+    const formatted=new Date(scheduledAt).toLocaleString('ar-YE',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Aden'});
+    app.notifications.notify(order.customer_id,'ORDER_EXECUTION_SCHEDULED',{code:order.code,scheduledAt:formatted},{orderId:order.id,scheduledAt});
+    if(order.provider_id){const provider=db.get<any>('SELECT user_id FROM service_providers WHERE id=?',order.provider_id);if(provider?.user_id)app.notifications.notify(provider.user_id,'ORDER_EXECUTION_SCHEDULED',{code:order.code,scheduledAt:formatted},{orderId:order.id,scheduledAt});}
+    app.sse.broadcast('sync',{scope:'orders',reason:'execution-scheduled',orderId:order.id});
+    return {ok:true,orderId:order.id,scheduledAt};
+  });
+
   r.get('/admin/operations/alerts', auth, adminLevel('SUPPORT'), (ctx:Ctx) => { refreshAlerts(); const status=String(ctx.query.status||'OPEN'); return {alerts:db.all<any>(`SELECT * FROM operational_alerts WHERE status=? ORDER BY CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END,last_seen_at DESC LIMIT 200`,status)}; });
   r.patch('/admin/operations/alerts/:id', auth, adminLevel('ADMIN'), (ctx:Ctx) => { const b=parse<any>(s.obj({status:s.oneOf(['ACKNOWLEDGED','RESOLVED'])}),ctx.body); const row=db.get<any>('SELECT * FROM operational_alerts WHERE id=?',ctx.params.id); if(!row)throw E.notFound('التنبيه غير موجود'); const now=iso(app.clock.now()); db.run(`UPDATE operational_alerts SET status=?,acknowledged_by=CASE WHEN ?='ACKNOWLEDGED' THEN ? ELSE acknowledged_by END,acknowledged_at=CASE WHEN ?='ACKNOWLEDGED' THEN ? ELSE acknowledged_at END,resolved_at=CASE WHEN ?='RESOLVED' THEN ? ELSE resolved_at END,updated_at=? WHERE id=?`,b.status,b.status,ctx.user!.id,b.status,now,b.status,now,now,row.id); app.audit.log({ctx,action:'operational.alert_update',entityType:'operational_alert',entityId:row.id,before:{status:row.status},after:{status:b.status}}); return {ok:true}; });
 

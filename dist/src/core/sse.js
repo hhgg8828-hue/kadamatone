@@ -2,6 +2,7 @@
 export class SseHub {
     maxPerUser;
     clients = new Map();
+    publicClients = new Set();
     timer;
     constructor(maxPerUser = 5) {
         this.maxPerUser = maxPerUser;
@@ -22,6 +23,24 @@ export class SseHub {
         res.on('close', () => { set.delete(res); if (!set.size)
             this.clients.delete(userId); });
     }
+    /** Anonymous subscribers receive only whitelisted public catalog/configuration events. */
+    addPublic(res) {
+        this.publicClients.add(res);
+        res.on('close', () => this.publicClients.delete(res));
+    }
+    broadcastPublic(event, data) {
+        if (event !== 'sync' || !data || typeof data !== 'object')
+            return;
+        const scope = String(data.scope || '');
+        if (!['catalog', 'settings', 'campaigns', 'temporary-services', 'order-stores'].includes(scope))
+            return;
+        for (const res of this.publicClients) {
+            try {
+                res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+            }
+            catch { /* connection closed */ }
+        }
+    }
     send(userId, event, data) {
         for (const res of this.clients.get(userId) || []) {
             try {
@@ -35,17 +54,22 @@ export class SseHub {
             try {
                 res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
             }
-            catch { /* connection closed */ } }
+            catch { /* connection closed */ } this.broadcastPublic(event, data); }
     ping() { for (const set of this.clients.values())
         for (const res of set)
             try {
                 res.write(': ping\n\n');
             }
-            catch { /* ignore */ } }
-    stats() { let connections = 0; for (const set of this.clients.values())
-        connections += set.size; return { users: this.clients.size, connections }; }
+            catch { /* ignore */ } for (const res of this.publicClients)
+        try {
+            res.write(': ping\n\n');
+        }
+        catch { /* ignore */ } }
+    stats() { let connections = this.publicClients.size; for (const set of this.clients.values())
+        connections += set.size; return { users: this.clients.size + (this.publicClients.size ? 1 : 0), connections }; }
     closeAll() { clearInterval(this.timer); for (const set of this.clients.values())
         for (const r of set)
-            r.end(); this.clients.clear(); }
+            r.end(); for (const r of this.publicClients)
+        r.end(); this.clients.clear(); this.publicClients.clear(); }
 }
 //# sourceMappingURL=sse.js.map

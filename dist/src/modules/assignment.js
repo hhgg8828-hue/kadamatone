@@ -13,7 +13,7 @@ export function createAssignmentService(app) {
                 const o = db.get('SELECT * FROM orders WHERE id = ?', orderId);
                 if (!o || !['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id)
                     return { offered: 0 };
-                if (db.get("SELECT status FROM order_contact_confirmations WHERE order_id=?", orderId)?.status === 'SCHEDULED')
+                if (['SCHEDULED', 'NEEDS_REVIEW'].includes(String(db.get("SELECT status FROM order_contact_confirmations WHERE order_id=?", orderId)?.status || '')))
                     return { offered: 0 };
                 // Expire stale offers before deciding whether another wave is allowed.
                 // Without this guard, two nearly simultaneous rejections could each launch a new wave,
@@ -65,7 +65,7 @@ export function createAssignmentService(app) {
                     const o = db.get('SELECT * FROM orders WHERE id=?', row.id);
                     if (!o || !['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id)
                         return false;
-                    if (db.get("SELECT status FROM order_contact_confirmations WHERE order_id=?", o.id)?.status === 'SCHEDULED')
+                    if (['SCHEDULED', 'NEEDS_REVIEW'].includes(String(db.get("SELECT status FROM order_contact_confirmations WHERE order_id=?", o.id)?.status || '')))
                         return false;
                     const prior = db.get('SELECT status,expires_at FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, providerId);
                     if (prior && ['REJECTED', 'EXPIRED', 'ACCEPTED'].includes(prior.status))

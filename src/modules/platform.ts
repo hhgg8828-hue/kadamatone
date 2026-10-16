@@ -15,7 +15,7 @@ export function registerPlatformRoutes(app: App, r: Router): void {
 
   r.get('/config', () => {
     const locale = settings.get<'ar' | 'en'>('platform.default_locale');
-    return { appVersion: '2.85', checkoutSuggestionsServicesEnabled: settings.get('checkout.suggested_services_enabled'), checkoutSuggestionsServicesIds: settings.get('checkout.suggested_services_ids'), checkoutSuggestionsSectionsEnabled: settings.get('checkout.suggested_sections_enabled'), checkoutSuggestionsSectionsIds: settings.get('checkout.suggested_sections_ids'), country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
+    return { appVersion: '2.86', checkoutSuggestionsServicesEnabled: settings.get('checkout.suggested_services_enabled'), checkoutSuggestionsServicesIds: settings.get('checkout.suggested_services_ids'), checkoutSuggestionsSectionsEnabled: settings.get('checkout.suggested_sections_enabled'), checkoutSuggestionsSectionsIds: settings.get('checkout.suggested_sections_ids'), country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
       appName: settings.get('app.name'), appCustomerName: settings.get('app.customer_name'), appProviderName: settings.get('app.provider_name'), appAdminName: settings.get('app.admin_name'), appTagline: settings.get('app.tagline'), appSymbol: settings.get('app.symbol'),
       newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'), adminSmsPhone: settings.get('orders.admin_sms_phone'),
       defaultLocale: locale, supportedLocales: ['ar', 'en'], direction: locale === 'ar' ? 'rtl' : 'ltr', mapProvider: app.config.mapProvider };
@@ -53,6 +53,7 @@ export function registerPlatformRoutes(app: App, r: Router): void {
       db.run('INSERT INTO service_areas(id,parent_id,name_i18n,type,locality_type,center_lat,center_lng,radius_km,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
         id, b.parentId || null, JSON.stringify(b.name), b.type, b.localityType || b.type, b.centerLat, b.centerLng, b.radiusKm, b.isActive ? 1 : 0, now, now);
       catalog.invalidate();
+      app.sse.broadcast('sync', { scope: 'catalog', reason: 'area-created' });
       app.audit.log({ ctx, action: 'area.create', entityType: 'area', entityId: id, after: { name: b.name, type: b.type } });
       ctx.status = 201;
       return { area: areaOut(id, ctx.locale) };

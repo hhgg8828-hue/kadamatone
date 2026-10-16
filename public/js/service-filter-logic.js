@@ -34,13 +34,18 @@ export function evaluateServiceFilter(services, key, favoriteIds, options = {}) 
 /** Parse the quantities and persisted per-line prices used by order tracking. */
 export function parseTrackingProductLines(description, serviceName, formData = {}, trackingAmount = null) {
   const trackingLines = String(description || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-  const parsed = trackingLines.filter(x => /^\d+[.)]\s*/.test(x) || /الكمية\s*[:：]/.test(x)).map(line => {
+  const parsed = trackingLines.flatMap(line => {
     const clean = line.replace(/^\d+[.)]\s*/, '');
     const match = clean.match(/^(.*?)\s*[—-]\s*الكمية\s*[:：]\s*(\d+)/);
-    return { name: (match?.[1] || clean).trim(), quantity: match ? Math.max(1, Number(match[2]) || 1) : 1 };
+    if (match) return [{ name: match[1].trim(), quantity: Math.max(1, Number(match[2]) || 1) }];
+    if (/^\d+[.)]\s*/.test(line) && !/^(الكمية|عدد العمال|عدد العاملين|عدد الركاب|عدد الأشخاص|عدد القطع)\s*[:：]/.test(clean)) return [{ name: clean.trim(), quantity: 0 }];
+    return [];
   });
-  const rawQuantity = formData.quantity ?? formData.qty ?? formData.count ?? formData.units ?? formData.numberOfItems;
-  const quantity = Number.isFinite(Number(rawQuantity)) && Number(rawQuantity) >= 1 ? Math.floor(Number(rawQuantity)) : 1;
+  const quantityKeys = /^(quantity|qty|count|units?|numberofitems|itemsquantity|workers?|workercount|workerscount|passengers?|passengercount|people|peoplecount|persons|personscount|riders?|riderscount|numberofpeople|numberofpassengers|numberofworkers)$/i;
+  const rawQuantity = Object.entries(formData || {}).find(([key, value]) => quantityKeys.test(key) && value !== null && value !== undefined && String(value).trim() !== '')?.[1];
+  const parsedDescriptionQuantity = trackingLines.map(line => line.match(/(?:الكمية|عدد العمال|عدد العاملين|عدد الركاب|عدد الأشخاص|عدد القطع)\s*(?:×|x|[:：])\s*(\d+)/i)?.[1]).find(Boolean);
+  const numericQuantity = Number(rawQuantity ?? parsedDescriptionQuantity ?? 1);
+  const quantity = Number.isFinite(numericQuantity) && numericQuantity >= 1 ? Math.floor(numericQuantity) : 1;
   const extras = Array.isArray(formData.additionalServices) ? formData.additionalServices : [];
   const primaryRaw = formData.primaryUnitPriceSnapshot;
   const primaryUnitPrice = primaryRaw !== null && primaryRaw !== undefined && Number.isFinite(Number(primaryRaw)) ? Number(primaryRaw) : null;
@@ -54,6 +59,7 @@ export function parseTrackingProductLines(description, serviceName, formData = {
     const unitPrice = extra && extra.unitPrice !== null && extra.unitPrice !== undefined && Number.isFinite(Number(extra.unitPrice))
       ? Number(extra.unitPrice)
       : (!extra && primaryUnitPrice !== null ? primaryUnitPrice : (rows.length === 1 && trackingAmount !== null && Number.isFinite(Number(trackingAmount)) ? Number(trackingAmount) / Math.max(1, item.quantity) : null));
-    return { ...item, quantity: Math.max(1, Number(item.quantity) || 1), unitPrice, lineTotal: unitPrice === null ? null : unitPrice * Math.max(1, Number(item.quantity) || 1) };
+    const lineQuantity = Number(item.quantity) >= 1 ? Math.floor(Number(item.quantity)) : (rows.length === 1 ? quantity : 1);
+    return { ...item, quantity: Math.max(1, lineQuantity), unitPrice, lineTotal: unitPrice === null ? null : unitPrice * Math.max(1, lineQuantity) };
   });
 }

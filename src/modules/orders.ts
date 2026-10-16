@@ -373,6 +373,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
       const notifyTargets = new Set([o.customer_id]);
       if (o.provider_id) { const pu = db.get<{ user_id: string }>('SELECT user_id FROM service_providers WHERE id = ?', o.provider_id); if (pu) notifyTargets.add(pu.user_id); }
       for (const uid of notifyTargets) if (uid !== ctx.user!.id) app.notifications.notify(uid, 'ORDER_CANCELLED', { code: o.code, reason: b.reason || '' }, { orderId: o.id });
+      app.sse.broadcast('sync',{scope:'orders',reason:'cancelled',orderId:o.id});
       return { order: orders.serialize(db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', o.id)!, ctx) };
     });
   });
@@ -399,21 +400,22 @@ export function registerOrderRoutes(app: App, r: Router): void {
     const result=db.tx(()=>{
       const row=db.get<any>('SELECT * FROM order_contact_confirmations WHERE order_id=?',ctx.params.orderId!); if(!row) throw E.notFound('سجل تأكيد الطلب غير موجود');
       const order=db.get<any>('SELECT id,code,customer_id,status,provider_id FROM orders WHERE id=?',row.order_id); if(!order) throw E.notFound('الطلب غير موجود');
-      if(b.status==='SCHEDULED'&&(order.provider_id||!['PENDING','SEARCHING','ASSIGNED'].includes(order.status)))throw E.conflict('لا يمكن جدولة اتصال لطلب بدأ تنفيذه أو أُسند بالفعل؛ راجع حالة الطلب أولًا','ORDER_ALREADY_ASSIGNED');
+      if((b.status==='SCHEDULED'||b.status==='NEEDS_REVIEW')&&(order.provider_id||!['PENDING','SEARCHING','ASSIGNED'].includes(order.status)))throw E.conflict('لا يمكن تعليق الطلب للمراجعة أو جدولة الاتصال بعد بدء التنفيذ أو إسناد الطلب؛ راجع حالة الطلب أولًا','ORDER_ALREADY_ASSIGNED');
       const now=iso(app.clock.now()); const attempted=row.attempt_count+1;
       const followUpAt=b.status==='SCHEDULED'?new Date(Date.parse(b.followUpAt)).toISOString():null;
       const updated=db.run("UPDATE order_contact_confirmations SET status=?,attempt_count=?,result_note=?,attempted_by=?,attempted_at=?,confirmed_at=CASE WHEN ?='CONFIRMED' THEN ? WHEN ?='PENDING' THEN NULL ELSE confirmed_at END,follow_up_at=?,follow_up_note=?,updated_at=? WHERE order_id=? AND updated_at=?",b.status,attempted,b.note?.trim()||null,ctx.user!.id,now,b.status,now,b.status,followUpAt,b.status==='SCHEDULED'?(b.note?.trim()||null):null,now,row.order_id,row.updated_at);
       if(!updated.changes) throw E.conflict('تغير سجل المتابعة من عملية أخرى؛ أعد المحاولة','CONFIRMATION_VERSION_CONFLICT');
-      if(b.status==='SCHEDULED'){
-        db.run("UPDATE order_assignments SET status='WITHDRAWN',responded_at=?,decision_reason='تم تعليق الطلب بانتظار معاودة الاتصال بالعميل' WHERE order_id=? AND status='OFFERED'",now,row.order_id);
-        if(order.status==='ASSIGNED'&&!order.provider_id){db.run("UPDATE orders SET status='SEARCHING',wave=0,updated_at=?,version=version+1 WHERE id=? AND status='ASSIGNED' AND provider_id IS NULL",now,row.order_id);db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)',row.order_id,'ASSIGNED','SEARCHING',ctx.user!.id,'ADMIN','بانتظار معاودة الاتصال بالعميل',now);}
+      if(b.status==='SCHEDULED'||b.status==='NEEDS_REVIEW'){
+        db.run("UPDATE order_assignments SET status='WITHDRAWN',responded_at=?,decision_reason=? WHERE order_id=? AND status='OFFERED'",now,b.status==='NEEDS_REVIEW'?'تم تعليق الطلب للمراجعة الإدارية':'تم تعليق الطلب بانتظار معاودة الاتصال بالعميل',row.order_id);
+        if(order.status==='ASSIGNED'&&!order.provider_id){db.run("UPDATE orders SET status='SEARCHING',wave=0,updated_at=?,version=version+1 WHERE id=? AND status='ASSIGNED' AND provider_id IS NULL",now,row.order_id);db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)',row.order_id,'ASSIGNED','SEARCHING',ctx.user!.id,'ADMIN',b.status==='NEEDS_REVIEW'?'تعليق للمراجعة الإدارية':'بانتظار معاودة الاتصال بالعميل',now);}
       }
       const labels:any={PENDING:'بانتظار الاتصال',CONFIRMED:'تم تأكيد الطلب',UNREACHABLE:'تعذر الاتصال',NEEDS_REVIEW:'يحتاج مراجعة التفاصيل',NOT_REQUIRED:'لا يحتاج إلى اتصال',SCHEDULED:'تمت جدولة متابعة الاتصال'};
       if(b.status==='CONFIRMED'||b.status==='UNREACHABLE'||b.status==='NEEDS_REVIEW') app.notifications.notify(order.customer_id,'ORDER_CONFIRMATION_RESULT',{code:order.code,result:labels[b.status]},{orderId:order.id,confirmationStatus:b.status});
       app.audit.log({ctx,action:'order.contact_confirmation',entityType:'order',entityId:order.id,before:{status:row.status,attemptCount:row.attempt_count},after:{status:b.status,attemptCount:attempted,note:b.note||null,followUpAt}});
       return {ok:true,status:b.status,attemptCount:attempted,followUpAt,orderId:order.id};
     });
-    if((b.status==='CONFIRMED'||b.status==='NOT_REQUIRED')&&result?.orderId){const current=db.get<any>('SELECT status,provider_id FROM orders WHERE id=?',result.orderId);if(current&&!current.provider_id&&['SEARCHING','ASSIGNED'].includes(current.status))app.assignment.assignWave(result.orderId);}
+    if(result?.orderId)app.sse.broadcast('sync',{scope:'orders',reason:'contact-confirmation-updated',orderId:result.orderId});
+    if((b.status==='CONFIRMED'||b.status==='NOT_REQUIRED'||b.status==='PENDING')&&result?.orderId){const current=db.get<any>('SELECT status,provider_id FROM orders WHERE id=?',result.orderId);if(current&&!current.provider_id&&['SEARCHING','ASSIGNED'].includes(current.status))app.assignment.assignWave(result.orderId);}
     return result;
   });
 
