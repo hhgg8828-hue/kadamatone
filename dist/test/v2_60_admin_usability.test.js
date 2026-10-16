@@ -28,9 +28,9 @@ test('توصيات تأكيد الطلب تظهر كبطاقات أفقية مص
     assert.match(app, /data-checkout-extra=/);
 });
 test('الفلاتر تعتمد على المفضلة والتاريخ والمسافة الحقيقية', () => {
-    assert.match(app, /key==='favorite'&&fav\.has\(id\)/);
-    assert.match(app, /key==='new'&&isNew/);
-    assert.match(app, /key==='nearby'&&Number\.isFinite\(d\)/);
+    assert.match(app, /evaluateServiceFilter\(filterServices,key/);
+    assert.match(app, /recentWindowMs:newServiceWindowMs/);
+    assert.match(app, /locationAvailable:!!loc/);
     assert.match(app, /data-service-created=.*sv\.createdAt.*sv\.created_at/);
 });
 test('إشعارات الخلفية مدعومة عبر Push في Service Worker', () => {

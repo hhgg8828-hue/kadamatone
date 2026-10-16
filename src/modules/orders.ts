@@ -15,7 +15,7 @@ import { executionEvent } from './execution.js';
 
 export interface CreateOrderInput {
   serviceId: string; description: string; location: LocationInput; areaId?: string; addressId?: string; contactPhone: string; recipientName?: string; recipientPhone?: string; recipientUserId?: string;
-  scheduledAt?: string; priority?: Priority; formData?: Record<string, unknown>; notes?: string; attachmentFileIds?: string[]; assistantSessionId?: string; tasks?: Array<{title:string;taskType?:string;details?:string}>;
+  scheduledAt?: string; priority?: Priority; formData?: Record<string, unknown>; notes?: string; attachmentFileIds?: string[]; assistantSessionId?: string; tasks?: Array<{title:string;taskType?:string;details?:string}>; additionalServices?: Array<{serviceId:string;quantity?:number}>;
 }
 const createOrderSchema: Schema = s.obj({
   serviceId: s.str({ min: 1, max: 64 }),
@@ -30,6 +30,7 @@ const createOrderSchema: Schema = s.obj({
   notes: s.str({ max: 500, optional: true }),
   attachmentFileIds: s.arr(s.str({ max: 64 }), { max: 10, optional: true }),
   tasks: s.arr(s.obj({title:s.str({min:2,max:200}),taskType:s.str({min:2,max:50,optional:true}),details:s.str({max:1000,optional:true})}),{max:20,optional:true}),
+  additionalServices: s.arr(s.obj({serviceId:s.str({min:1,max:64}),quantity:s.int({min:1,max:999,optional:true})}),{max:10,optional:true}),
   recipientName: s.str({ max: 80, optional: true }), recipientPhone: s.str({ max: 24, optional: true }), recipientUserId: s.str({ max: 64, optional: true }), assistantSessionId: s.str({ max: 64, optional: true }),
 });
 
@@ -166,10 +167,14 @@ export function registerOrderRoutes(app: App, r: Router): void {
     const fields = parseJson<FormField[]>(svc.form_schema, []) ?? [];
     const formData = validateFormData(fields, b.formData);
     const serviceCategory: any = catalog.all().byCategory.get(svc.category_id);
-    const effectiveUnitPrice = svc.pricing_type === 'FIXED' && (svc.uses_category_default === 1 || svc.base_price == null) && serviceCategory?.default_pricing_type === 'FIXED' ? serviceCategory.default_base_price ?? null : svc.base_price;
-    if (svc.pricing_type === 'FIXED' && (effectiveUnitPrice === null || !Number.isFinite(Number(effectiveUnitPrice)) || Number(effectiveUnitPrice) < 0)) {
+    const effectivePriceFor = (service:any):number|null => {const category:any=catalog.all().byCategory.get(service.category_id);const raw=service.pricing_type==='FIXED'&&(service.uses_category_default===1||service.base_price==null)&&category?.default_pricing_type==='FIXED'?(category.default_base_price??null):service.base_price;return raw===null||raw===undefined||!Number.isFinite(Number(raw))||Number(raw)<0?null:Number(raw)};
+    const effectiveUnitPrice = effectivePriceFor(svc);
+    if (svc.pricing_type === 'FIXED' && effectiveUnitPrice === null) {
       throw E.unprocessable('سعر هذه الخدمة غير محدد حاليًا. يرجى التواصل مع الإدارة قبل تأكيد الطلب.', 'SERVICE_PRICE_UNAVAILABLE');
     }
+    const requestedAdditional=b.additionalServices||[];
+    const seenAdditional=new Set<string>();
+    const extraServices=requestedAdditional.map((item)=>{if(item.serviceId===svc.id||seenAdditional.has(item.serviceId))throw E.unprocessable('لا يمكن إضافة الخدمة نفسها أكثر من مرة إلى الطلب','DUPLICATE_ADDITIONAL_SERVICE');seenAdditional.add(item.serviceId);const extra=catalog.getActiveService(item.serviceId);if(!extra)throw E.unprocessable('إحدى الخدمات الإضافية لم تعد متاحة','ADDITIONAL_SERVICE_UNAVAILABLE');const price=effectivePriceFor(extra);if(extra.pricing_type==='FIXED'&&price===null)throw E.unprocessable('سعر إحدى الخدمات الإضافية غير محدد؛ أزلها أو تواصل مع الإدارة','ADDITIONAL_SERVICE_PRICE_UNAVAILABLE');const serialized=catalog.serializeService(extra,ctx.locale);return {serviceId:extra.id,name:serialized.name,quantity:Math.max(1,Math.min(999,Math.floor(Number(item.quantity||1)))),pricingType:extra.pricing_type,unitPrice:price,currency:serialized.currency||app.settings.get<string>('platform.currency')};});
     if (b.scheduledAt && Date.parse(b.scheduledAt) <= app.clock.now()) throw E.unprocessable('موعد التنفيذ يجب أن يكون في المستقبل', 'SCHEDULED_TIME_PAST', [{ path: 'scheduledAt', message: 'اختر وقتًا قادمًا' }]);
     const idemKey = readIdempotencyKey(ctx.req.headers['idempotency-key']);
 
@@ -218,6 +223,12 @@ export function registerOrderRoutes(app: App, r: Router): void {
         const chain=locRow.area_id?catalog.areaChain(locRow.area_id):[];
         if (!serviceAreaRules.some(areaId=>chain.includes(areaId))) throw E.unprocessable('الخدمة غير متاحة في منطقة موقع الخدمة المحدد','SERVICE_NOT_AVAILABLE_IN_AREA');
       }
+      for(const extra of extraServices){const rules=db.all<{area_id:string}>('SELECT area_id FROM service_area_rules WHERE service_id=?',extra.serviceId).map(x=>x.area_id);if(!rules.length)continue;if(!locationProvided)throw E.unprocessable('حدد موقع الخدمة للتحقق من توفر الخدمات الإضافية في منطقتك','LOCATION_REQUIRED_FOR_COVERAGE');const chain=locRow.area_id?catalog.areaChain(locRow.area_id):[];if(!rules.some(areaId=>chain.includes(areaId)))throw E.unprocessable(`إحدى الخدمات الإضافية غير متاحة في منطقة الموقع المحدد`,'ADDITIONAL_SERVICE_NOT_AVAILABLE_IN_AREA');}
+
+      if(extraServices.length){formData.additionalServices=extraServices;formData.primaryUnitPriceSnapshot=effectiveUnitPrice;}
+      const orderDescription=extraServices.length?`${b.description}\nالخدمات الإضافية ضمن الطلب:\n${extraServices.map((x,i)=>`${i+1}. ${x.name} — الكمية: ${x.quantity} — ${x.unitPrice===null?'السعر يحدد لاحقًا':`سعر الوحدة ${x.unitPrice} ${x.currency}`}`).join('\n')}`:b.description;
+      const orderPricingType=svc.pricing_type==='FIXED'&&extraServices.some(x=>x.pricingType!=='FIXED')?'QUOTE':svc.pricing_type;
+      if(orderDescription.length>1000)throw E.unprocessable('تفاصيل الطلب والخدمات الإضافية طويلة جدًا؛ قلّل الخدمات الإضافية أو اختصر الوصف','ORDER_DESCRIPTION_TOO_LONG');
 
       // حماية إضافية من الضغط/الإرسال المكرر: إذا أرسل العميل نفس الطلب فعليًا
       // مرتين خلال ثوانٍ قليلة بنفس الخدمة والوصف والبيانات والموقع، نعيد الطلب
@@ -230,7 +241,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
            AND o.created_at >= ? ORDER BY o.created_at DESC LIMIT 10`,
         ctx.user!.id, svc.id, iso(app.clock.now() - duplicateWindowMs));
       const same = recent.find((x) => {
-        if (x.description !== b.description || (x.contact_phone || '') !== b.contactPhone) return false;
+        if (x.description !== orderDescription || (x.contact_phone || '') !== b.contactPhone) return false;
         if ((x.form_data || '') !== JSON.stringify(formData)) return false;
         if (x.scheduled_at !== (b.scheduledAt || null)) return false;
         if (x.location_provided === 0 && !locationProvided) return true;
@@ -267,12 +278,13 @@ export function registerOrderRoutes(app: App, r: Router): void {
       db.run(`INSERT INTO orders(id,code,customer_id,service_id,status,priority,description,form_data,location_id,area_id,contact_phone,scheduled_at,
                 pricing_type,price_snapshot,currency,customer_notes,attachments,idempotency_key,recipient_name,recipient_phone,recipient_user_id,location_provided,assistant_session_id,created_at,updated_at)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        id, code, ctx.user!.id, svc.id, 'PENDING', b.priority || svc.default_priority, b.description, JSON.stringify(formData), locRow.id, locRow.area_id,
-        b.contactPhone, b.scheduledAt || null, svc.pricing_type, svc.pricing_type === 'FIXED' ? Number(effectiveUnitPrice) * quantityForPrice(fields, formData) : null, app.settings.get<string>('platform.currency'),
+        id, code, ctx.user!.id, svc.id, 'PENDING', b.priority || svc.default_priority, orderDescription, JSON.stringify(formData), locRow.id, locRow.area_id,
+        b.contactPhone, b.scheduledAt || null, orderPricingType, orderPricingType === 'FIXED' && extraServices.every(x=>x.pricingType==='FIXED'&&x.unitPrice!==null) ? Number(effectiveUnitPrice) * quantityForPrice(fields, formData) + extraServices.reduce((sum,x)=>sum+Number(x.unitPrice)*x.quantity,0) : null, app.settings.get<string>('platform.currency'),
         b.notes || null, JSON.stringify(attachments), idemKey, b.recipientName||null, b.recipientPhone||null, b.recipientUserId||null, locationProvided ? 1 : 0, b.assistantSessionId || null, nowIso, nowIso);
       db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,created_at) VALUES (?,?,?,?,?,?)', id, null, 'PENDING', ctx.user!.id, 'CUSTOMER', nowIso);
       db.run('INSERT INTO order_contact_confirmations(order_id,status,attempt_count,created_at,updated_at) VALUES(?,?,?,?,?)',id,'PENDING',0,nowIso,nowIso);
-      if (b.tasks?.length) { for (let i=0;i<b.tasks.length;i++) db.run('INSERT INTO order_tasks(id,order_id,sequence_no,title,task_type,status,details,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',uuid(),id,i+1,b.tasks[i].title,b.tasks[i].taskType||'GENERAL','PENDING',b.tasks[i].details||null,nowIso,nowIso); executionEvent(app,id,'COMPOUND_TASKS_CREATED','إنشاء طلب مركب',`تم إنشاء ${b.tasks.length} مهام مرتبطة بالطلب`,'CUSTOMER',ctx.user!.id,{count:b.tasks.length}); }
+      const allTasks=[...(b.tasks||[]),...extraServices.map(x=>({title:`خدمة إضافية: ${x.name}`,taskType:'SERVICE',details:JSON.stringify({serviceId:x.serviceId,quantity:x.quantity,pricingType:x.pricingType,unitPrice:x.unitPrice,currency:x.currency})}))];
+      if (allTasks.length) { for (let i=0;i<allTasks.length;i++) db.run('INSERT INTO order_tasks(id,order_id,sequence_no,title,task_type,status,details,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',uuid(),id,i+1,allTasks[i].title,allTasks[i].taskType||'GENERAL','PENDING',allTasks[i].details||null,nowIso,nowIso); executionEvent(app,id,'COMPOUND_TASKS_CREATED','إنشاء طلب مركب',`تم إنشاء ${allTasks.length} مهام مرتبطة بالطلب`,'CUSTOMER',ctx.user!.id,{count:allTasks.length}); }
       if (b.assistantSessionId) db.run("UPDATE assistant_sessions SET status='CONFIRMED',updated_at=? WHERE id=? AND customer_id=?",nowIso,b.assistantSessionId,ctx.user!.id);
       if (b.assistantSessionId) db.run('UPDATE intent_audit SET order_id=?,selected_service_id=?,updated_at=? WHERE assistant_session_id=? AND order_id IS NULL',id,svc.id,nowIso,b.assistantSessionId);
       let o = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', id)!;
@@ -357,25 +369,34 @@ export function registerOrderRoutes(app: App, r: Router): void {
   r.get('/admin/order-confirmations', auth, (ctx: Ctx) => {
     if (ctx.user!.role !== 'ADMIN') throw E.forbidden();
     const status=String(ctx.query['status']||'PENDING').toUpperCase();
-    if(status!=='ALL'&&!['PENDING','CONFIRMED','UNREACHABLE','NEEDS_REVIEW','NOT_REQUIRED'].includes(status)) throw E.unprocessable('حالة تأكيد غير صالحة','INVALID_CONFIRMATION_STATUS');
+    if(status!=='ALL'&&!['PENDING','CONFIRMED','UNREACHABLE','NEEDS_REVIEW','NOT_REQUIRED','SCHEDULED'].includes(status)) throw E.unprocessable('حالة تأكيد غير صالحة','INVALID_CONFIRMATION_STATUS');
     const where=status==='ALL'?'': 'AND oc.status=?';
-    const rows=db.all<any>(`SELECT oc.*,o.code,o.status order_status,o.description,o.contact_phone order_contact_phone,o.customer_notes,o.created_at order_created_at,u.full_name customer_name,u.phone customer_account_phone,s.name_i18n service_name FROM order_contact_confirmations oc JOIN orders o ON o.id=oc.order_id JOIN users u ON u.id=o.customer_id JOIN services s ON s.id=o.service_id WHERE 1=1 ${where} ORDER BY CASE oc.status WHEN 'PENDING' THEN 0 WHEN 'UNREACHABLE' THEN 1 WHEN 'NEEDS_REVIEW' THEN 2 ELSE 3 END,oc.created_at DESC LIMIT 300`,...(status==='ALL'?[]:[status]));
-    return {items:rows.map(x=>({orderId:x.order_id,orderCode:x.code,orderStatus:x.order_status,description:x.description,phone:String(x.customer_account_phone||'').trim()||String(x.order_contact_phone||'').trim()||null,phoneSource:String(x.customer_account_phone||'').trim()?'ACCOUNT':String(x.order_contact_phone||'').trim()?'ORDER':'NONE',customerName:x.customer_name,serviceName:JSON.parse(x.service_name||'{}').ar||x.service_name,customerNotes:x.customer_notes,orderCreatedAt:x.order_created_at,status:x.status,attemptCount:x.attempt_count,resultNote:x.result_note,attemptedAt:x.attempted_at,confirmedAt:x.confirmed_at,updatedAt:x.updated_at})),counts:{pending:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='PENDING'")?.n||0),unreachable:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='UNREACHABLE'")?.n||0),needsReview:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='NEEDS_REVIEW'")?.n||0)}};
+    const rows=db.all<any>(`SELECT oc.*,o.code,o.status order_status,o.description,o.contact_phone order_contact_phone,o.customer_notes,o.created_at order_created_at,u.full_name customer_name,u.phone customer_account_phone,s.name_i18n service_name FROM order_contact_confirmations oc JOIN orders o ON o.id=oc.order_id JOIN users u ON u.id=o.customer_id JOIN services s ON s.id=o.service_id WHERE 1=1 ${where} ORDER BY CASE oc.status WHEN 'SCHEDULED' THEN 0 WHEN 'PENDING' THEN 1 WHEN 'UNREACHABLE' THEN 2 WHEN 'NEEDS_REVIEW' THEN 3 ELSE 4 END,CASE WHEN oc.status='SCHEDULED' THEN oc.follow_up_at END ASC,oc.created_at DESC LIMIT 300`,...(status==='ALL'?[]:[status]));
+    return {items:rows.map(x=>({orderId:x.order_id,orderCode:x.code,orderStatus:x.order_status,description:x.description,phone:String(x.customer_account_phone||'').trim()||String(x.order_contact_phone||'').trim()||null,phoneSource:String(x.customer_account_phone||'').trim()?'ACCOUNT':String(x.order_contact_phone||'').trim()?'ORDER':'NONE',customerName:x.customer_name,serviceName:JSON.parse(x.service_name||'{}').ar||x.service_name,customerNotes:x.customer_notes,orderCreatedAt:x.order_created_at,status:x.status,attemptCount:x.attempt_count,resultNote:x.result_note,attemptedAt:x.attempted_at,confirmedAt:x.confirmed_at,followUpAt:x.follow_up_at,followUpNote:x.follow_up_note,updatedAt:x.updated_at})),counts:{pending:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='PENDING'")?.n||0),unreachable:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='UNREACHABLE'")?.n||0),needsReview:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='NEEDS_REVIEW'")?.n||0),scheduled:Number(db.get("SELECT COUNT(*) n FROM order_contact_confirmations WHERE status='SCHEDULED'")?.n||0)}};
   });
   r.patch('/admin/order-confirmations/:orderId', auth, (ctx: Ctx) => {
     if (ctx.user!.role !== 'ADMIN') throw E.forbidden();
-    const b=parse<any>(s.obj({status:s.oneOf(['CONFIRMED','UNREACHABLE','NEEDS_REVIEW','NOT_REQUIRED','PENDING']),note:s.str({max:1000,optional:true})}),ctx.body);
-    return db.tx(()=>{
+    const b=parse<any>(s.obj({status:s.oneOf(['CONFIRMED','UNREACHABLE','NEEDS_REVIEW','NOT_REQUIRED','PENDING','SCHEDULED']),note:s.str({max:1000,optional:true}),followUpAt:s.str({max:40,optional:true})}),ctx.body);
+    if(b.status==='SCHEDULED'&&(!b.followUpAt||!Number.isFinite(Date.parse(b.followUpAt))||Date.parse(b.followUpAt)<=app.clock.now())) throw E.unprocessable('اختر موعد متابعة في المستقبل','INVALID_FOLLOW_UP_TIME');
+    const result=db.tx(()=>{
       const row=db.get<any>('SELECT * FROM order_contact_confirmations WHERE order_id=?',ctx.params.orderId!); if(!row) throw E.notFound('سجل تأكيد الطلب غير موجود');
-      const order=db.get<any>('SELECT id,code,customer_id,status FROM orders WHERE id=?',row.order_id); if(!order) throw E.notFound('الطلب غير موجود');
+      const order=db.get<any>('SELECT id,code,customer_id,status,provider_id FROM orders WHERE id=?',row.order_id); if(!order) throw E.notFound('الطلب غير موجود');
+      if(b.status==='SCHEDULED'&&(order.provider_id||!['PENDING','SEARCHING','ASSIGNED'].includes(order.status)))throw E.conflict('لا يمكن جدولة اتصال لطلب بدأ تنفيذه أو أُسند بالفعل؛ راجع حالة الطلب أولًا','ORDER_ALREADY_ASSIGNED');
       const now=iso(app.clock.now()); const attempted=row.attempt_count+1;
-      const updated=db.run("UPDATE order_contact_confirmations SET status=?,attempt_count=?,result_note=?,attempted_by=?,attempted_at=?,confirmed_at=CASE WHEN ?='CONFIRMED' THEN ? WHEN ?='PENDING' THEN NULL ELSE confirmed_at END,updated_at=? WHERE order_id=? AND updated_at=?",b.status,attempted,b.note?.trim()||null,ctx.user!.id,now,b.status,now,b.status,now,row.order_id,row.updated_at);
+      const followUpAt=b.status==='SCHEDULED'?new Date(Date.parse(b.followUpAt)).toISOString():null;
+      const updated=db.run("UPDATE order_contact_confirmations SET status=?,attempt_count=?,result_note=?,attempted_by=?,attempted_at=?,confirmed_at=CASE WHEN ?='CONFIRMED' THEN ? WHEN ?='PENDING' THEN NULL ELSE confirmed_at END,follow_up_at=?,follow_up_note=?,updated_at=? WHERE order_id=? AND updated_at=?",b.status,attempted,b.note?.trim()||null,ctx.user!.id,now,b.status,now,b.status,followUpAt,b.status==='SCHEDULED'?(b.note?.trim()||null):null,now,row.order_id,row.updated_at);
       if(!updated.changes) throw E.conflict('تغير سجل المتابعة من عملية أخرى؛ أعد المحاولة','CONFIRMATION_VERSION_CONFLICT');
-      const labels:any={PENDING:'بانتظار الاتصال',CONFIRMED:'تم تأكيد الطلب',UNREACHABLE:'تعذر الاتصال',NEEDS_REVIEW:'يحتاج مراجعة التفاصيل',NOT_REQUIRED:'لا يحتاج إلى اتصال'};
+      if(b.status==='SCHEDULED'){
+        db.run("UPDATE order_assignments SET status='WITHDRAWN',responded_at=?,decision_reason='تم تعليق الطلب بانتظار معاودة الاتصال بالعميل' WHERE order_id=? AND status='OFFERED'",now,row.order_id);
+        if(order.status==='ASSIGNED'&&!order.provider_id){db.run("UPDATE orders SET status='SEARCHING',wave=0,updated_at=?,version=version+1 WHERE id=? AND status='ASSIGNED' AND provider_id IS NULL",now,row.order_id);db.run('INSERT INTO order_status_history(order_id,from_status,to_status,changed_by,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?)',row.order_id,'ASSIGNED','SEARCHING',ctx.user!.id,'ADMIN','بانتظار معاودة الاتصال بالعميل',now);}
+      }
+      const labels:any={PENDING:'بانتظار الاتصال',CONFIRMED:'تم تأكيد الطلب',UNREACHABLE:'تعذر الاتصال',NEEDS_REVIEW:'يحتاج مراجعة التفاصيل',NOT_REQUIRED:'لا يحتاج إلى اتصال',SCHEDULED:'تمت جدولة متابعة الاتصال'};
       if(b.status==='CONFIRMED'||b.status==='UNREACHABLE'||b.status==='NEEDS_REVIEW') app.notifications.notify(order.customer_id,'ORDER_CONFIRMATION_RESULT',{code:order.code,result:labels[b.status]},{orderId:order.id,confirmationStatus:b.status});
-      app.audit.log({ctx,action:'order.contact_confirmation',entityType:'order',entityId:order.id,before:{status:row.status,attemptCount:row.attempt_count},after:{status:b.status,attemptCount:attempted,note:b.note||null}});
-      return {ok:true,status:b.status,attemptCount:attempted};
+      app.audit.log({ctx,action:'order.contact_confirmation',entityType:'order',entityId:order.id,before:{status:row.status,attemptCount:row.attempt_count},after:{status:b.status,attemptCount:attempted,note:b.note||null,followUpAt}});
+      return {ok:true,status:b.status,attemptCount:attempted,followUpAt,orderId:order.id};
     });
+    if((b.status==='CONFIRMED'||b.status==='NOT_REQUIRED')&&result?.orderId){const current=db.get<any>('SELECT status,provider_id FROM orders WHERE id=?',result.orderId);if(current&&!current.provider_id&&['SEARCHING','ASSIGNED'].includes(current.status))app.assignment.assignWave(result.orderId);}
+    return result;
   });
 
   r.get('/admin/orders', auth, (ctx: Ctx) => {

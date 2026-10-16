@@ -13,6 +13,8 @@ export function createAssignmentService(app) {
                 const o = db.get('SELECT * FROM orders WHERE id = ?', orderId);
                 if (!o || !['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id)
                     return { offered: 0 };
+                if (db.get("SELECT status FROM order_contact_confirmations WHERE order_id=?", orderId)?.status === 'SCHEDULED')
+                    return { offered: 0 };
                 // Expire stale offers before deciding whether another wave is allowed.
                 // Without this guard, two nearly simultaneous rejections could each launch a new wave,
                 // creating duplicate active offers and unnecessary notifications for the same order.
@@ -62,6 +64,8 @@ export function createAssignmentService(app) {
                 const didOffer = db.tx(() => {
                     const o = db.get('SELECT * FROM orders WHERE id=?', row.id);
                     if (!o || !['SEARCHING', 'ASSIGNED'].includes(o.status) || o.provider_id)
+                        return false;
+                    if (db.get("SELECT status FROM order_contact_confirmations WHERE order_id=?", o.id)?.status === 'SCHEDULED')
                         return false;
                     const prior = db.get('SELECT status,expires_at FROM order_assignments WHERE order_id=? AND provider_id=?', o.id, providerId);
                     if (prior && ['REJECTED', 'EXPIRED', 'ACCEPTED'].includes(prior.status))

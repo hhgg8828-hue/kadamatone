@@ -2580,3 +2580,15 @@ html,body { max-width:100%; overflow-x:clip; }
 .modal .category-services-grid.category-view-list .category-service-choice small{margin-inline-start:auto;white-space:nowrap}
 :root[data-theme="dark"] .modal .category-view-toggle,:root[data-theme="dark"] .modal .all-categories-grid .all-category-choice,:root[data-theme="dark"] .modal .category-services-grid .category-service-choice{background:var(--theme-surface,#1b2a40);color:var(--theme-text,#eef4fc);border-color:var(--theme-line,#344861)}
 :root[data-theme="dark"] .modal .all-categories-show-all{background:#243c58;color:var(--theme-text,#eef4fc);border-color:#3d6b88}
+
+
+/* v2.82 — accessibility option cards must remain legible in dark mode. */
+:root[data-theme="dark"] .a11y-options label{background:var(--theme-surface,#1b2a40)!important;color:var(--theme-text,#eef4fc)!important;border-color:var(--theme-line,#344861)!important;}
+:root[data-theme="dark"] .a11y-options label input{accent-color:#70d6a8;}
+:root[data-theme="dark"] .checkout-recommendation-image{background:#24364f!important;color:#b9f1d3!important;border:1px solid #3b536e!important;}
+:root[data-theme="dark"] .checkout-recommendation-image .service-icon-svg{stroke:#b9f1d3!important;fill:none!important;}
+:root[data-theme="light"] .checkout-recommendation-image{background:#eaf5ef!important;color:#176b4d!important;border:1px solid #d2e8db!important;}
+:root[data-theme="light"] .checkout-recommendation-image .service-icon-svg{stroke:#176b4d!important;fill:none!important;}
+/* The arrow moves right only; vertical position and size remain unchanged. */
+.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-9px;bottom:-6px;}
+@media(max-width:520px){.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-9px;bottom:-6px;}}

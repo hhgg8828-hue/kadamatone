@@ -4,8 +4,8 @@ import test from 'node:test';
 test('v2.76: customer filters persist and match favorite/new/nearby behavior', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     assert.match(app, /khadamat\.home\.serviceFilter\.v1/);
-    assert.match(app, /key==='favorite'&&fav\.has\(id\)/);
-    assert.match(app, /key==='new'&&isNew/);
+    assert.match(app, /evaluateServiceFilter\(filterServices,key/);
+    assert.match(app, /recentWindowMs:newServiceWindowMs/);
     assert.match(app, /providers\/nearby\?serviceId=/);
     assert.match(app, /khadamat\.home\.selectedCategory\.v1/);
     assert.match(app, /startCustomerCatalogPolling/);

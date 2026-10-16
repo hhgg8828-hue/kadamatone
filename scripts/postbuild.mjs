@@ -12,6 +12,8 @@ for (const file of fs.readdirSync(srcMigrations)) {
 fs.mkdirSync(path.join(dist, 'data'), { recursive: true });
 const srcPublic = path.join(root, 'public');
 const distPublic = path.join(dist, 'public');
+// The browser entrypoint is emitted under public/js, so keep its relative helper import in sync with the canonical source.
+fs.copyFileSync(path.join(srcPublic, 'service-filter-logic.js'), path.join(srcPublic, 'js', 'service-filter-logic.js'));
 fs.rmSync(distPublic, { recursive: true, force: true });
 fs.cpSync(srcPublic, distPublic, { recursive: true });
 console.log('Build assets copied.');

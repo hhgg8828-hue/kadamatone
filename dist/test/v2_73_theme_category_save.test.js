@@ -7,7 +7,7 @@ const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 test('v2.80: category modal does not leave a stale category restriction on home service filters', () => {
     assert.match(app, /localStorage\.removeItem\('khadamat\.home\.selectedCategory\.v1'\)/);
     assert.match(app, /applyServiceFilter\(activeHomeServiceFilter\)/);
-    assert.match(app, /const filterMatch\s*=\s*key\s*===\s*'all'/);
+    assert.match(app, /evaluateServiceFilter\(filterServices,\s*key/);
     assert.match(app, /data-service-filter-empty/);
 });
 test('v2.73: service save has duplicate-submit protection, timeout recovery and success feedback', () => {

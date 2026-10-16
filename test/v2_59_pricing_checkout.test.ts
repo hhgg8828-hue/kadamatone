@@ -10,8 +10,8 @@ const migration = readFileSync('src/db/migrations/040_service_category_price_inh
  test('category default fixed price is exposed when a service has no individual price', () => {
   assert.match(catalog, /x\.pricing_type === 'FIXED' && \(x\.uses_category_default === 1/);
   assert.match(migration, /uses_category_default INTEGER NOT NULL DEFAULT 0/);
-  assert.match(orders, /const effectiveUnitPrice = svc\.pricing_type === 'FIXED' && \(svc\.uses_category_default === 1/);
-  assert.match(orders, /Number\(effectiveUnitPrice\) \* quantityForPrice\(fields, formData\)/);
+  assert.match(orders, /const effectivePriceFor = \(service:any\)/);
+  assert.match(orders, /extraServices\.reduce\(\(sum,x\)=>sum\+Number\(x\.unitPrice\)\*x\.quantity,0\)/);
  });
 
 test('fixed-price order is rejected on server when no effective price exists', () => {

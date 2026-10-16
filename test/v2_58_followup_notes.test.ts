@@ -11,13 +11,13 @@ test('nearby services require valid customer and service coordinates and sort by
   assert.match(app, /if\(!loc\)return Infinity/);
   assert.match(app, /providers\/nearby\?serviceId=/);
   assert.match(app, /nearbyServiceDistanceCache/);
-  assert.match(app, /key==='nearby'\&\&Number\.isFinite\(d\)/);
-  assert.match(app, /if\(key==='nearby'\)ranked\.sort\(\(a,b\)=>a\.d-b\.d/);
+  assert.match(app, /evaluateServiceFilter\(filterServices,key/);
+  assert.match(app, /rankIndex\.get\(id\)/);
   assert.match(app, /لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب/);
 });
 
 test('new service and campaign filters do not invent freshness when timestamps are missing', () => {
-  assert.match(app, /key==='new'&&isNew/);
+  assert.match(app, /recentWindowMs:newServiceWindowMs/);
   assert.ok(!/isNew\|\|\(!Number\.isFinite\(created\)&&i<2\)/.test(app));
 });
 

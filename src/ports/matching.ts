@@ -31,6 +31,7 @@ export class NearestRatedMatcher implements Matcher {
 
   findCandidates(order: OrderRow, { excludeProviderIds = [], limit }: { excludeProviderIds: string[]; limit: number }): Candidate[] {
     const { db, settings } = this.app;
+    if(order.id&&db.get<{status:string}>("SELECT status FROM order_contact_confirmations WHERE order_id=?",order.id)?.status==='SCHEDULED')return [];
     const loc = order.location_provided === 0 ? null : db.get<{ lat: number; lng: number }>('SELECT lat, lng FROM locations WHERE id = ?', order.location_id);
     if (order.location_provided !== 0 && !loc) return [];
     const when = order.scheduled_at ? Date.parse(order.scheduled_at) : this.app.clock.now();
@@ -41,6 +42,8 @@ export class NearestRatedMatcher implements Matcher {
     const serviceSlug = String(db.get<{slug:string}>('SELECT slug FROM services WHERE id=?', order.service_id)?.slug || '');
     let requiredCapability: string | null = null;
     const form=(()=>{ try{return JSON.parse(order.form_data||'{}')}catch{return {}} })() as any;
+    const additionalServiceIds:string[]=Array.from(new Set<string>((Array.isArray(form.additionalServices)?form.additionalServices:[]).map((x:any)=>String(x?.serviceId||'')).filter((id:string)=>id&&id!==order.service_id)));
+    const requiredServiceIds=[order.service_id,...additionalServiceIds];
     if (serviceSlug === 'motorcycle-trips') { const purpose=String(form.purpose||''); requiredCapability = purpose==='PASSENGER'?'trip:passenger': purpose==='MEDICINE'?'trip:medicine': purpose==='ITEM_PURCHASE'?'trip:purchase': purpose==='PARCEL'||purpose==='HOME_PICKUP'?'trip:delivery': purpose==='RESTAURANT_PICKUP'?'trip:restaurant': purpose==='DOCUMENT_DELIVERY'?'trip:documents':purpose==='TECHNICIAN_PICKUP'?'trip:worker':purpose==='STORE_SHOPPING'?'trip:shopping':purpose==='SMALL_CARGO'?'trip:cargo':null; }
     else if (serviceSlug === 'passenger-transport') requiredCapability='trip:passenger';
     else if (serviceSlug === 'pharmacy-purchase') requiredCapability='purchase:pharmacy';
@@ -51,23 +54,27 @@ export class NearestRatedMatcher implements Matcher {
     else if (serviceSlug === 'seasonal-crop-transport') requiredCapability='agri:crop-transport';
     const rows = db.all<any>(`SELECT sp.id,sp.base_lat,sp.base_lng,sp.rating_avg,sp.completed_orders_count,
         GROUP_CONCAT(DISTINCT psa.area_id) provider_area_ids,
+        GROUP_CONCAT(DISTINCT ps.service_id) provider_service_ids,
         GROUP_CONCAT(DISTINCT pc.capability_key) capability_keys,
         ll.lat live_lat,ll.lng live_lng,ll.updated_at live_updated_at,
         CASE WHEN f.provider_id IS NULL THEN 0 ELSE 1 END favorite,
         (SELECT COUNT(*) FROM orders ao WHERE ao.provider_id=sp.id AND ao.status IN ('ACCEPTED','ON_THE_WAY','IN_PROGRESS')) active_order_count
       FROM service_providers sp
       JOIN users u ON u.id=sp.user_id AND u.status='ACTIVE'
-      JOIN provider_services ps ON ps.provider_id=sp.id AND ps.service_id=? AND ps.is_active=1
+      JOIN provider_services ps ON ps.provider_id=sp.id AND ps.service_id IN (${requiredServiceIds.map(()=>'?').join(',')}) AND ps.is_active=1
       LEFT JOIN provider_service_areas psa ON psa.provider_id=sp.id
       LEFT JOIN provider_capabilities pc ON pc.provider_id=sp.id AND pc.is_active=1
       LEFT JOIN provider_live_locations ll ON ll.provider_id=sp.id AND ll.updated_at >= ?
       LEFT JOIN favorite_providers f ON f.customer_id=? AND f.provider_id=sp.id
       WHERE sp.verification_status='VERIFIED' AND sp.is_online=1 AND sp.accepting_orders=1
-      GROUP BY sp.id`, order.service_id, new Date(this.app.clock.now()-5*60_000).toISOString(), order.customer_id);
+      GROUP BY sp.id`, ...requiredServiceIds, new Date(this.app.clock.now()-5*60_000).toISOString(), order.customer_id);
 
     const scored: Candidate[] = [];
     for (const p of rows) {
       if (excluded.has(p.id)) continue;
+      const offeredServices=new Set(String(p.provider_service_ids||'').split(',').filter(Boolean));
+      if(additionalServiceIds.some((id:string)=>!offeredServices.has(id))) continue;
+      if(additionalServiceIds.some((id:string)=>{const rules=db.all<{area_id:string}>('SELECT area_id FROM service_area_rules WHERE service_id=?',id).map(x=>x.area_id);return rules.length&&(!loc||!rules.some(areaId=>chain.has(areaId)));})) continue;
       if (!isProviderAvailable(db, p.id, when, tz)) continue;
       if (requiredCapability) { const caps=String(p.capability_keys||'').split(',').filter(Boolean); if(caps.length && !caps.includes(requiredCapability)) continue; }
       // مقدم الخدمة الذي حدّد نطاق تغطية يجب أن يطابق منطقة الطلب حتى لو كانت
