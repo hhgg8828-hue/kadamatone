@@ -39,7 +39,7 @@ test('regular admin can edit branding settings but not technical settings', asyn
     assert.equal(technical.status, 403);
     const config = await t.api('GET', '/api/v1/config');
     assert.equal(config.body.appName, 'هيثم للخدمات');
-    assert.equal(config.body.appVersion, '2.77');
+    assert.equal(config.body.appVersion, '2.76');
   } finally { await t.close(); }
 });
 

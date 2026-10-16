@@ -1763,7 +1763,7 @@ function renderCustomer() {
 
   <section id="servicesSection" class="reference-service-section">
     
-    <div class="customer-service-filters" role="group" aria-label="تصفية الخدمات"><button type="button" class="active" data-service-filter="all">الكل</button><button type="button" data-service-filter="nearby">الأقرب</button><button type="button" data-service-filter="new">الجديدة</button><button type="button" data-service-filter="favorite">المفضلة</button></div>
+    <div class="customer-service-toolbar"><div class="customer-service-filters" role="group" aria-label="تصفية الخدمات"><button type="button" class="active" data-service-filter="all">الكل</button><button type="button" data-service-filter="nearby">الأقرب</button><button type="button" data-service-filter="new">الجديدة</button><button type="button" data-service-filter="favorite">المفضلة</button></div><button type="button" class="customer-view-toggle" id="customerServiceViewToggle" aria-label="تغيير طريقة عرض الخدمات" aria-pressed="false" title="عرض المربعات"><svg class="view-grid-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg><svg class="view-list-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/></svg></button></div>
     <div id="customerServiceList" class="customer-service-list">${state.services.map((sv, i) => `<article class="customer-service-row" data-service-card="${esc(sv.id)}" data-service-index="${i}" data-service-category="${esc(sv.categorySlug || '')}" data-service-created="${esc(sv.createdAt || sv.created_at || sv.updatedAt || sv.updated_at || '')}"><button type="button" class="customer-service-main" data-open-service="${esc(sv.id)}"><span class="customer-service-logo">${serviceIconSvg(sv.name, sv.icon || sv.categoryIcon || sv.categoryName || '')}</span><span class="customer-service-copy"><b>${esc(sv.name)}</b><small>${esc(sv.categoryName || 'خدمات متنوعة')}</small><span>${esc(sv.description || 'اطلب الخدمة بسهولة من هنا')}</span>${sv.pricingType === 'FIXED' && sv.basePrice != null ? `<strong class="customer-service-price">${esc(sv.basePrice)} ${esc(currencyLabel())}</strong>` : ''}</span></button><div class="customer-service-side"><span class="customer-service-open-badge">متاح</span><button type="button" class="customer-service-favorite" data-service-favorite="${esc(sv.id)}" aria-label="إضافة إلى المفضلة">♡</button><button type="button" class="customer-service-order" data-open-service="${esc(sv.id)}">اطلب</button></div></article>`).join('')}</div>
     ${guestView ? '<div class="customer-guest-hint"><button type="button" class="btn" id="customerSignInToOrder">تسجيل الدخول لطلب خدمة</button></div>' : ''}
   </section>
@@ -1859,7 +1859,24 @@ function renderCustomer() {
     else
         localStorage.removeItem('khadamat.home.selectedCategory.v1'); document.querySelectorAll('.customer-category-tile[data-cat]').forEach(c => { const active = !!selectedHomeCategorySlug && c.dataset.cat === selectedHomeCategorySlug; c.classList.toggle('selected', active); c.setAttribute('aria-pressed', active ? 'true' : 'false'); }); document.getElementById('allCategoriesBtn')?.classList.toggle('selected', !selectedHomeCategorySlug); applyServiceFilter(activeHomeServiceFilter); document.getElementById('servicesSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => applyHomeCategory(x.dataset.cat || '')));
-    document.getElementById('allCategoriesBtn')?.addEventListener('click', () => applyHomeCategory(''));
+    const categoryViewKey = 'khadamat.home.categoriesView.v1';
+    const serviceViewKey = 'khadamat.home.servicesView.v1';
+    const setServiceView = (view) => { const next = view === 'grid' ? 'grid' : 'list'; localStorage.setItem(serviceViewKey, next); const list = document.getElementById('customerServiceList'); if (list) {
+        list.classList.toggle('service-view-grid', next === 'grid');
+        list.classList.toggle('service-view-list', next === 'list');
+    } const toggle = document.getElementById('customerServiceViewToggle'); if (toggle) {
+        toggle.classList.toggle('is-grid', next === 'grid');
+        toggle.setAttribute('aria-pressed', next === 'grid' ? 'true' : 'false');
+        toggle.setAttribute('title', next === 'grid' ? 'عرض الأسطر' : 'عرض المربعات');
+        toggle.setAttribute('aria-label', next === 'grid' ? 'التبديل إلى عرض الأسطر' : 'التبديل إلى عرض المربعات');
+    } };
+    setServiceView(localStorage.getItem(serviceViewKey) || 'list');
+    document.getElementById('customerServiceViewToggle')?.addEventListener('click', () => setServiceView(localStorage.getItem(serviceViewKey) === 'grid' ? 'list' : 'grid'));
+    const openAllCategories = () => { const cats = customerMainCategories(state.cats); let view = localStorage.getItem(categoryViewKey) === 'list' ? 'list' : 'grid'; const render = () => { const tiles = cats.map((c) => `<button type="button" class="all-category-choice card" data-all-category="${esc(c.slug)}"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join(''); return `<div class="all-categories-modal"><div class="all-categories-modal-head"><div><h2>كل التصنيفات</h2><p class="muted">اختر التصنيف لعرض الخدمات التابعة له.</p></div><button type="button" class="customer-view-toggle category-view-toggle ${view === 'grid' ? 'is-grid' : ''}" id="allCategoriesViewToggle" aria-label="${view === 'grid' ? 'التبديل إلى عرض الأسطر' : 'التبديل إلى عرض المربعات'}" title="${view === 'grid' ? 'عرض الأسطر' : 'عرض المربعات'}"><svg class="view-grid-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg><svg class="view-list-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/></svg></button></div><button type="button" class="all-categories-show-all" id="allCategoriesShowAll">عرض جميع الخدمات</button><div class="all-categories-grid ${view === 'list' ? 'category-view-list' : 'category-view-grid'}">${tiles || '<p class="muted">لا توجد تصنيفات متاحة حاليًا.</p>'}</div></div>`; }; showModal(render()); const bind = () => { document.getElementById('allCategoriesViewToggle')?.addEventListener('click', () => { view = view === 'grid' ? 'list' : 'grid'; localStorage.setItem(categoryViewKey, view); const content = document.querySelector('.all-categories-modal'); if (content) {
+        content.outerHTML = render().replace(/^<div class="all-categories-modal">/, '<div class="all-categories-modal">');
+        bind();
+    } }); document.querySelectorAll('[data-all-category]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCategory || ''; closeModal(); applyHomeCategory(slug); })); document.getElementById('allCategoriesShowAll')?.addEventListener('click', () => { closeModal(); applyHomeCategory(''); }); }; bind(); };
+    document.getElementById('allCategoriesBtn')?.addEventListener('click', openAllCategories);
     document.getElementById('allOffersBtn')?.addEventListener('click', () => { const offers = state.campaigns || []; showModal(`<div class="all-offers-modal"><h2>كل العروض</h2><p class="muted">اختر العرض لعرض تفاصيله أو الانتقال إلى الخدمات المرتبطة به.</p><div class="all-offers-grid">${offers.map((c) => `<button type="button" class="card all-offer-item" data-all-offer="${esc(c.id)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="all-offer-placeholder">✦</span>`}<b>${esc(c.title)}</b><small>${esc(c.description || '')}</small></button>`).join('') || '<p class="muted">لا توجد عروض متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-offer]').forEach(b => b.addEventListener('click', () => { const c = offers.find((v) => v.id === b.dataset.allOffer); if (!c)
         return; closeModal(); const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (t === 'CATEGORY' && v)
         openCampaignCategories(c);
@@ -1989,43 +2006,22 @@ function renderCustomer() {
             return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
         } const cacheKey = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}:${String(card.dataset.serviceCard || '')}`; return nearbyServiceDistanceCache.get(cacheKey) ?? Infinity; };
         const now = Date.now();
-        // Resolve category membership from both service metadata and the actual category tree.
-        // The tree's `services` arrays are authoritative for nested/custom admin categories,
-        // while IDs/slugs/names provide compatibility with catalog versions that omit arrays.
-        const categoryIds = new Set(), categoryNames = new Set(), categorySlugs = new Set(), categoryServiceIds = new Set();
-        const collectCategory = (nodes, inside = false) => (nodes || []).forEach((c) => {
-            const slug = String(c.slug || '');
-            const match = slug === selectedHomeCategorySlug;
-            const included = match || inside;
-            if (included) {
-                if (c.id != null)
-                    categoryIds.add(String(c.id));
-                if (c.name)
-                    categoryNames.add(String(c.name));
-                if (slug)
-                    categorySlugs.add(slug);
-                (Array.isArray(c.services) ? c.services : []).forEach((sv) => { if (sv?.id != null)
-                    categoryServiceIds.add(String(sv.id)); });
-            }
-            collectCategory(c.children, included);
-        });
+        // Resolve the selected category against real catalog IDs, slugs and names.
+        // Parent categories include their descendants; the category picker itself stays a modal.
+        const categoryIds = new Set(), categorySlugs = new Set(), categoryNames = new Set();
+        const normalizeCategory = (value) => String(value ?? '').normalize('NFKC').trim().replace(/[\u064B-\u065F\u0670]/g, '').replace(/[\sـ]+/g, ' ').toLocaleLowerCase('ar');
+        const addCategoryValue = (set, value) => { const v = normalizeCategory(value); if (v)
+            set.add(v); };
+        const collectCategory = (nodes, inside = false) => (nodes || []).forEach((c) => { const match = String(c.slug || '') === selectedHomeCategorySlug; if (match || inside) {
+            addCategoryValue(categoryIds, c.id);
+            addCategoryValue(categorySlugs, c.slug);
+            addCategoryValue(categoryNames, typeof c.name === 'object' ? (c.name?.ar || c.name?.en) : c.name);
+            addCategoryValue(categoryNames, c.nameAr);
+            addCategoryValue(categoryNames, c.name?.ar);
+        } collectCategory(Array.isArray(c.children) ? c.children : [], match || inside); });
         if (selectedHomeCategorySlug)
             collectCategory(state.cats);
-        const normalizeCategory = (value) => String(value ?? '').trim().toLocaleLowerCase().replace(/[\s_-]+/g, '');
-        const ranked = cards.map(card => {
-            const created = Date.parse(card.dataset.serviceCreated || '');
-            const isNew = Number.isFinite(created) && created <= now;
-            const d = key === 'nearby' ? distance(card) : Infinity;
-            const id = String(card.dataset.serviceCard || '');
-            const sv = state.services.find((v) => String(v.id) === id);
-            const serviceCategorySlug = String(sv?.categorySlug || card.dataset.serviceCategory || '');
-            const serviceCategoryId = String(sv?.categoryId || '');
-            const serviceCategoryName = String(sv?.categoryName || card.querySelector('.customer-service-copy small')?.textContent || '');
-            const categoryMatch = !selectedHomeCategorySlug || categoryServiceIds.has(id) || categorySlugs.has(serviceCategorySlug) || serviceCategorySlug === selectedHomeCategorySlug || categoryIds.has(serviceCategoryId) || categoryNames.has(serviceCategoryName) || normalizeCategory(serviceCategorySlug) === normalizeCategory(selectedHomeCategorySlug);
-            const filterMatch = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d));
-            const show = categoryMatch && filterMatch;
-            return { card, show, d, created: Number.isFinite(created) ? created : 0, categoryMatch };
-        });
+        const ranked = cards.map(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && created <= now; const d = key === 'nearby' ? distance(card) : Infinity; const id = String(card.dataset.serviceCard || ''); const sv = state.services.find((v) => String(v.id) === id); const serviceCategory = sv?.category || sv?.catalogCategory || {}; const serviceCategorySlug = sv?.categorySlug || serviceCategory?.slug || card.dataset.serviceCategory || ''; const serviceCategoryId = sv?.categoryId ?? serviceCategory?.id ?? ''; const serviceCategoryName = sv?.categoryName ?? serviceCategory?.name ?? card.querySelector('.customer-service-copy small')?.textContent ?? ''; const categoryMatch = !selectedHomeCategorySlug || categorySlugs.has(normalizeCategory(serviceCategorySlug)) || categoryIds.has(normalizeCategory(serviceCategoryId)) || categoryNames.has(normalizeCategory(typeof serviceCategoryName === 'object' ? (serviceCategoryName?.ar || serviceCategoryName?.en) : serviceCategoryName)); const filterMatch = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d)); const show = categoryMatch && filterMatch; return { card, show, d, created: Number.isFinite(created) ? created : 0, categoryMatch }; });
         if (key === 'nearby')
             ranked.sort((a, b) => a.d - b.d || a.card.dataset.serviceCard.localeCompare(b.card.dataset.serviceCard));
         else if (key === 'new')
@@ -2072,8 +2068,7 @@ function renderCustomer() {
                 empty.setAttribute('role', 'status');
                 list.appendChild(empty);
             }
-            const categoryHasServices = ranked.some(x => x.categoryMatch);
-            empty.textContent = key === 'nearby' && nearbyDistanceLookupRunning ? 'جارٍ ترتيب الخدمات حسب قرب مقدمي الخدمة…' : selectedHomeCategorySlug && !categoryHasServices ? 'لا توجد خدمات متاحة في هذا القسم حاليًا.' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
+            empty.textContent = key === 'nearby' && nearbyDistanceLookupRunning ? 'جارٍ ترتيب الخدمات حسب قرب مقدمي الخدمة…' : selectedHomeCategorySlug && !ranked.some(x => { const sv = state.services.find((v) => String(v.id) === String(x.card.dataset.serviceCard)); return String(sv?.categorySlug || x.card.dataset.serviceCategory || '') === selectedHomeCategorySlug || categoryIds.has(String(sv?.categoryId || '')) || categoryNames.has(String(sv?.categoryName || '')); }) ? 'لا توجد خدمات متاحة في هذا القسم حاليًا.' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
         }
         else
             empty?.remove();

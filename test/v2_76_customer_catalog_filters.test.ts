@@ -11,7 +11,7 @@ test('v2.76: customer filters persist and match favorite/new/nearby behavior', (
   assert.match(app, /khadamat\.home\.selectedCategory\.v1/);
   assert.match(app, /startCustomerCatalogPolling/);
   assert.match(app, /},10000\)/);
-  assert.match(app, /document\.getElementById\('allCategoriesBtn'\)\?\.addEventListener\('click',\(\)=>applyHomeCategory\(''\)\)/);
+  assert.match(app, /document\.getElementById\('allCategoriesBtn'\)\?\.addEventListener\('click',openAllCategories\)/);
 });
 
 test('v2.76: checkout uses actual catalog categories and dark theme fixes white invoice surfaces', () => {
