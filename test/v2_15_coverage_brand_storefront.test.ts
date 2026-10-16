@@ -35,7 +35,7 @@ test('public configuration exposes editable brand, ticker and release informatio
   try {
     const before = await t.api('GET', '/api/v1/config');
     assert.equal(before.status, 200);
-    assert.equal(before.body.appName, 'خدمات');
+    assert.equal(before.body.appName, 'خدمات الهيثم');
     assert.ok(typeof before.body.newsTicker === 'string');
     assert.ok(typeof before.body.releaseNotes === 'string');
     const token = await loginAdmin(t.api);
@@ -46,7 +46,7 @@ test('public configuration exposes editable brand, ticker and release informatio
     const manifest = await t.api('GET', '/manifest-customer.webmanifest');
     assert.equal(manifest.status, 200);
     assert.match(manifest.headers.get('content-type') || '', /application\/manifest\+json/);
-    assert.match(manifest.body.name, /^هيثم/);
+    assert.equal(manifest.body.name, after.body.appCustomerName);
   } finally {
     await t.close();
   }

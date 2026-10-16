@@ -6,8 +6,8 @@ const css = readFileSync('public/css/app.css', 'utf8');
 const migration = readFileSync('src/db/migrations/039_remove_demo_order_store_seeds.sql', 'utf8');
 test('V2.66: متاجر الطلب تختار التصنيفات الحقيقية من كتالوج الإدارة', () => {
     assert.ok(app.includes('القسم الحقيقي من كتالوج خدمات'));
-    assert.ok(app.includes("api('/order-stores')"));
-    assert.ok(app.includes('catalogCategories.find'));
+    assert.ok(app.includes('const selected=catalogCategories'));
+    assert.ok(!app.includes("api('/order-stores')"));
     assert.ok(app.includes("openCategory(slug)"));
     assert.ok(!app.includes('<option>بقالات</option><option>صيدليات</option>'));
     assert.ok(migration.includes('DELETE FROM order_store_recommendations'));

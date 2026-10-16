@@ -8,7 +8,9 @@ const catalog = readFileSync('src/modules/catalog.ts', 'utf8');
 
 test('nearby services require valid customer and service coordinates and sort by distance', () => {
   assert.match(app, /function validCoordinates\(latValue:any,lngValue:any\)/);
-  assert.match(app, /if\(!loc\|\|!point\)return Infinity/);
+  assert.match(app, /if\(!loc\)return Infinity/);
+  assert.match(app, /providers\/nearby\?serviceId=/);
+  assert.match(app, /nearbyServiceDistanceCache/);
   assert.match(app, /key==='nearby'\&\&Number\.isFinite\(d\)/);
   assert.match(app, /if\(key==='nearby'\)ranked\.sort\(\(a,b\)=>a\.d-b\.d/);
   assert.match(app, /لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب/);

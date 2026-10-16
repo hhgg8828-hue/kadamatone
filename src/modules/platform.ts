@@ -15,7 +15,7 @@ export function registerPlatformRoutes(app: App, r: Router): void {
 
   r.get('/config', () => {
     const locale = settings.get<'ar' | 'en'>('platform.default_locale');
-    return { appVersion: '2.75', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
+    return { appVersion: '2.77', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
       appName: settings.get('app.name'), appCustomerName: settings.get('app.customer_name'), appProviderName: settings.get('app.provider_name'), appAdminName: settings.get('app.admin_name'), appTagline: settings.get('app.tagline'), appSymbol: settings.get('app.symbol'),
       newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'), adminSmsPhone: settings.get('orders.admin_sms_phone'),
       defaultLocale: locale, supportedLocales: ['ar', 'en'], direction: locale === 'ar' ? 'rtl' : 'ltr', mapProvider: app.config.mapProvider };

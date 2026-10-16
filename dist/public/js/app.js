@@ -123,6 +123,7 @@ async function ensureLeaflet() {
     return leafletPromise;
 }
 let customerPollTimer;
+let catalogPollTimer;
 let providerPollTimer;
 let providerHeartbeatTimer;
 let notificationPollTimer;
@@ -133,6 +134,9 @@ let liveRefreshTimer;
 const stopPollers = () => { if (customerPollTimer !== undefined) {
     clearInterval(customerPollTimer);
     customerPollTimer = undefined;
+} if (catalogPollTimer !== undefined) {
+    clearInterval(catalogPollTimer);
+    catalogPollTimer = undefined;
 } if (providerPollTimer !== undefined) {
     clearInterval(providerPollTimer);
     providerPollTimer = undefined;
@@ -152,6 +156,45 @@ const stopPollers = () => { if (customerPollTimer !== undefined) {
     clearInterval(offerCountdownTimer);
     offerCountdownTimer = undefined;
 } };
+let lastCustomerCatalogSignature = '';
+const nearbyServiceDistanceCache = new Map();
+const nearbyDistanceLookupKeys = new Set();
+let nearbyDistanceLookupRunning = false;
+function customerCatalogSignature(payload) { return JSON.stringify({ categories: payload.categories || [], services: payload.services || [], temporaryServices: payload.temporaryServices || [], campaigns: payload.campaigns || [], popularity: payload.popularity || [] }); }
+function startCustomerCatalogPolling() {
+    if (catalogPollTimer !== undefined)
+        clearInterval(catalogPollTimer);
+    lastCustomerCatalogSignature = customerCatalogSignature({ categories: state.cats, services: state.services, temporaryServices: state.temporaryServices, campaigns: state.campaigns, popularity: state.popularity });
+    catalogPollTimer = window.setInterval(async () => {
+        if (page !== 'customer' || !document.querySelector('.customer-shell'))
+            return;
+        try {
+            const areaQuery = state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : '';
+            const payload = await api('/catalog/bootstrap' + areaQuery);
+            const signature = customerCatalogSignature(payload);
+            if (signature === lastCustomerCatalogSignature)
+                return;
+            lastCustomerCatalogSignature = signature;
+            const scrollY = window.scrollY;
+            const ordersVisible = !!document.getElementById('ordersSection') && !document.getElementById('ordersSection').classList.contains('hide-section');
+            const rail = document.getElementById('categoryScroll');
+            const railScroll = rail?.scrollLeft || 0;
+            state.cats = payload.categories || [];
+            state.services = payload.services || [];
+            state.temporaryServices = payload.temporaryServices || [];
+            state.campaigns = payload.campaigns || [];
+            state.popularity = payload.popularity || [];
+            if (!customerMainCategories(state.cats).some((c) => String(c.slug || '') === localStorage.getItem('khadamat.home.selectedCategory.v1')))
+                localStorage.removeItem('khadamat.home.selectedCategory.v1');
+            renderCustomer();
+            if (ordersVisible)
+                switchCustomerSection('orders');
+            requestAnimationFrame(() => { window.scrollTo({ top: scrollY, behavior: 'auto' }); const nextRail = document.getElementById('categoryScroll'); if (nextRail)
+                nextRail.scrollLeft = railScroll; });
+        }
+        catch { /* Keep the current catalog visible during temporary network failures. */ }
+    }, 10000);
+}
 let pendingAssistImage = null;
 let pendingAssistImageFileId = null;
 let realtime;
@@ -1187,6 +1230,7 @@ async function customer() {
             state.orders = [];
             renderCustomer();
             stopPollers();
+            startCustomerCatalogPolling();
         }
         catch (e) {
             shell(`<div class="card error">${esc(e.message)}</div>`);
@@ -1259,6 +1303,7 @@ async function customer() {
             requestAnimationFrame(() => window.scrollTo({ top: previousScrollY, behavior: 'auto' }));
         handleNotificationDeepLink().catch(() => { });
         stopPollers();
+        startCustomerCatalogPolling();
         customerPollTimer = window.setInterval(async () => { try {
             state.orders = sortCustomerOrders(await fetchAllCustomerOrders());
             const box = document.getElementById('orders');
@@ -1691,15 +1736,21 @@ function renderCustomer() {
     } return out.join(' ← '); };
     const selectableAreas = state.areas.filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').slice().sort((a, b) => areaPath(a).localeCompare(areaPath(b), 'ar'));
     const customerCategories = customerMainCategories(state.cats);
-    let selectedHomeCategorySlug = '';
-    let activeHomeServiceFilter = 'all';
+    let selectedHomeCategorySlug = localStorage.getItem('khadamat.home.selectedCategory.v1') || '';
+    let activeHomeServiceFilter = localStorage.getItem('khadamat.home.serviceFilter.v1') || 'all';
+    if (!['all', 'nearby', 'new', 'favorite'].includes(activeHomeServiceFilter))
+        activeHomeServiceFilter = 'all';
+    if (selectedHomeCategorySlug && !customerCategories.some((c) => String(c.slug || '') === selectedHomeCategorySlug)) {
+        selectedHomeCategorySlug = '';
+        localStorage.removeItem('khadamat.home.selectedCategory.v1');
+    }
     const activeTemporaryService = (state.temporaryServices || []).filter((x) => { const now = Date.now(), start = Date.parse(String(x.startAt || '')), end = Date.parse(String(x.endAt || '')); return x.isActive === true && Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now; }).sort((a, b) => (Number(b.priority || 0) - Number(a.priority || 0)) || ((Date.parse(String(a.endAt)) - Date.parse(String(b.endAt)))))[0];
     const temporaryTitle = activeTemporaryService ? String(activeTemporaryService.title || activeTemporaryService.name || 'العرض المؤقت').trim() : ' ';
     const tickerText = activeTemporaryService ? `اضغط هنا لعرض ${temporaryTitle}` : (String(state.config?.newsTicker || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.').trim() || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.');
     shell(`<div class="customer-sticky-discovery">
   <div class="khadamat-news-ticker reference-news-ticker" data-temporary-offer="${activeTemporaryService ? 'true' : 'false'}" role="${activeTemporaryService ? 'button' : 'status'}" ${activeTemporaryService ? `data-temp-id="${esc(activeTemporaryService.id)}" tabindex="0" aria-label="اضغط هنا لعرض ${esc(temporaryTitle)}"` : 'aria-label="آخر الأخبار والعروض"'}><span class="news-ticker-label">${activeTemporaryService ? 'عرض مؤقت' : 'آخر الأخبار'}</span><div class="news-ticker-window"><div class="news-ticker-track"><span>${esc(tickerText)}</span><span aria-hidden="true">${esc(tickerText)}</span></div></div>${activeTemporaryService ? '<span class="temporary-offer-arrow" aria-hidden="true">←</span>' : ''}</div>
   <section class="quick-assist-reference" aria-label="الوصول السريع"><div class="quick-assist-reference-head"><span class="quick-assist-reference-icon">✦</span><div><b>الوصول السريع</b><small>تحدث أو اكتب ما تحتاجه وسنساعدك في الوصول إلى الخدمة.</small></div></div><form id="quickAssistForm" class="quick-assist-card" autocomplete="off"><div class="quick-assist-input-row"><textarea id="quickAssistText" maxlength="500" rows="1" aria-label="اكتب ما تحتاجه" placeholder="مثال: أريد واحد يشتري لي بيبسي ويوصله للبيت"></textarea><button class="btn quick-assist-voice" id="quickAssistVoice" type="button" aria-label="التحدث لكتابة الطلب">🎤</button><button class="btn quick-assist-send" type="submit" aria-label="بحث">←</button></div><div id="quickAssistStatus" class="quick-assist-status" role="status" aria-live="polite"></div><div id="quickAssistResults" class="quick-assist-results" aria-live="polite"></div></form></section>
-  <section class="customer-category-showcase customer-category-showcase-top" aria-label="التصنيفات"><div class="customer-category-rail" id="cats"><button type="button" class="customer-category-tile all-categories-tile" id="allCategoriesBtn" aria-label="كل التصنيفات"><span class="all-categories-check" aria-hidden="true">✓</span><b>كل التصنيفات</b></button>${customerCategories.map((c) => `<button class="customer-category-tile" data-cat="${esc(c.slug)}" type="button"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join('')}</div></section>
+  <section class="customer-category-showcase customer-category-showcase-top" aria-label="التصنيفات"><div class="customer-category-rail" id="cats"><button type="button" class="customer-category-tile all-categories-tile" id="allCategoriesBtn" aria-label="كل التصنيفات"><span class="all-categories-check" aria-hidden="true">✓</span><b>كل التصنيفات</b></button><div class="customer-category-scroll" id="categoryScroll">${customerCategories.map((c) => `<button class="customer-category-tile" data-cat="${esc(c.slug)}" type="button"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join('')}</div></div></section>
   </div>
   <section class="customer-offers" aria-label="العروض القريبة منك"><div class="campaign-strip-wrap"><div class="campaign-strip">${(state.campaigns || []).length ? (state.campaigns || []).map((c) => `<article class="campaign-card card" data-campaign-card="${esc(c.id)}" tabindex="0" role="button" aria-label="فتح العرض: ${esc(c.title)}"><div class="campaign-image-wrap">${c.imageUrl ? `<img class="campaign-image" src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<div class="campaign-image campaign-image-placeholder" aria-hidden="true">${serviceIconSvg(c.title || 'عرض', '')}</div>`}<span class="campaign-image-overlay-label" aria-hidden="true">${esc(c.buttonLabel || 'اكتشف العرض')}</span><button type="button" class="campaign-favorite" data-campaign-favorite="${esc(c.id)}" aria-label="إضافة إلى المفضلة">♡</button></div></article>`).join('') : `<button type="button" class="customer-empty-banner" data-scroll-categories><span class="customer-empty-banner-art" aria-hidden="true">${serviceIconSvg('خدمات متنوعة', '')}</span><span><b>اكتشف الخدمات المتاحة في منطقتك</b><small>اختر القسم الذي تحتاجه وابدأ طلبك بسهولة.</small><strong>تصفح الخدمات ←</strong></span></button>`}</div><button type="button" class="all-offers-button" id="allOffersBtn">كل العروض</button></div></section>
   <div class="card manual-service-fallback"><div class="search-wrap"><div class="row search-row"><div class="search-box"><span class="search-icon">⌕</span><input id="search" autocomplete="off" placeholder="ابحث عن خدمة..."><button class="clear-search" id="clearSearch" type="button" aria-label="مسح">×</button></div></div><div id="suggestions" class="suggestions hide"></div></div></div>
@@ -1713,7 +1764,7 @@ function renderCustomer() {
   <section id="servicesSection" class="reference-service-section">
     
     <div class="customer-service-filters" role="group" aria-label="تصفية الخدمات"><button type="button" class="active" data-service-filter="all">الكل</button><button type="button" data-service-filter="nearby">الأقرب</button><button type="button" data-service-filter="new">الجديدة</button><button type="button" data-service-filter="favorite">المفضلة</button></div>
-    <div id="customerServiceList" class="customer-service-list">${state.services.map((sv, i) => `<article class="customer-service-row" data-service-card="${esc(sv.id)}" data-service-index="${i}" data-service-category="${esc(sv.categorySlug || '')}" data-service-created="${esc(sv.createdAt || '')}"><button type="button" class="customer-service-main" data-open-service="${esc(sv.id)}"><span class="customer-service-logo">${serviceIconSvg(sv.name, sv.icon || sv.categoryIcon || sv.categoryName || '')}</span><span class="customer-service-copy"><b>${esc(sv.name)}</b><small>${esc(sv.categoryName || 'خدمات متنوعة')}</small><span>${esc(sv.description || 'اطلب الخدمة بسهولة من هنا')}</span>${sv.pricingType === 'FIXED' && sv.basePrice != null ? `<strong class="customer-service-price">${esc(sv.basePrice)} ${esc(currencyLabel())}</strong>` : ''}</span></button><div class="customer-service-side"><span class="customer-service-open-badge">متاح</span><button type="button" class="customer-service-favorite" data-service-favorite="${esc(sv.id)}" aria-label="إضافة إلى المفضلة">♡</button><button type="button" class="customer-service-order" data-open-service="${esc(sv.id)}">اطلب</button></div></article>`).join('') || '<div class="card empty">لا توجد خدمات متاحة في هذه المنطقة حاليًا.</div>'}</div>
+    <div id="customerServiceList" class="customer-service-list">${state.services.map((sv, i) => `<article class="customer-service-row" data-service-card="${esc(sv.id)}" data-service-index="${i}" data-service-category="${esc(sv.categorySlug || '')}" data-service-created="${esc(sv.createdAt || sv.created_at || sv.updatedAt || sv.updated_at || '')}"><button type="button" class="customer-service-main" data-open-service="${esc(sv.id)}"><span class="customer-service-logo">${serviceIconSvg(sv.name, sv.icon || sv.categoryIcon || sv.categoryName || '')}</span><span class="customer-service-copy"><b>${esc(sv.name)}</b><small>${esc(sv.categoryName || 'خدمات متنوعة')}</small><span>${esc(sv.description || 'اطلب الخدمة بسهولة من هنا')}</span>${sv.pricingType === 'FIXED' && sv.basePrice != null ? `<strong class="customer-service-price">${esc(sv.basePrice)} ${esc(currencyLabel())}</strong>` : ''}</span></button><div class="customer-service-side"><span class="customer-service-open-badge">متاح</span><button type="button" class="customer-service-favorite" data-service-favorite="${esc(sv.id)}" aria-label="إضافة إلى المفضلة">♡</button><button type="button" class="customer-service-order" data-open-service="${esc(sv.id)}">اطلب</button></div></article>`).join('')}</div>
     ${guestView ? '<div class="customer-guest-hint"><button type="button" class="btn" id="customerSignInToOrder">تسجيل الدخول لطلب خدمة</button></div>' : ''}
   </section>
 
@@ -1803,13 +1854,12 @@ function renderCustomer() {
     document.addEventListener('click', function outside(e) { if (!search.contains(e.target) && !suggestions.contains(e.target)) {
         suggestions.className = 'suggestions hide';
     } }, { once: false });
-    const applyHomeCategory = (slug) => { selectedHomeCategorySlug = String(slug || ''); document.querySelectorAll('.customer-category-tile[data-cat]').forEach(c => { const active = !!selectedHomeCategorySlug && c.dataset.cat === selectedHomeCategorySlug; c.classList.toggle('selected', active); c.setAttribute('aria-pressed', active ? 'true' : 'false'); }); document.getElementById('allCategoriesBtn')?.classList.toggle('selected', !selectedHomeCategorySlug); applyServiceFilter(activeHomeServiceFilter); document.getElementById('servicesSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    const applyHomeCategory = (slug) => { selectedHomeCategorySlug = String(slug || ''); if (selectedHomeCategorySlug)
+        localStorage.setItem('khadamat.home.selectedCategory.v1', selectedHomeCategorySlug);
+    else
+        localStorage.removeItem('khadamat.home.selectedCategory.v1'); document.querySelectorAll('.customer-category-tile[data-cat]').forEach(c => { const active = !!selectedHomeCategorySlug && c.dataset.cat === selectedHomeCategorySlug; c.classList.toggle('selected', active); c.setAttribute('aria-pressed', active ? 'true' : 'false'); }); document.getElementById('allCategoriesBtn')?.classList.toggle('selected', !selectedHomeCategorySlug); applyServiceFilter(activeHomeServiceFilter); document.getElementById('servicesSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => applyHomeCategory(x.dataset.cat || '')));
-    document.getElementById('allCategoriesBtn')?.addEventListener('click', () => { if (selectedHomeCategorySlug) {
-        applyHomeCategory('');
-        return;
-    } const all = []; const walk = (xs) => xs.forEach((c) => { all.push(c); if (Array.isArray(c.children))
-        walk(c.children); }); walk(state.cats); showModal(`<div class="all-categories-modal"><h2>كل التصنيفات</h2><p class="muted">اختر قسمًا لعرض خدماته في الصفحة الرئيسية.</p><div class="grid all-categories-grid">${all.map((c) => `<button type="button" class="card service-option" data-all-cat="${esc(c.slug)}"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b><span class="muted">عرض الخدمات ←</span></button>`).join('') || '<p class="muted">لا توجد تصنيفات متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-cat]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCat || ''; closeModal(); applyHomeCategory(slug); })); });
+    document.getElementById('allCategoriesBtn')?.addEventListener('click', () => applyHomeCategory(''));
     document.getElementById('allOffersBtn')?.addEventListener('click', () => { const offers = state.campaigns || []; showModal(`<div class="all-offers-modal"><h2>كل العروض</h2><p class="muted">اختر العرض لعرض تفاصيله أو الانتقال إلى الخدمات المرتبطة به.</p><div class="all-offers-grid">${offers.map((c) => `<button type="button" class="card all-offer-item" data-all-offer="${esc(c.id)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="all-offer-placeholder">✦</span>`}<b>${esc(c.title)}</b><small>${esc(c.description || '')}</small></button>`).join('') || '<p class="muted">لا توجد عروض متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-offer]').forEach(b => b.addEventListener('click', () => { const c = offers.find((v) => v.id === b.dataset.allOffer); if (!c)
         return; closeModal(); const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (t === 'CATEGORY' && v)
         openCampaignCategories(c);
@@ -1900,13 +1950,15 @@ function renderCustomer() {
     const saveServiceFavorites = (ids) => localStorage.setItem(serviceFavoritesKey(), JSON.stringify([...new Set(ids)]));
     document.querySelectorAll('[data-service-favorite]').forEach(x => { const id = x.dataset.serviceFavorite || ''; if (serviceFavorites().includes(id)) {
         x.textContent = '♥';
+        x.classList.add('is-favorite');
         x.setAttribute('aria-pressed', 'true');
         x.setAttribute('aria-label', 'إزالة من المفضلة');
     }
     else {
+        x.classList.remove('is-favorite');
         x.setAttribute('aria-pressed', 'false');
         x.setAttribute('aria-label', 'إضافة إلى المفضلة');
-    } x.addEventListener('click', e => { e.stopPropagation(); const fav = serviceFavorites(); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; saveServiceFavorites(next); x.textContent = next.includes(id) ? '♥' : '♡'; x.setAttribute('aria-pressed', next.includes(id) ? 'true' : 'false'); x.setAttribute('aria-label', next.includes(id) ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'); if (document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'favorite')
+    } x.addEventListener('click', e => { e.stopPropagation(); const fav = serviceFavorites(); const next = fav.includes(id) ? fav.filter(v => v !== id) : [...fav, id]; saveServiceFavorites(next); x.textContent = next.includes(id) ? '♥' : '♡'; x.classList.toggle('is-favorite', next.includes(id)); x.setAttribute('aria-pressed', next.includes(id) ? 'true' : 'false'); x.setAttribute('aria-label', next.includes(id) ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'); if (document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'favorite')
         applyServiceFilter('favorite'); }); });
     function validCoordinates(latValue, lngValue) { if (latValue === null || latValue === undefined || lngValue === null || lngValue === undefined || String(latValue).trim() === '' || String(lngValue).trim() === '')
         return null; const lat = Number(latValue), lng = Number(lngValue); return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null; }
@@ -1915,6 +1967,7 @@ function renderCustomer() {
         if (!validKeys.includes(key))
             key = 'all';
         activeHomeServiceFilter = key;
+        localStorage.setItem('khadamat.home.serviceFilter.v1', key);
         document.querySelectorAll('[data-service-filter]').forEach(b => { const active = b.dataset.serviceFilter === key; b.classList.toggle('active', active); b.setAttribute('aria-pressed', active ? 'true' : 'false'); });
         const fav = new Set(serviceFavorites());
         const list = document.getElementById('customerServiceList');
@@ -1928,17 +1981,51 @@ function renderCustomer() {
         catch {
             return null;
         } })();
-        const distance = (card) => { const sv = state.services.find((v) => String(v.id) === String(card.dataset.serviceCard)); const point = validCoordinates(sv?.latitude ?? sv?.lat ?? sv?.location?.lat, sv?.longitude ?? sv?.lng ?? sv?.location?.lng); if (!loc || !point)
-            return Infinity; const r = (x) => x * Math.PI / 180; const dLat = r(point.lat - loc.lat), dLng = r(point.lng - loc.lng); const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(loc.lat)) * Math.cos(r(point.lat)) * Math.sin(dLng / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a))); };
-        const now = Date.now(), newWindow = 30 * 86400000;
-        const categoryIds = new Set(), categoryNames = new Set();
-        const collectCategory = (nodes, inside = false) => (nodes || []).forEach((c) => { const match = String(c.slug || '') === selectedHomeCategorySlug; if (match || inside) {
-            categoryIds.add(String(c.id));
-            categoryNames.add(String(c.name || ''));
-        } collectCategory(c.children, match || inside); });
+        const distance = (card) => { const sv = state.services.find((v) => String(v.id) === String(card.dataset.serviceCard)); const point = validCoordinates(sv?.latitude ?? sv?.lat ?? sv?.location?.lat, sv?.longitude ?? sv?.lng ?? sv?.location?.lng); if (!loc)
+            return Infinity; if (point) {
+            const r = (x) => x * Math.PI / 180;
+            const dLat = r(point.lat - loc.lat), dLng = r(point.lng - loc.lng);
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(loc.lat)) * Math.cos(r(point.lat)) * Math.sin(dLng / 2) ** 2;
+            return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+        } const cacheKey = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}:${String(card.dataset.serviceCard || '')}`; return nearbyServiceDistanceCache.get(cacheKey) ?? Infinity; };
+        const now = Date.now();
+        // Resolve category membership from both service metadata and the actual category tree.
+        // The tree's `services` arrays are authoritative for nested/custom admin categories,
+        // while IDs/slugs/names provide compatibility with catalog versions that omit arrays.
+        const categoryIds = new Set(), categoryNames = new Set(), categorySlugs = new Set(), categoryServiceIds = new Set();
+        const collectCategory = (nodes, inside = false) => (nodes || []).forEach((c) => {
+            const slug = String(c.slug || '');
+            const match = slug === selectedHomeCategorySlug;
+            const included = match || inside;
+            if (included) {
+                if (c.id != null)
+                    categoryIds.add(String(c.id));
+                if (c.name)
+                    categoryNames.add(String(c.name));
+                if (slug)
+                    categorySlugs.add(slug);
+                (Array.isArray(c.services) ? c.services : []).forEach((sv) => { if (sv?.id != null)
+                    categoryServiceIds.add(String(sv.id)); });
+            }
+            collectCategory(c.children, included);
+        });
         if (selectedHomeCategorySlug)
             collectCategory(state.cats);
-        const ranked = cards.map(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && created <= now && now - created < newWindow; const d = key === 'nearby' ? distance(card) : Infinity; const id = String(card.dataset.serviceCard || ''); const sv = state.services.find((v) => String(v.id) === id); const serviceCategorySlug = String(sv?.categorySlug || card.dataset.serviceCategory || ''); const categoryMatch = !selectedHomeCategorySlug || serviceCategorySlug === selectedHomeCategorySlug || categoryIds.has(String(sv?.categoryId || '')) || categoryNames.has(String(sv?.categoryName || '')); const filterMatch = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d)); const show = categoryMatch && filterMatch; return { card, show, d, created: Number.isFinite(created) ? created : 0 }; });
+        const normalizeCategory = (value) => String(value ?? '').trim().toLocaleLowerCase().replace(/[\s_-]+/g, '');
+        const ranked = cards.map(card => {
+            const created = Date.parse(card.dataset.serviceCreated || '');
+            const isNew = Number.isFinite(created) && created <= now;
+            const d = key === 'nearby' ? distance(card) : Infinity;
+            const id = String(card.dataset.serviceCard || '');
+            const sv = state.services.find((v) => String(v.id) === id);
+            const serviceCategorySlug = String(sv?.categorySlug || card.dataset.serviceCategory || '');
+            const serviceCategoryId = String(sv?.categoryId || '');
+            const serviceCategoryName = String(sv?.categoryName || card.querySelector('.customer-service-copy small')?.textContent || '');
+            const categoryMatch = !selectedHomeCategorySlug || categoryServiceIds.has(id) || categorySlugs.has(serviceCategorySlug) || serviceCategorySlug === selectedHomeCategorySlug || categoryIds.has(serviceCategoryId) || categoryNames.has(serviceCategoryName) || normalizeCategory(serviceCategorySlug) === normalizeCategory(selectedHomeCategorySlug);
+            const filterMatch = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d));
+            const show = categoryMatch && filterMatch;
+            return { card, show, d, created: Number.isFinite(created) ? created : 0, categoryMatch };
+        });
         if (key === 'nearby')
             ranked.sort((a, b) => a.d - b.d || a.card.dataset.serviceCard.localeCompare(b.card.dataset.serviceCard));
         else if (key === 'new')
@@ -1949,6 +2036,32 @@ function renderCustomer() {
             card.dataset.distanceKm = String(d);
         else
             delete card.dataset.distanceKm; list.appendChild(card); });
+        if (key === 'nearby' && loc && state.user?.role === 'CUSTOMER' && !nearbyDistanceLookupRunning) {
+            const missing = [...new Set(ranked.filter(x => x.categoryMatch).map(x => String(x.card.dataset.serviceCard || '')).filter(id => { const sv = state.services.find((v) => String(v.id) === id); const point = validCoordinates(sv?.latitude ?? sv?.lat ?? sv?.location?.lat, sv?.longitude ?? sv?.lng ?? sv?.location?.lng); const cacheKey = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}:${id}`; return !point && !nearbyServiceDistanceCache.has(cacheKey) && !nearbyDistanceLookupKeys.has(cacheKey); }))];
+            if (missing.length) {
+                nearbyDistanceLookupRunning = true;
+                (async () => { try {
+                    for (let i = 0; i < missing.length; i += 4) {
+                        await Promise.all(missing.slice(i, i + 4).map(async (id) => { const cacheKey = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}:${id}`; nearbyDistanceLookupKeys.add(cacheKey); try {
+                            const result = await api(`/providers/nearby?serviceId=${encodeURIComponent(id)}&lat=${encodeURIComponent(String(loc.lat))}&lng=${encodeURIComponent(String(loc.lng))}&limit=1`);
+                            const km = Number(result.providers?.[0]?.distanceKm);
+                            nearbyServiceDistanceCache.set(cacheKey, Number.isFinite(km) ? km : Infinity);
+                        }
+                        catch {
+                            nearbyServiceDistanceCache.set(cacheKey, Infinity);
+                        }
+                        finally {
+                            nearbyDistanceLookupKeys.delete(cacheKey);
+                        } }));
+                    }
+                }
+                finally {
+                    nearbyDistanceLookupRunning = false;
+                    if (document.getElementById('customerServiceList') && document.querySelector('[data-service-filter].active')?.getAttribute('data-service-filter') === 'nearby')
+                        applyServiceFilter('nearby');
+                } })();
+            }
+        }
         let empty = list.querySelector('[data-service-filter-empty]');
         const visible = ranked.some(x => x.show);
         if (!visible) {
@@ -1959,13 +2072,16 @@ function renderCustomer() {
                 empty.setAttribute('role', 'status');
                 list.appendChild(empty);
             }
-            empty.textContent = selectedHomeCategorySlug && !ranked.some(x => { const sv = state.services.find((v) => String(v.id) === String(x.card.dataset.serviceCard)); return String(sv?.categorySlug || x.card.dataset.serviceCategory || '') === selectedHomeCategorySlug || categoryIds.has(String(sv?.categoryId || '')) || categoryNames.has(String(sv?.categoryName || '')); }) ? 'لا توجد خدمات متاحة في هذا القسم حاليًا.' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
+            const categoryHasServices = ranked.some(x => x.categoryMatch);
+            empty.textContent = key === 'nearby' && nearbyDistanceLookupRunning ? 'جارٍ ترتيب الخدمات حسب قرب مقدمي الخدمة…' : selectedHomeCategorySlug && !categoryHasServices ? 'لا توجد خدمات متاحة في هذا القسم حاليًا.' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
         }
         else
             empty?.remove();
     }
     document.querySelectorAll('[data-service-filter]').forEach(x => x.addEventListener('click', () => applyServiceFilter(x.dataset.serviceFilter || 'all')));
-    applyServiceFilter('all');
+    document.querySelectorAll('.customer-category-tile[data-cat]').forEach(c => { const active = !!selectedHomeCategorySlug && c.dataset.cat === selectedHomeCategorySlug; c.classList.toggle('selected', active); c.setAttribute('aria-pressed', active ? 'true' : 'false'); });
+    document.getElementById('allCategoriesBtn')?.classList.toggle('selected', !selectedHomeCategorySlug);
+    applyServiceFilter(activeHomeServiceFilter);
     document.getElementById('customerCitySelect')?.addEventListener('change', async () => { const id = document.getElementById('customerCitySelect').value; state.selectedAreaId = id; try {
         if (id)
             localStorage.setItem('khadamat.selectedAreaId', id);
@@ -2914,15 +3030,13 @@ async function openOrderForm(serviceId, initial = null) {
                 const flattenForCheckout = (items) => items.flatMap((c) => [c, ...flattenForCheckout(c.children || [])]);
                 const catalogCategories = flattenForCheckout(state.cats || []).filter((c) => (c.services || []).some((x) => x.isActive !== false));
                 const loadManagedCategories = async () => { try {
-                    const response = await api('/order-stores');
-                    const configured = (response.items || []).filter((x) => x.isActive !== false && x.is_active !== 0);
-                    const selected = configured.map((item) => catalogCategories.find((c) => String(c.name).trim() === String(item.categoryName || item.category_name || item.storeName || item.store_name || '').trim())).filter(Boolean).filter((c, index, arr) => arr.findIndex((v) => v.id === c.id) === index);
+                    const selected = catalogCategories;
                     const categoryCard = (c) => `<button type="button" class="checkout-recommendation-card" data-order-category="${esc(c.slug || c.id)}"><span class="checkout-recommendation-image">${imageFor(c)}</span><b>${esc(c.name)}</b><small>${(c.services || []).filter((x) => x.isActive !== false).length} خدمات متاحة</small></button>`;
                     if (storeHost)
-                        storeHost.innerHTML = selected.length ? `<div class="checkout-recommendation-rail">${selected.map(categoryCard).join('')}</div>` : '<span class="muted">لا توجد أقسام مفعّلة في «متاجر الطلب». فعّل الأقسام الحقيقية من لوحة الإدارة.</span>';
+                        storeHost.innerHTML = selected.length ? `<div class="checkout-recommendation-rail">${selected.map(categoryCard).join('')}</div>` : '<span class="muted">لا توجد أقسام تحتوي على خدمات مفعّلة حاليًا. فعّل التصنيفات وخدماتها من لوحة الإدارة.</span>';
                     const openCatalogCategory = (slug) => { document.querySelector('.modal-backdrop')?.remove(); openCategory(slug); };
                     document.querySelectorAll('[data-order-category]').forEach(btn => btn.addEventListener('click', () => openCatalogCategory(btn.dataset.orderCategory || '')));
-                    document.getElementById('checkoutAllStores')?.addEventListener('click', () => { showModal(`<h2>الأقسام المتاحة في خدمات</h2><div class="checkout-recommendation-rail checkout-recommendation-rail-all">${selected.map(categoryCard).join('')}</div>`); document.querySelectorAll('[data-order-category]').forEach(btn => btn.addEventListener('click', () => openCatalogCategory(btn.dataset.orderCategory || ''))); });
+                    document.getElementById('checkoutAllStores')?.addEventListener('click', () => { showModal(`<h2>الأقسام المتاحة في خدمات الهيثم</h2><div class="checkout-recommendation-rail checkout-recommendation-rail-all">${selected.map(categoryCard).join('')}</div>`); document.querySelectorAll('[data-order-category]').forEach(btn => btn.addEventListener('click', () => openCatalogCategory(btn.dataset.orderCategory || ''))); });
                 }
                 catch {
                     if (storeHost)

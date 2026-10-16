@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.75",
-  "description": "توحيد الثيم وإدارة هوية التطبيق من لوحة الإدارة",
+  "version": "2.77",
+  "description": "تحسين تصفية الخدمات والتحديث التلقائي وتوافق تأكيد الطلب مع الوضع الداكن",
   "private": true,
   "type": "module",
   "engines": {

@@ -31,7 +31,7 @@ test('الفلاتر تعتمد على المفضلة والتاريخ والم�
     assert.match(app, /key==='favorite'&&fav\.has\(id\)/);
     assert.match(app, /key==='new'&&isNew/);
     assert.match(app, /key==='nearby'&&Number\.isFinite\(d\)/);
-    assert.match(app, /data-service-created="\$\{esc\(sv\.createdAt\|\|''\)\}"/);
+    assert.match(app, /data-service-created="\$\{esc\(sv\.createdAt\|\|sv\.created_at\|\|sv\.updatedAt\|\|sv\.updated_at\|\|''\)\}"/);
 });
 test('إشعارات الخلفية مدعومة عبر Push في Service Worker', () => {
     assert.match(serviceWorker, /addEventListener\('push'/);
