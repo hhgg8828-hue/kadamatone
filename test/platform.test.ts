@@ -88,9 +88,11 @@ describe('Dynamic form validation (server-side)', () => {
   const schema = parse(formSchemaSchema, [
     { key: 'workers_count', type: 'number', label: { ar: 'عدد' }, required: true, min: 1, max: 50 },
     { key: 'kind', type: 'select', label: { ar: 'نوع' }, options: [{ value: 'a', label: { ar: 'أ' } }] },
+    { key: 'confirmed', type: 'boolean', label: { ar: 'هل تؤكد؟' } },
   ]);
   test('يقبل بيانات صحيحة ويحذف الحقول غير المعرّفة', () => {
-    assert.deepEqual(validateFormData(schema, { workers_count: 3, kind: 'a', hacker: 'x' }), { workers_count: 3, kind: 'a' });
+    assert.deepEqual(validateFormData(schema, { workers_count: 3, kind: 'a', confirmed: true, hacker: 'x' }), { workers_count: 3, kind: 'a', confirmed: true });
+    assert.deepEqual(validateFormData(schema, { workers_count: 3, kind: 'a', confirmed: false }), { workers_count: 3, kind: 'a', confirmed: false });
   });
   test('يرفض حقلًا إلزاميًا مفقودًا وقيمًا خارج النطاق وخيارًا غير مسموح', () => {
     assert.throws(() => validateFormData(schema, {}), (e: any) => e.status === 422);

@@ -16,12 +16,12 @@ test('V2.67: home screen removes redundant section titles and displays admin-cre
   assert.match(app, /customerMainCategories\(state\.cats\)/);
 });
 
-test('V2.67: customer header has customer-service modal and location arrow attached to its button', () => {
+test('V2.71: customer header has customer-service modal and location selector anchored by the notification bell', () => {
   assert.match(app, /customerContactToggle/);
   assert.match(app, /اتصل بخدمة العملاء/);
   assert.match(app, /wa\.me\/967778100022/);
-  assert.match(app, /customer-contact-location-wrap/);
-  assert.match(css, /\.customer-contact-location-wrap \.customer-area-arrow\{position:absolute;right:-4px;bottom:-5px/);
+  assert.match(app, /customer-notification-location-wrap/);
+  assert.match(css, /\.customer-notification-location-wrap \.customer-area-arrow\{position:absolute;right:-6px;bottom:-6px/);
 });
 
 test('V2.67: order cards show total and only repeat completed or cancelled orders', () => {

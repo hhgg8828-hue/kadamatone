@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.70",
-  "description": "تنظيف اختبارات الإصدارات وتوحيد أصول الواجهة والتخزين المؤقت",
+  "version": "2.71",
+  "description": "إصلاح إرسال الخدمات المخصصة وتنقل الإدارة وتجربة الكتالوج",
   "private": true,
   "type": "module",
   "engines": {

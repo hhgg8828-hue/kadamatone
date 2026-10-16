@@ -2067,3 +2067,20 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="dark"] .trip-estimate-metrics small{color:#c0d0c8}
 :root[data-theme="dark"] .trip-estimate-metrics strong{color:#b8ead0}
 @media(max-width:420px){.trip-estimate-metrics{gap:5px}.trip-estimate-metrics>div{padding:8px 4px}.trip-estimate-metrics strong{font-size:12px}.customer-shell .order-progress [data-track-order]{width:100%}}
+
+
+/* v2.71: location selector sits at the lower-right of the notification bell, separated from the icon. */
+.customer-shell .customer-notification-location-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;height:34px;overflow:visible;margin-inline-end:3px;}
+.customer-shell .customer-notification-location-wrap .notification-top-btn{width:31px;min-width:31px;height:31px;min-height:31px;flex:0 0 31px;}
+.customer-shell .customer-notification-location-wrap .customer-area-arrow{position:absolute;right:-6px;bottom:-6px;z-index:3;display:grid;place-items:center;width:17px;height:17px;min-width:17px;min-height:17px;padding:0;border:1px solid rgba(255,255,255,.9);border-radius:50%;background:#f4ead8;color:#176b4d;font-size:12px;line-height:1;box-shadow:0 2px 5px rgba(0,0,0,.24);}
+.admin-catalog-icon{display:inline-grid;place-items:center;vertical-align:middle;min-width:26px;min-height:26px;margin-inline-end:3px;font-size:20px;}
+.admin-catalog-icon-image{display:block;width:28px;height:28px;object-fit:cover;border-radius:7px;border:1px solid var(--theme-line,#dce5df);}
+.admin-category-title>b,.admin-category-service b{font-size:15px;line-height:1.6;}
+.dynamic-order-field>label{font-size:14px;line-height:1.6;}
+:root[data-theme="dark"] .customer-shell .muted,:root[data-theme="dark"] .admin-page .muted,:root[data-theme="dark"] .dynamic-order-field>label,:root[data-theme="dark"] .admin-category-title,:root[data-theme="dark"] .admin-category-service{color:var(--theme-text,#eef4fc)!important;}
+:root[data-theme="dark"] .customer-shell .field label,:root[data-theme="dark"] .admin-page .field label{color:var(--theme-text,#eef4fc)!important;}
+/* Notifications must remain fully readable across the available screen width. */
+#liveToasts{left:max(8px,env(safe-area-inset-left,0px))!important;right:max(8px,env(safe-area-inset-right,0px))!important;width:auto!important;max-width:none!important;margin:0!important;align-items:stretch!important;}
+#liveToasts>div{width:100%!important;max-width:none!important;min-width:0!important;padding:14px 16px!important;font-size:15px!important;line-height:1.7!important;overflow-wrap:anywhere!important;}
+#liveToasts>div b{font-size:16px!important;}
+@media(max-width:520px){.customer-shell .customer-notification-location-wrap{width:31px;flex-basis:31px;height:30px;margin-inline-end:3px}.customer-shell .customer-notification-location-wrap .notification-top-btn{width:27px;min-width:27px;height:27px;min-height:27px;flex-basis:27px}.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-6px;bottom:-6px;width:16px;height:16px;min-width:16px;min-height:16px;font-size:11px}}
