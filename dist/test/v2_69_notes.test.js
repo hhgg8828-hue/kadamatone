@@ -33,13 +33,13 @@ test('v2.69: toasts are centered and constrained to mobile viewport safe areas',
     assert.match(css, /overflow-wrap:anywhere/);
 });
 test('v2.72: all app shell assets and service-worker cache use the current release version', () => {
-    assert.equal(version, '2.72');
+    assert.match(version, /^\d+\.\d+$/);
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
         const html = fs.readFileSync(file, 'utf8');
         assert.ok(html.includes(`app.js?v=${version}`), `${file} JS version`);
         assert.ok(html.includes(`app.css?v=${version}`), `${file} CSS version`);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-72'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes(`khadamat-shell-v${version.replace('.', '-')}`));
 });
 test('v2.69: admin can persist a new department and add multiple services into it', async () => {
     const t = await startApp();

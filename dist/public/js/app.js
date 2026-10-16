@@ -44,6 +44,7 @@ function applyAccessibilityPreferences() {
 }
 function setAccessibilityPreference(key, enabled) { localStorage.setItem(A11Y_KEYS[key], enabled ? '1' : '0'); applyAccessibilityPreferences(); }
 applyAccessibilityPreferences();
+let customerScrollNavInstalled = false;
 const THEME_KEY = 'khadamat.theme.v1';
 function applyThemePreference() { const choice = localStorage.getItem(THEME_KEY) || 'system'; const dark = choice === 'dark' || (choice === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; document.documentElement.dataset.themeChoice = choice; }
 function setThemePreference(choice) { localStorage.setItem(THEME_KEY, ['light', 'dark', 'system'].includes(choice) ? choice : 'system'); applyThemePreference(); }
@@ -1690,6 +1691,8 @@ function renderCustomer() {
     } return out.join(' ← '); };
     const selectableAreas = state.areas.filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').slice().sort((a, b) => areaPath(a).localeCompare(areaPath(b), 'ar'));
     const customerCategories = customerMainCategories(state.cats);
+    let selectedHomeCategorySlug = '';
+    let activeHomeServiceFilter = 'all';
     const activeTemporaryService = (state.temporaryServices || []).filter((x) => { const now = Date.now(), start = Date.parse(String(x.startAt || '')), end = Date.parse(String(x.endAt || '')); return x.isActive === true && Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now; }).sort((a, b) => (Number(b.priority || 0) - Number(a.priority || 0)) || ((Date.parse(String(a.endAt)) - Date.parse(String(b.endAt)))))[0];
     const temporaryTitle = activeTemporaryService ? String(activeTemporaryService.title || activeTemporaryService.name || 'العرض المؤقت').trim() : ' ';
     const tickerText = activeTemporaryService ? `اضغط هنا لعرض ${temporaryTitle}` : (String(state.config?.newsTicker || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.').trim() || 'اختر منطقتك لتشاهد الخدمات والعروض المتاحة بالقرب منك.');
@@ -1800,9 +1803,13 @@ function renderCustomer() {
     document.addEventListener('click', function outside(e) { if (!search.contains(e.target) && !suggestions.contains(e.target)) {
         suggestions.className = 'suggestions hide';
     } }, { once: false });
-    document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => { document.querySelectorAll('[data-cat]').forEach(c => c.classList.toggle('selected', c === x)); openCategory(x.dataset.cat); }));
-    document.getElementById('allCategoriesBtn')?.addEventListener('click', () => { const all = []; const walk = (xs) => xs.forEach((c) => { all.push(c); if (Array.isArray(c.children))
-        walk(c.children); }); walk(state.cats); showModal(`<div class="all-categories-modal"><h2>كل التصنيفات</h2><div class="grid all-categories-grid">${all.map((c) => `<button type="button" class="card service-option" data-all-cat="${esc(c.slug)}"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b><span class="muted">عرض الخدمات ←</span></button>`).join('') || '<p class="muted">لا توجد تصنيفات متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-cat]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCat || ''; closeModal(); openCategory(slug); })); });
+    const applyHomeCategory = (slug) => { selectedHomeCategorySlug = String(slug || ''); document.querySelectorAll('.customer-category-tile[data-cat]').forEach(c => { const active = !!selectedHomeCategorySlug && c.dataset.cat === selectedHomeCategorySlug; c.classList.toggle('selected', active); c.setAttribute('aria-pressed', active ? 'true' : 'false'); }); document.getElementById('allCategoriesBtn')?.classList.toggle('selected', !selectedHomeCategorySlug); applyServiceFilter(activeHomeServiceFilter); document.getElementById('servicesSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => applyHomeCategory(x.dataset.cat || '')));
+    document.getElementById('allCategoriesBtn')?.addEventListener('click', () => { if (selectedHomeCategorySlug) {
+        applyHomeCategory('');
+        return;
+    } const all = []; const walk = (xs) => xs.forEach((c) => { all.push(c); if (Array.isArray(c.children))
+        walk(c.children); }); walk(state.cats); showModal(`<div class="all-categories-modal"><h2>كل التصنيفات</h2><p class="muted">اختر قسمًا لعرض خدماته في الصفحة الرئيسية.</p><div class="grid all-categories-grid">${all.map((c) => `<button type="button" class="card service-option" data-all-cat="${esc(c.slug)}"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b><span class="muted">عرض الخدمات ←</span></button>`).join('') || '<p class="muted">لا توجد تصنيفات متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-cat]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCat || ''; closeModal(); applyHomeCategory(slug); })); });
     document.getElementById('allOffersBtn')?.addEventListener('click', () => { const offers = state.campaigns || []; showModal(`<div class="all-offers-modal"><h2>كل العروض</h2><p class="muted">اختر العرض لعرض تفاصيله أو الانتقال إلى الخدمات المرتبطة به.</p><div class="all-offers-grid">${offers.map((c) => `<button type="button" class="card all-offer-item" data-all-offer="${esc(c.id)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="all-offer-placeholder">✦</span>`}<b>${esc(c.title)}</b><small>${esc(c.description || '')}</small></button>`).join('') || '<p class="muted">لا توجد عروض متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-offer]').forEach(b => b.addEventListener('click', () => { const c = offers.find((v) => v.id === b.dataset.allOffer); if (!c)
         return; closeModal(); const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (t === 'CATEGORY' && v)
         openCampaignCategories(c);
@@ -1812,6 +1819,23 @@ function renderCustomer() {
         openOrderFormBySlug(v);
     else
         openCampaignDetails(c); })); });
+    if (!customerScrollNavInstalled) {
+        customerScrollNavInstalled = true;
+        let previousScrollY = window.scrollY;
+        let lastScrollDirectionChange = 0;
+        window.addEventListener('scroll', () => { const nav = document.querySelector('.customer-bottom-nav'); if (!nav)
+            return; const current = window.scrollY; const delta = current - previousScrollY; if (current < 80) {
+            nav.classList.remove('nav-hidden-on-scroll');
+            previousScrollY = current;
+            return;
+        } if (Math.abs(delta) >= 7) {
+            const now = performance.now();
+            if (now - lastScrollDirectionChange > 35) {
+                nav.classList.toggle('nav-hidden-on-scroll', delta < 0);
+                lastScrollDirectionChange = now;
+            }
+        } previousScrollY = current; }, { passive: true });
+    }
     document.querySelectorAll('[data-customer-nav]').forEach(x => x.addEventListener('click', () => { if (document.getElementById('modal'))
         closeModal(); const key = String(x.dataset.customerNav || 'home'); document.querySelectorAll('[data-customer-nav]').forEach(n => n.classList.toggle('active', n.dataset.customerNav === key)); if (key === 'account') {
         if (!state.user)
@@ -1890,6 +1914,7 @@ function renderCustomer() {
         const validKeys = ['all', 'nearby', 'new', 'favorite'];
         if (!validKeys.includes(key))
             key = 'all';
+        activeHomeServiceFilter = key;
         document.querySelectorAll('[data-service-filter]').forEach(b => { const active = b.dataset.serviceFilter === key; b.classList.toggle('active', active); b.setAttribute('aria-pressed', active ? 'true' : 'false'); });
         const fav = new Set(serviceFavorites());
         const list = document.getElementById('customerServiceList');
@@ -1906,7 +1931,14 @@ function renderCustomer() {
         const distance = (card) => { const sv = state.services.find((v) => String(v.id) === String(card.dataset.serviceCard)); const point = validCoordinates(sv?.latitude ?? sv?.lat ?? sv?.location?.lat, sv?.longitude ?? sv?.lng ?? sv?.location?.lng); if (!loc || !point)
             return Infinity; const r = (x) => x * Math.PI / 180; const dLat = r(point.lat - loc.lat), dLng = r(point.lng - loc.lng); const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(loc.lat)) * Math.cos(r(point.lat)) * Math.sin(dLng / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a))); };
         const now = Date.now(), newWindow = 30 * 86400000;
-        const ranked = cards.map(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && created <= now && now - created < newWindow; const d = key === 'nearby' ? distance(card) : Infinity; const id = String(card.dataset.serviceCard || ''); const show = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d)); return { card, show, d, created: Number.isFinite(created) ? created : 0 }; });
+        const categoryIds = new Set(), categoryNames = new Set();
+        const collectCategory = (nodes, inside = false) => (nodes || []).forEach((c) => { const match = String(c.slug || '') === selectedHomeCategorySlug; if (match || inside) {
+            categoryIds.add(String(c.id));
+            categoryNames.add(String(c.name || ''));
+        } collectCategory(c.children, match || inside); });
+        if (selectedHomeCategorySlug)
+            collectCategory(state.cats);
+        const ranked = cards.map(card => { const created = Date.parse(card.dataset.serviceCreated || ''); const isNew = Number.isFinite(created) && created <= now && now - created < newWindow; const d = key === 'nearby' ? distance(card) : Infinity; const id = String(card.dataset.serviceCard || ''); const sv = state.services.find((v) => String(v.id) === id); const serviceCategorySlug = String(sv?.categorySlug || card.dataset.serviceCategory || ''); const categoryMatch = !selectedHomeCategorySlug || serviceCategorySlug === selectedHomeCategorySlug || categoryIds.has(String(sv?.categoryId || '')) || categoryNames.has(String(sv?.categoryName || '')); const filterMatch = key === 'all' || (key === 'favorite' && fav.has(id)) || (key === 'new' && isNew) || (key === 'nearby' && Number.isFinite(d)); const show = categoryMatch && filterMatch; return { card, show, d, created: Number.isFinite(created) ? created : 0 }; });
         if (key === 'nearby')
             ranked.sort((a, b) => a.d - b.d || a.card.dataset.serviceCard.localeCompare(b.card.dataset.serviceCard));
         else if (key === 'new')
@@ -1927,12 +1959,13 @@ function renderCustomer() {
                 empty.setAttribute('role', 'status');
                 list.appendChild(empty);
             }
-            empty.textContent = key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.';
+            empty.textContent = selectedHomeCategorySlug && !ranked.some(x => { const sv = state.services.find((v) => String(v.id) === String(x.card.dataset.serviceCard)); return String(sv?.categorySlug || x.card.dataset.serviceCategory || '') === selectedHomeCategorySlug || categoryIds.has(String(sv?.categoryId || '')) || categoryNames.has(String(sv?.categoryName || '')); }) ? 'لا توجد خدمات متاحة في هذا القسم حاليًا.' : key === 'favorite' ? 'لم تضف خدمات إلى المفضلة بعد. اضغط على القلب بجانب الخدمة لإضافتها.' : key === 'new' ? 'لا توجد خدمات أُضيفت خلال الفترة الأخيرة.' : key === 'nearby' && !loc ? 'حدد موقعك أو اختر موقعًا محفوظًا لعرض الخدمات الأقرب.' : key === 'nearby' ? 'لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب.' : 'لا تتوفر خدمات مطابقة لهذه التصفية حاليًا.';
         }
         else
             empty?.remove();
     }
     document.querySelectorAll('[data-service-filter]').forEach(x => x.addEventListener('click', () => applyServiceFilter(x.dataset.serviceFilter || 'all')));
+    applyServiceFilter('all');
     document.getElementById('customerCitySelect')?.addEventListener('change', async () => { const id = document.getElementById('customerCitySelect').value; state.selectedAreaId = id; try {
         if (id)
             localStorage.setItem('khadamat.selectedAreaId', id);
@@ -4856,7 +4889,9 @@ function openServiceEditor(sv, cats, refresh, availableServices = state.services
     season.addEventListener('change', sync);
     sync();
     document.getElementById('addServiceField')?.addEventListener('click', () => { formSchema.push({ key: 'detail_' + Date.now().toString(36), type: 'text', label: { ar: 'تفصيل إضافي', en: 'Additional detail' }, required: false }); renderSchema(); });
-    form.addEventListener('submit', async (e) => { e.preventDefault(); const f = new FormData(form); const error = document.getElementById('serviceEditorError'); error.textContent = ''; form.querySelectorAll('.field-invalid').forEach((el) => { el.classList.remove('field-invalid'); el.querySelector('.service-field-error')?.remove(); }); const pricingType = String(f.get('pricingType')); const baseRaw = String(f.get('basePrice') || '').trim(); const seasonal = f.has('seasonalEnabled'); const start = String(f.get('seasonStartAt') || ''); const end = String(f.get('seasonEndAt') || ''); const failField = (name, message) => { const control = form.querySelector(`[name="${name}"]`); const wrap = control?.closest('.field'); if (wrap) {
+    let serviceSaveInProgress = false;
+    form.addEventListener('submit', async (e) => { e.preventDefault(); if (serviceSaveInProgress)
+        return; const f = new FormData(form); const error = document.getElementById('serviceEditorError'); error.textContent = ''; form.querySelectorAll('.field-invalid').forEach((el) => { el.classList.remove('field-invalid'); el.querySelector('.service-field-error')?.remove(); }); const pricingType = String(f.get('pricingType')); const baseRaw = String(f.get('basePrice') || '').trim(); const seasonal = f.has('seasonalEnabled'); const start = String(f.get('seasonStartAt') || ''); const end = String(f.get('seasonEndAt') || ''); const failField = (name, message) => { const control = form.querySelector(`[name="${name}"]`); const wrap = control?.closest('.field'); if (wrap) {
         wrap.classList.add('field-invalid');
         const note = document.createElement('small');
         note.className = 'service-field-error';
@@ -4884,7 +4919,7 @@ function openServiceEditor(sv, cats, refresh, availableServices = state.services
         control?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         window.setTimeout(() => control?.focus({ preventScroll: true }), 180);
         return;
-    } const body = { categoryId: String(f.get('categoryId')), name: { ar: String(f.get('ar')).trim(), en: String(f.get('en') || '').trim() }, ...(String(f.get('description') || '').trim() ? { description: { ar: String(f.get('description') || '').trim() } } : {}), icon: String(f.get('icon') || '').trim(), pricingType, defaultPriority: String(f.get('defaultPriority') || 'NORMAL'), basePrice: baseRaw === '' ? undefined : Number(baseRaw), formSchema: formSchema.map((x) => ({ ...x, key: String(x.key || 'detail'), type: String(x.type || 'text'), label: typeof x.label === 'string' ? { ar: x.label, en: x.label } : x.label, required: !!x.required })), requiresInspection: f.has('requiresInspection'), requiresVehicle: f.has('requiresVehicle'), supportsWaiting: f.has('supportsWaiting'), deliveryProofType: String(f.get('deliveryProofType') || 'NONE'), seasonalEnabled: seasonal, seasonStartAt: seasonal ? new Date(start).toISOString() : undefined, seasonEndAt: seasonal ? new Date(end).toISOString() : undefined }; if (!sv) {
+    } serviceSaveInProgress = true; const body = { categoryId: String(f.get('categoryId')), name: { ar: String(f.get('ar')).trim(), en: String(f.get('en') || '').trim() }, ...(String(f.get('description') || '').trim() ? { description: { ar: String(f.get('description') || '').trim() } } : {}), icon: String(f.get('icon') || '').trim(), pricingType, defaultPriority: String(f.get('defaultPriority') || 'NORMAL'), basePrice: baseRaw === '' ? undefined : Number(baseRaw), formSchema: formSchema.map((x) => ({ ...x, key: String(x.key || 'detail'), type: String(x.type || 'text'), label: typeof x.label === 'string' ? { ar: x.label, en: x.label } : x.label, required: !!x.required })), requiresInspection: f.has('requiresInspection'), requiresVehicle: f.has('requiresVehicle'), supportsWaiting: f.has('supportsWaiting'), deliveryProofType: String(f.get('deliveryProofType') || 'NONE'), seasonalEnabled: seasonal, seasonStartAt: seasonal ? new Date(start).toISOString() : undefined, seasonEndAt: seasonal ? new Date(end).toISOString() : undefined }; if (!sv) {
         const rawSlug = makeAdminSlug(String(f.get('en') || '').trim() || String(f.get('ar') || ''));
         const used = new Set((availableServices || []).map((x) => String(x.slug || '')));
         let uniqueSlug = rawSlug;
@@ -4897,10 +4932,30 @@ function openServiceEditor(sv, cats, refresh, availableServices = state.services
         body.isActive = String(f.get('isActive')) === 'true'; const btn = form.querySelector('button[type="submit"]') || form.querySelector('.service-editor-save'); if (btn) {
         btn.disabled = true;
         btn.textContent = 'جارٍ الحفظ…';
-    } try {
-        await api(sv ? '/admin/services/' + encodeURIComponent(sv.id) : '/admin/services', { method: sv ? 'PATCH' : 'POST', body: JSON.stringify(body) });
-        document.querySelector('.modal-backdrop')?.remove();
-        await refresh();
+    } let saveSucceeded = false; try {
+        const controller = new AbortController();
+        let timedOut = false;
+        const timeoutId = window.setTimeout(() => { timedOut = true; controller.abort(); }, 20000);
+        try {
+            await api(sv ? '/admin/services/' + encodeURIComponent(sv.id) : '/admin/services', { method: sv ? 'PATCH' : 'POST', body: JSON.stringify(body), signal: controller.signal });
+        }
+        catch (requestError) {
+            if (timedOut)
+                throw new Error('انتهت مهلة الحفظ. تحقق من الاتصال ثم حاول مجددًا.');
+            throw requestError;
+        }
+        finally {
+            window.clearTimeout(timeoutId);
+        }
+        saveSucceeded = true;
+        closeModal();
+        toast('تم الحفظ بنجاح', sv ? 'تم تحديث بيانات الخدمة بنجاح.' : 'تمت إضافة الخدمة بنجاح.');
+        try {
+            await refresh();
+        }
+        catch {
+            toast('تم الحفظ', 'تم حفظ الخدمة، لكن تعذر تحديث القائمة تلقائيًا. أعد تحميل الصفحة لمراجعة التغييرات.');
+        }
     }
     catch (x) {
         const message = x.message || 'تعذر حفظ الخدمة. راجع الحقول وحاول مجددًا.';
@@ -4920,6 +4975,20 @@ function openServiceEditor(sv, cats, refresh, availableServices = state.services
         if (btn) {
             btn.disabled = false;
             btn.textContent = 'حفظ الخدمة';
+        }
+    }
+    finally {
+        serviceSaveInProgress = false;
+        const currentForm = document.getElementById('serviceEditor');
+        const currentBtn = currentForm?.querySelector('button[type="submit"]') || currentForm?.querySelector('.service-editor-save');
+        if (currentBtn) {
+            currentBtn.disabled = false;
+            currentBtn.textContent = sv ? 'حفظ التعديلات' : 'حفظ الخدمة';
+        }
+        if (saveSucceeded) {
+            const currentError = document.getElementById('serviceEditorError');
+            if (currentError)
+                currentError.textContent = '';
         }
     } });
 }

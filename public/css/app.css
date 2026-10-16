@@ -2084,3 +2084,174 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 #liveToasts>div{width:100%!important;max-width:none!important;min-width:0!important;padding:14px 16px!important;font-size:15px!important;line-height:1.7!important;overflow-wrap:anywhere!important;}
 #liveToasts>div b{font-size:16px!important;}
 @media(max-width:520px){.customer-shell .customer-notification-location-wrap{width:31px;flex-basis:31px;height:30px;margin-inline-end:3px}.customer-shell .customer-notification-location-wrap .notification-top-btn{width:27px;min-width:27px;height:27px;min-height:27px;flex-basis:27px}.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-6px;bottom:-6px;width:16px;height:16px;min-width:16px;min-height:16px;font-size:11px}}
+
+/* v2.73 — consistent day/night surfaces across every screen and modal. */
+:root[data-theme="dark"] { color-scheme:dark; }
+:root[data-theme="dark"] html,
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #app,
+:root[data-theme="dark"] .shell,
+:root[data-theme="dark"] .customer-shell,
+:root[data-theme="dark"] .provider-shell,
+:root[data-theme="dark"] .admin-shell { background-color:var(--theme-bg,#111e32)!important; color:var(--theme-text,#eef4fc)!important; }
+:root[data-theme="dark"] .app-topbar,
+:root[data-theme="dark"] .customer-sticky-discovery,
+:root[data-theme="dark"] .customer-category-showcase,
+:root[data-theme="dark"] .customer-category-showcase-top,
+:root[data-theme="dark"] .customer-offers,
+:root[data-theme="dark"] .reference-service-section,
+:root[data-theme="dark"] .customer-order-confirmation,
+:root[data-theme="dark"] .order-confirmation-step,
+:root[data-theme="dark"] .about-app,
+:root[data-theme="dark"] .about-app-head,
+:root[data-theme="dark"] .about-app-section,
+:root[data-theme="dark"] .about-app-contact,
+:root[data-theme="dark"] .about-app-footer,
+:root[data-theme="dark"] .about-app-services,
+:root[data-theme="dark"] .checkout-reference-payment,
+:root[data-theme="dark"] .checkout-reference-payment-title,
+:root[data-theme="dark"] .checkout-time-options,
+:root[data-theme="dark"] .trip-schedule-fields,
+:root[data-theme="dark"] .trip-location-card,
+:root[data-theme="dark"] .trip-items-disclosure,
+:root[data-theme="dark"] .modern-order-service-summary,
+:root[data-theme="dark"] .modern-order-location,
+:root[data-theme="dark"] .modern-saved-address,
+:root[data-theme="dark"] .modern-location-status,
+:root[data-theme="dark"] .dynamic-order-field,
+:root[data-theme="dark"] .order-submit-note,
+:root[data-theme="dark"] .service-editor-modal,
+:root[data-theme="dark"] .admin-tab-dialog-head,
+:root[data-theme="dark"] .admin-tab-dialog-content,
+:root[data-theme="dark"] .admin-tab-dialog,
+:root[data-theme="dark"] .admin-queue,
+:root[data-theme="dark"] .admin-nav-group,
+:root[data-theme="dark"] .admin-dashboard-underlay,
+:root[data-theme="dark"] .account-menu-list,
+:root[data-theme="dark"] .account-accessibility,
+:root[data-theme="dark"] .account-menu-grid,
+:root[data-theme="dark"] .account-app-footer,
+:root[data-theme="dark"] .customer-account-home,
+:root[data-theme="dark"] .customer-account-menu,
+:root[data-theme="dark"] .customer-account-menu-row,
+:root[data-theme="dark"] .customer-account-menu-icon,
+:root[data-theme="dark"] .customer-account-area,
+:root[data-theme="dark"] .customer-account-footer,
+:root[data-theme="dark"] .customer-subscription-empty,
+:root[data-theme="dark"] .customer-subscriptions-view,
+:root[data-theme="dark"] .checkout-reference-address-editor,
+:root[data-theme="dark"] .checkout-payment-choice,
+:root[data-theme="dark"] .checkout-time-now,
+:root[data-theme="dark"] .checkout-time-later,
+:root[data-theme="dark"] .about-app-services span { background-color:var(--theme-surface,#1b2a40)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .modal>.card,
+:root[data-theme="dark"] .customer-shell .modal>.card,
+:root[data-theme="dark"] .admin-page .modal>.card { background:var(--theme-bg,#111e32)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .modal>.card h1,
+:root[data-theme="dark"] .modal>.card h2,
+:root[data-theme="dark"] .modal>.card h3,
+:root[data-theme="dark"] .modal>.card h4,
+:root[data-theme="dark"] .modal>.card b,
+:root[data-theme="dark"] .modal>.card strong,
+:root[data-theme="dark"] .modal>.card label,
+:root[data-theme="dark"] .modal>.card .admin-shell-title { color:var(--theme-text,#eef4fc)!important; }
+:root[data-theme="dark"] .modal>.card p,
+:root[data-theme="dark"] .modal>.card small,
+:root[data-theme="dark"] .modal>.card .muted,
+:root[data-theme="dark"] .about-app-footer small,
+:root[data-theme="dark"] .about-app-contact .about-contact-row { color:var(--theme-muted,#b9c7da)!important; }
+:root[data-theme="dark"] .about-app-services span,
+:root[data-theme="dark"] .about-app-slogan,
+:root[data-theme="dark"] .checkout-reference-row,
+:root[data-theme="dark"] .checkout-reference-payment,
+:root[data-theme="dark"] .checkout-payment-choice,
+:root[data-theme="dark"] .checkout-time-options,
+:root[data-theme="dark"] .checkout-reference-address-editor,
+:root[data-theme="dark"] .checkout-reference-coupon,
+:root[data-theme="dark"] .checkout-reference-note,
+:root[data-theme="dark"] .checkout-reference-row .field,
+:root[data-theme="dark"] .checkout-time-options .field,
+:root[data-theme="dark"] .trip-schedule-fields .field,
+:root[data-theme="dark"] .trip-location-card,
+:root[data-theme="dark"] .trip-items-disclosure,
+:root[data-theme="dark"] .suggestions,
+:root[data-theme="dark"] .suggestion,
+:root[data-theme="dark"] .service-option,
+:root[data-theme="dark"] .all-categories-grid .card,
+:root[data-theme="dark"] .all-offer-item,
+:root[data-theme="dark"] .order-detail-content,
+:root[data-theme="dark"] .order-details-accordion details,
+:root[data-theme="dark"] .admin-category-card,
+:root[data-theme="dark"] .admin-category-service,
+:root[data-theme="dark"] .admin-category-empty { background:var(--theme-surface,#1b2a40)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .modal input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="dark"] .modal select,
+:root[data-theme="dark"] .modal textarea,
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .field textarea,
+:root[data-theme="dark"] .search-box input,
+:root[data-theme="dark"] .checkout-time-options input,
+:root[data-theme="dark"] input[type="datetime-local"],
+:root[data-theme="dark"] input[type="date"] { background-color:var(--theme-surface,#1b2a40)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; color-scheme:dark; }
+:root[data-theme="dark"] .modal select option,
+:root[data-theme="dark"] select option { background:#1b2a40!important; color:#eef4fc!important; }
+:root[data-theme="dark"] .admin-tab-dialog-head { background:var(--theme-surface,#1b2a40)!important; }
+:root[data-theme="dark"] .admin-queue { background:var(--theme-surface,#1b2a40)!important; }
+:root[data-theme="dark"] .customer-category-showcase-top { border-radius:16px; padding:4px 8px; }
+:root[data-theme="dark"] .customer-category-showcase-top .customer-category-rail { background:var(--theme-surface,#1b2a40)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .customer-category-showcase-top .customer-category-tile { background:transparent!important; color:var(--theme-text,#eef4fc)!important; }
+:root[data-theme="dark"] .customer-category-showcase-top .customer-category-tile.selected { background:#243c58!important; }
+:root[data-theme="dark"] .customer-service-filters button { background:var(--theme-surface,#1b2a40)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .customer-service-filters button.active { background:#176b57!important; color:#fff!important; border-color:#287b68!important; }
+:root[data-theme="dark"] .checkout-reference-header { background:var(--theme-surface,#1b2a40)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .checkout-reference-header h2,
+:root[data-theme="dark"] .checkout-reference-label b,
+:root[data-theme="dark"] .checkout-reference-payment-title b,
+:root[data-theme="dark"] .checkout-payment-choice span,
+:root[data-theme="dark"] .checkout-time-options label { color:var(--theme-text,#eef4fc)!important; }
+:root[data-theme="dark"] .checkout-reference-row small,
+:root[data-theme="dark"] .checkout-reference-label small { color:var(--theme-muted,#b9c7da)!important; }
+:root[data-theme="dark"] .modal .btn.secondary { background:#22334b!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="dark"] .table th,
+:root[data-theme="dark"] .table td,
+:root[data-theme="dark"] .table tbody tr:hover td { background:var(--theme-surface,#1b2a40)!important; color:var(--theme-text,#eef4fc)!important; border-color:var(--theme-line,#344861)!important; }
+:root[data-theme="light"] .modal>.card { background:var(--theme-surface,#fff)!important; color:var(--theme-text,#182230)!important; border-color:var(--theme-line,#e5eaf0)!important; }
+:root[data-theme="light"] .about-app-services span,
+:root[data-theme="light"] .checkout-payment-choice,
+:root[data-theme="light"] .checkout-time-now,
+:root[data-theme="light"] .checkout-time-later { background:var(--theme-surface,#fff)!important; color:var(--theme-text,#182230)!important; border-color:var(--theme-line,#e5eaf0)!important; }
+:root[data-theme="light"] .modal input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="light"] .modal select,
+:root[data-theme="light"] .modal textarea,
+:root[data-theme="light"] input[type="datetime-local"],
+:root[data-theme="light"] input[type="date"] { background:#fff!important; color:#182230!important; border-color:#d5dce8!important; color-scheme:light; }
+:root[data-theme="dark"] html,
+:root[data-theme="dark"] body { overflow-x:clip; }
+:root[data-theme="dark"] .customer-shell,
+:root[data-theme="dark"] .modal,
+:root[data-theme="dark"] .modal>.card,
+:root[data-theme="dark"] .order-confirmation-step,
+:root[data-theme="dark"] .modern-order-flow { max-width:100%; min-width:0; }
+.customer-shell .customer-service-list,
+.customer-shell .customer-service-row,
+.customer-shell .checkout-reference-row,
+.customer-shell .checkout-reference-payment,
+.customer-shell .order-confirmation-step { min-width:0; max-width:100%; }
+
+/* Prevent document-level horizontal drift while preserving internal horizontal rails. */
+html,body { max-width:100%; overflow-x:clip; }
+
+/* v2.73 — bottom navigation follows scroll direction without affecting page layout. */
+.customer-shell .customer-bottom-nav{transition:transform .22s ease,opacity .22s ease;will-change:transform;}
+.customer-shell .customer-bottom-nav.nav-hidden-on-scroll{transform:translate(50%,calc(100% + 10px));opacity:0;pointer-events:none;}
+.customer-shell .customer-contact-top-btn::before,.customer-shell .customer-contact-top-btn::after{content:none!important;display:none!important;}
+:root[data-theme="dark"] .customer-shell .customer-bottom-nav.nav-hidden-on-scroll{transform:translate(50%,calc(100% + 10px));}
+@media(prefers-reduced-motion:reduce){.customer-shell .customer-bottom-nav{transition:none!important;}}
+
+/* Keep only the compact app header and category rail pinned; discovery content scrolls away. */
+.customer-shell .app-topbar{position:sticky;top:0;z-index:130;}
+.customer-shell .customer-sticky-discovery{position:static!important;top:auto!important;background:transparent!important;backdrop-filter:none!important;box-shadow:none!important;}
+.customer-shell .customer-category-showcase-top{position:sticky;top:72px;z-index:120;background:var(--theme-surface,#fff)!important;box-shadow:0 5px 12px rgba(20,45,35,.08);}
+:root[data-theme="dark"] .customer-shell .customer-category-showcase-top{background:var(--theme-surface,#1b2a40)!important;box-shadow:0 5px 14px rgba(0,0,0,.22);}
+@media(max-width:600px){.customer-shell .app-topbar{min-height:56px!important;}.customer-shell .customer-category-showcase-top{top:56px;}}

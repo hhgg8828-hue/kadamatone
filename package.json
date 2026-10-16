@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.72",
-  "description": "إصلاح ظهور الإشعارات بالكامل داخل حدود الشاشة",
+  "version": "2.73",
+  "description": "تحسينات شاملة للوضع الداكن وتصفية الخدمات وإصلاح حفظ الخدمات",
   "private": true,
   "type": "module",
   "engines": {
