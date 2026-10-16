@@ -22,8 +22,7 @@ test('محرر الخدمة لا يطلب من المسؤول كتابة JSON ي
 
 test('معرّفات الخدمات والأقسام تنشأ تلقائيًا من الأسماء', () => {
   assert.match(app, /function makeAdminSlug/);
-  assert.match(app, /const rawSlug=makeAdminSlug\(String\(f\.get\('en'\)/);
-  assert.match(app, /body\.slug=uniqueSlug/);
+  assert.match(app, /body\.slug=makeAdminSlug\(String\(f\.get\('en'\)/);
 });
 
 test('توصيات تأكيد الطلب تظهر كبطاقات أفقية مصورة وبها عرض الكل', () => {

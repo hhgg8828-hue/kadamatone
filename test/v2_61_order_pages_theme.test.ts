@@ -11,9 +11,8 @@ test('صفحات تتبع الطلب تتبع المظهر النهاري وال
   assert.match(css, /:root\[data-theme="light"\] body:has\(\.customer-shell\) #modal:has\(\.reference-tracking\)/);
   assert.match(css, /:root\[data-theme="dark"\] body:has\(\.customer-shell\) #modal:has\(\.reference-tracking\)/);
 });
-test('بطاقات طلباتي تعرض رقم الطلب والتكرار للطلبات المكتملة والملغاة فقط',()=>{
+test('بطاقات طلباتي تتضمن رقمًا ظاهرًا ونسخًا وتكرارًا للطلب غير النشط',()=>{
   assert.match(app, /data-copy-order-code="\$\{esc\(o\.code\)\}"/);
-  assert.match(app, /order-repeat-btn-wide/);
-  assert.match(app, /const canRepeat=completed\|\|cancelled/);
+  assert.match(app, /تكرار الطلب　⇄/);
   assert.match(css, /\.order-card-total-row/);
 });

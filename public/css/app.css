@@ -1974,49 +1974,34 @@ body:has(.customer-shell) #modal:has(#tripForm)>.card{max-height:calc(100dvh - e
 :root[data-theme="light"] .customer-order-tracking.reference-tracking .tracking-reference-products span{color:var(--theme-text,#17231f)!important}
 @media(max-width:420px){.checkout-store-rail-layout{grid-template-columns:76px minmax(0,1fr);gap:6px}.checkout-all-stores-fixed{min-height:68px;padding:8px 5px;font-size:12px}.customer-order-tracking.reference-tracking .tracking-reference-header{padding:16px!important}}
 
-/* v2.66 notes implementation: compact customer header and less vertical clutter */
-.customer-shell .app-topbar{gap:8px;min-height:58px;padding:7px 10px;}
-.customer-shell .top-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:nowrap;}
-.customer-shell .customer-contact-location-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;height:32px;overflow:visible;}
-.customer-shell .top-actions .customer-contact-top-btn,.customer-shell .top-actions .notification-top-btn,.customer-shell .top-actions .customer-header-icon{display:grid;place-items:center;width:31px;min-width:31px;height:31px;min-height:31px;flex:0 0 31px;padding:0;border:1px solid rgba(255,255,255,.2);border-radius:9px;background:rgba(255,255,255,.14);color:#fff;font-size:17px;line-height:1;text-decoration:none;}
-.customer-shell .customer-contact-location-wrap .customer-contact-top-btn{width:32px;min-width:32px;height:32px;min-height:32px;flex-basis:32px;}
-.customer-shell .customer-contact-location-wrap .customer-area-arrow{position:absolute;right:-4px;bottom:-5px;z-index:2;display:grid;place-items:center;width:17px;height:17px;min-width:17px;min-height:17px;padding:0;border:1px solid rgba(255,255,255,.65);border-radius:50%;background:#f4ead8;color:#176b4d;font-size:13px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.2);}
-.customer-shell .brand-lockup{min-width:0;flex:1;gap:7px;}
-.customer-shell .brand-lockup small{max-width:140px;}
-.customer-shell .customer-category-showcase-top{margin:0 0 5px;padding:0 8px 3px;}
-.customer-shell .customer-category-heading{display:none!important;}
-.customer-shell .customer-category-showcase-top .customer-category-rail{gap:5px;padding-top:1px;padding-bottom:2px;}
-.customer-shell .customer-category-showcase-top .customer-category-tile{flex-basis:61px;gap:3px;padding:2px;}
-.customer-shell .customer-category-showcase-top .customer-category-art{width:43px;height:43px;flex-basis:43px;}
-.customer-shell .customer-category-showcase-top .customer-category-art .service-icon-svg{width:25px;height:25px;}
-.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:59px;min-width:59px;min-height:58px;gap:3px;padding:3px 2px;}
-.customer-shell .customer-category-showcase-top .all-categories-check{width:26px;height:26px;font-size:18px;}
-.customer-shell .customer-offers{margin-top:4px!important;margin-bottom:9px!important;}
-.customer-shell .customer-offers .section-heading{display:none!important;}
-.customer-shell .campaign-strip-wrap{margin-top:0!important;}
-.customer-shell .reference-service-heading{display:flex;justify-content:flex-end;min-height:0;margin:0!important;padding:0!important;}
-.customer-shell .reference-service-heading .reference-service-count{font-size:11px;opacity:.65;}
-.customer-shell .customer-service-filters{margin-top:2px;}
-.customer-contact-options{display:grid;gap:12px;min-width:min(320px,78vw);}
-.customer-contact-options h2,.customer-contact-options p{margin:0;}
-.customer-contact-option{display:flex;align-items:center;justify-content:center;min-height:46px;text-decoration:none;}
-.order-card-compact{padding:13px!important;border-radius:15px!important;margin:10px 0!important;}
-.order-card-compact .order-card-topline{padding-bottom:9px;direction:rtl;}
-.order-card-compact .order-card-delivery{font-size:12px;font-weight:800;color:var(--theme-muted,#667085);white-space:nowrap;}
-.order-card-detail-name{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:11px 0 8px;}
-.order-card-detail-name>b{font-size:15px;line-height:1.5;min-width:0;overflow-wrap:anywhere;}
-.order-card-detail-name .order-card-date{font-size:11px;white-space:nowrap;}
-.order-card-detail-separator{height:1px;background:var(--theme-line,#e5eaf0);margin:0 0 8px;}
-.order-card-detail-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:5px 0;color:var(--theme-muted,#667085);font-size:12px;}
-.order-card-detail-meta>b{color:var(--theme-text,#182230);text-align:left;overflow-wrap:anywhere;}
-.order-card-detail-meta button{border:0;background:transparent;color:inherit;padding:0 3px;}
-.order-card-compact .order-card-total-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--theme-line,#e5eaf0);margin-top:7px;padding-top:10px;}
-.order-card-compact .order-card-total-row>b{font-size:13px;}
-.order-card-compact .order-card-total-row strong{font-size:15px;text-align:left;}
-.order-repeat-btn-wide{display:flex!important;align-items:center;justify-content:center;gap:8px;width:100%;min-height:43px;margin-top:12px;border-radius:9px!important;}
-.order-repeat-btn-wide span{font-size:22px;line-height:1;}
-.order-repeat-btn-wide b{font-size:13px;}
-.service-editor-modal .field-invalid input,.service-editor-modal .field-invalid select,.service-editor-modal .field-invalid textarea{border-color:#c73737!important;box-shadow:0 0 0 2px rgba(199,55,55,.12)!important;}
-.service-editor-modal .service-field-error{display:block;color:#bd2c2c;font-weight:700;margin-top:5px;line-height:1.6;}
-#serviceEditorError{white-space:normal;line-height:1.8;margin:10px 0;}
-@media(max-width:520px){.customer-shell .app-topbar{min-height:56px;padding:6px 8px;gap:5px}.customer-shell .top-actions{gap:4px}.customer-shell .top-actions .customer-contact-top-btn,.customer-shell .top-actions .notification-top-btn,.customer-shell .top-actions .customer-header-icon{width:27px;min-width:27px;height:27px;min-height:27px;flex-basis:27px;font-size:15px}.customer-shell .customer-contact-location-wrap{width:28px;height:28px;flex-basis:28px}.customer-shell .customer-contact-location-wrap .customer-contact-top-btn{width:28px;min-width:28px;height:28px;min-height:28px;flex-basis:28px}.customer-shell .customer-contact-location-wrap .customer-area-arrow{width:16px;height:16px;min-width:16px;min-height:16px;right:-4px;bottom:-4px;font-size:12px}.customer-shell .customer-category-showcase-top .customer-category-tile{flex-basis:57px}.customer-shell .customer-category-showcase-top .customer-category-art{width:40px;height:40px;flex-basis:40px}.customer-shell .customer-category-showcase-top .all-categories-tile{flex-basis:55px;min-width:55px;min-height:56px}}
+
+/* v2.67 — compact home discovery, accessible support menu, and order summary layout */
+.customer-shell .customer-category-showcase-top{padding-top:0!important;margin-top:0!important;padding-bottom:2px!important}
+.customer-shell .customer-category-heading{display:none!important}
+.customer-shell .customer-category-rail{margin-top:0!important}
+.customer-shell .customer-offers{margin-top:3px!important;margin-bottom:7px!important}
+.customer-shell .customer-offers .section-heading{display:none!important}
+.customer-shell .reference-service-heading{display:none!important}
+.customer-shell .customer-sticky-discovery .customer-category-showcase-top{padding-top:0!important;padding-bottom:2px!important}
+.customer-shell .customer-contact-menu{position:relative;display:flex;align-items:center;align-self:center}
+.customer-shell .customer-contact-top-btn{position:relative;display:flex;align-items:center;gap:2px;min-width:38px;min-height:36px;justify-content:center;padding:5px 7px!important}
+.customer-shell .contact-menu-caret{position:absolute;right:-3px;bottom:-5px;font-size:13px;line-height:12px;background:var(--theme-surface,#fff);border-radius:50%;width:14px;height:14px;display:grid;place-items:center;border:1px solid var(--theme-line,#e5eaf0)}
+.customer-shell .customer-contact-options{position:absolute;top:calc(100% + 8px);right:0;z-index:500;min-width:190px;background:var(--theme-surface,#fff);border:1px solid var(--theme-line,#e5eaf0);border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.15);padding:5px;display:flex;flex-direction:column}
+.customer-shell .customer-contact-options a{padding:11px 12px;border-radius:8px;color:var(--theme-text,#182230);text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap}
+.customer-shell .customer-contact-options a:hover{background:var(--theme-bg,#f5f7f8)}
+.order-card-code-date{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;font-size:12px;color:var(--theme-muted,#667085)}
+.order-card-code-date .order-card-date{display:inline-block;margin:0}
+.order-card-code-date .order-card-code{display:inline-flex;align-items:center;gap:5px;margin:0}
+.order-card-divider{color:var(--theme-line,#98a2b3);font-weight:700}
+.order-card-topline{direction:rtl!important}
+.order-card-topline .status{order:0}
+.order-card-topline .order-card-delivery{order:1}
+.order-card-total-row{direction:rtl;justify-content:space-between!important}
+.order-card-total-row>b{order:0}
+.order-card-total-row>.order-card-total,.order-card-total-row>strong{order:1}
+.order-card-repeat{display:block!important;margin:13px 0 0!important}
+.order-repeat-btn{display:flex!important;align-items:center;justify-content:center;gap:8px;width:100%!important;min-height:48px!important;border-radius:12px!important;background:var(--primary,#16845b)!important;color:#fff!important;font-size:16px!important;font-weight:800}
+.order-repeat-btn span{font-size:23px;line-height:1}
+.service-editor-modal .field-invalid input,.service-editor-modal .field-invalid select,.service-editor-modal .field-invalid textarea{border-color:#d92d20!important;box-shadow:0 0 0 2px rgba(217,45,32,.12)!important}
+.service-editor-modal .service-field-error{display:block;color:#d92d20;font-size:13px;margin-top:5px;font-weight:700}
+@media(max-width:600px){.customer-shell .customer-sticky-discovery .customer-category-showcase-top{padding-bottom:1px!important}.customer-shell .customer-offers{margin-top:2px!important}.customer-shell .customer-contact-options{right:auto;left:0}}
