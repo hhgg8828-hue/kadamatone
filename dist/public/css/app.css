@@ -2657,3 +2657,30 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .exit-confirm-modal>.exit-confirm-card,:root[data-theme="dark"] .admin-order-workflow{background:#172438!important;color:#eef4fc!important;border-color:#344861!important}
 :root[data-theme="dark"] .exit-confirm-card h2,:root[data-theme="dark"] .admin-order-workflow h3{color:#eef4fc!important}
 :root[data-theme="dark"] .admin-order-workflow .muted{color:#b9c7da!important}
+
+
+/* v2.87: provider service/skill selection cards must stay readable in dark mode. */
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check,
+:root[data-theme="dark"] .provider-shell #servicesEditor label.service-check,
+:root[data-theme="dark"] .provider-shell .provider-services .service-check {
+  background:#1b2a40!important; background-image:none!important; color:#eef4fc!important;
+  border-color:#3b536e!important; box-shadow:none!important;
+}
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check b,
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check span,
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check small,
+:root[data-theme="dark"] .provider-shell .provider-services .service-check b,
+:root[data-theme="dark"] .provider-shell .provider-services .service-check span,
+:root[data-theme="dark"] .provider-shell .provider-services .service-check small { color:#eef4fc!important; }
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check small,
+:root[data-theme="dark"] .provider-shell .provider-services .service-check small { color:#b9c7da!important; }
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check input[type="checkbox"],
+:root[data-theme="dark"] .provider-shell .provider-services .service-check input[type="checkbox"] {
+  accent-color:#70d6a8; background-color:#22334b!important; border-color:#8ba3bd!important;
+}
+:root[data-theme="dark"] .provider-shell #servicesEditor .service-check:has(input:checked),
+:root[data-theme="dark"] .provider-shell .provider-services .service-check:has(input:checked) {
+  border-color:#70d6a8!important; box-shadow:inset 0 0 0 1px rgba(112,214,168,.35)!important;
+}
+:root[data-theme="light"] .provider-shell #servicesEditor .service-check,
+:root[data-theme="light"] .provider-shell .provider-services .service-check { color:#182b22; }
