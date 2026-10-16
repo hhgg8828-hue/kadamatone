@@ -2592,3 +2592,15 @@ html,body { max-width:100%; overflow-x:clip; }
 /* The arrow moves right only; vertical position and size remain unchanged. */
 .customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-9px;bottom:-6px;}
 @media(max-width:520px){.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-9px;bottom:-6px;}}
+
+/* v2.83: provider portal dark surfaces and service execution-option cards */
+:root[data-theme="dark"] .provider-quick-nav{background:#1b2a40!important;border-color:#344861!important;box-shadow:none!important}
+:root[data-theme="dark"] .provider-quick-nav a{background:#22334b!important;background-image:none!important;color:#eef4fc!important;border-color:#3b536e!important}
+:root[data-theme="dark"] .provider-quick-nav a:hover{background:#2a405d!important;border-color:#54708f!important}
+:root[data-theme="dark"] .provider-command-strip>div,:root[data-theme="dark"] .provider-command-strip>div:first-child{background:#1b2a40!important;background-image:none!important;border-color:#344861!important;box-shadow:none!important}
+:root[data-theme="dark"] .provider-command-strip b{color:#eef4fc!important}
+:root[data-theme="dark"] .provider-command-strip small{color:#b9c7da!important}
+:root[data-theme="dark"] .provider-shell .service-check,:root[data-theme="dark"] .provider-shell .provider-notification-summary,:root[data-theme="dark"] .provider-shell .provider-notification-stats{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
+:root[data-theme="dark"] .service-editor-checks label,:root[data-theme="dark"] .service-field-required,:root[data-theme="dark"] .quantity-support-setting{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
+:root[data-theme="dark"] .service-editor-checks label input,:root[data-theme="dark"] .service-field-required input,:root[data-theme="dark"] .quantity-support-setting input{accent-color:#70d6a8}
+:root[data-theme="dark"] .quantity-support-setting small{color:#b9c7da!important}
