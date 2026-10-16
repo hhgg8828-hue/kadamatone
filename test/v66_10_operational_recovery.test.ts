@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
 import { startApp, registerUser, loginAdmin } from './helpers.js';
 
 test('V66.14: مشوار الدباب لا يتوقف إذا تعطل التوجيه الخارجي ويستخدم احتياط المسافة', async()=>{
@@ -27,6 +28,6 @@ test('V66.14: اعتماد المركبة يعمل أيضًا عبر المسا�
 
 test('V66.14: واجهة مقدم الخدمة تعيد عرض العرض الجديد فور ظهوره وتستخدم cache bust', async()=>{
   const fs=await import('node:fs');
-  const app=fs.readFileSync('public/app.ts','utf8'); const provider=fs.readFileSync('public/provider.html','utf8'); const admin=fs.readFileSync('public/admin.html','utf8');
-  assert.match(app,/providerPollTimer=window\.setInterval[\s\S]*?8000/); assert.match(app,/if\(addedOffers\.length\)/); assert.match(provider,/app\.js\?v=2\.38/); assert.match(admin,/app\.js\?v=2\.38/);
+  const app=fs.readFileSync('public/app.ts','utf8'); const provider=fs.readFileSync('public/provider.html','utf8'); const admin=fs.readFileSync('public/admin.html','utf8'); const version=JSON.parse(fs.readFileSync('package.json','utf8')).version;
+  assert.match(app,/providerPollTimer=window\.setInterval[\s\S]*?8000/); assert.match(app,/if\(addedOffers\.length\)/); assert.ok(provider.includes(`app.js?v=${version}`)); assert.ok(admin.includes(`app.js?v=${version}`));
 });

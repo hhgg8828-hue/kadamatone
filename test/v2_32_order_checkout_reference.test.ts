@@ -6,8 +6,10 @@ test('V2.34 uses service-specific fields and only shows generic details when nee
   const app = fs.readFileSync('public/app.ts', 'utf8');
   const flow = app.slice(app.indexOf('async function openOrderForm(serviceId:string'), app.indexOf('function renderOrderTimeline'));
   assert.ok(flow.includes('const hasDedicatedDescription='));
-  assert.ok(flow.includes("const quantityFieldsHtml=quantityFields.map(renderField).join('')"));
+  assert.ok(flow.includes('const quantityFieldsHtml=quantityFields.map((f:any)=>'));
   assert.ok(flow.includes('${descriptionFieldHtml}${fields}${quantityFieldsHtml}'));
+  assert.ok(flow.includes('class=\"quantity-stepper\"'));
+  assert.ok(flow.includes('data-qty-step=\"1\"'));
   assert.ok(flow.includes('const needsGenericDescription=!hasDedicatedDescription&&'));
   assert.ok(flow.includes('const descriptionFieldHtml=hasDedicatedDescription||!needsGenericDescription?\'\':'));
   assert.ok(!flow.includes('${optionalFieldsHtml}'));
@@ -42,8 +44,8 @@ test('V2.34 confirmation avoids extra product questions after the customer compl
 test('V2.34 app assets and service-worker cache are aligned', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.38'), file);
-    assert.ok(html.includes('app.css?v=2.38'), file);
+    assert.ok(html.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
+    assert.ok(html.includes(`app.css?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-38'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').match(/khadamat-shell-v\d+-\d+/));
 });

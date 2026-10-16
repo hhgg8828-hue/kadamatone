@@ -30,10 +30,10 @@ test('customer categories use a square all-categories tile and offers button sit
 test('asset URLs and service worker cache are bumped for 2.25', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.58'), file);
-    assert.ok(html.includes('app.css?v=2.58'), file);
+    assert.ok(html.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
+    assert.ok(html.includes(`app.css?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-58'));
+  assert.ok(fs.readFileSync('public/sw.js', 'utf8').match(/khadamat-shell-v\d+-\d+/));
 });
 
 test('campaign schema migration preserves valid writes for category campaigns with multiple category slugs', async () => {

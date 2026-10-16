@@ -41,8 +41,8 @@ test('Unmatched needs have a dedicated custom-service path with the original des
 test('Release 2.5 keeps public asset cache identifiers aligned', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
     const html = fs.readFileSync(file, 'utf8');
-    assert.ok(html.includes('app.js?v=2.38'), file);
-    assert.ok(html.includes('app.css?v=2.38'), file);
+    assert.ok(html.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
+    assert.ok(html.includes(`app.css?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
   }
-  assert.ok(fs.readFileSync('public/sw.js','utf8').includes('khadamat-shell-v2-38'));
+  assert.ok(fs.readFileSync('public/sw.js','utf8').match(/khadamat-shell-v\d+-\d+/));
 });

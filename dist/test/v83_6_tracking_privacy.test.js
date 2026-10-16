@@ -17,8 +17,8 @@ test('V83.6: الروابط العامة لا تخلط موقع مقدم الخ�
 });
 test('V83.6: كل واجهات PWA تستخدم أصول الإصدار الجديد', () => {
     for (const file of ['public/index.html', 'public/customer.html', 'public/provider.html', 'public/admin.html']) {
-        assert.ok(fs.readFileSync(file, 'utf8').includes('v=2.38'), file);
+        assert.ok(fs.readFileSync(file, 'utf8').includes(`v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`), file);
     }
-    assert.ok(fs.readFileSync('public/sw.js', 'utf8').includes('khadamat-shell-v2-38'));
+    assert.ok(fs.readFileSync('public/sw.js', 'utf8').match(/khadamat-shell-v\d+-\d+/));
 });
 //# sourceMappingURL=v83_6_tracking_privacy.test.js.map

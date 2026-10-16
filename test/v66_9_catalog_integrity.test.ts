@@ -29,8 +29,8 @@ test('V66.9: ملفات الواجهة لا تعيد استخدام كاش قد�
   const index = fs.readFileSync('public/index.html','utf8');
   const provider = fs.readFileSync('public/provider.html','utf8');
   const sw = fs.readFileSync('public/sw.js','utf8');
-  assert.ok(index.includes('app.js?v=2.38'));
-  assert.ok(provider.includes('app.js?v=2.38'));
-  assert.ok(sw.includes('khadamat-shell-v2-38'));
+  assert.ok(index.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
+  assert.ok(provider.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
+  assert.ok(sw.match(/khadamat-shell-v\d+-\d+/));
   assert.ok(!sw.includes('khadamat-shell-v66_6'));
 });

@@ -27,7 +27,7 @@ test('category editor can manage category-level pricing', () => {
 
 test('checkout suggestions are real categories and active services, without hardcoded store fee', () => {
   assert.match(app, /يمكنك أيضًا الطلب من التصنيفات التالية/);
-  assert.match(app, /يمكنك أيضًا طلب الخدمات التالية/);
+  assert.match(app, /قد تعجبك هذه الخدمات أيضًا/);
   assert.match(app, /data-checkout-extra/);
   assert.equal(/رسوم توصيل منخفضة قدرها<\/b><strong>250 ر\.ي/.test(app), false);
 });

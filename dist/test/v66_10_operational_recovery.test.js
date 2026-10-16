@@ -40,9 +40,10 @@ test('V66.14: واجهة مقدم الخدمة تعيد عرض العرض الج
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const provider = fs.readFileSync('public/provider.html', 'utf8');
     const admin = fs.readFileSync('public/admin.html', 'utf8');
+    const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
     assert.match(app, /providerPollTimer=window\.setInterval[\s\S]*?8000/);
     assert.match(app, /if\(addedOffers\.length\)/);
-    assert.match(provider, /app\.js\?v=2\.38/);
-    assert.match(admin, /app\.js\?v=2\.38/);
+    assert.ok(provider.includes(`app.js?v=${version}`));
+    assert.ok(admin.includes(`app.js?v=${version}`));
 });
 //# sourceMappingURL=v66_10_operational_recovery.test.js.map

@@ -18,8 +18,8 @@ test('provider auth exposes provider registration and customer switch', () => {
 });
 test('provider page and frontend assets use the current version', () => {
     assert.ok(provider.includes('data-page="provider"'));
-    assert.ok(provider.includes('app.js?v=2.38'));
-    assert.ok(index.includes('app.js?v=2.38'));
+    assert.ok(provider.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
+    assert.ok(index.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
 });
 test('provider order action is not nested inside the clickable order detail button', () => {
     assert.match(app, /class=\"order-card-main\"/);
@@ -168,7 +168,7 @@ test('V47: order chat UI exposes quick replies and live chat refresh hook', () =
 });
 test('V53: admin account settings and guarded offer acceptance are exposed', () => {
     const source = app;
-    assert.match(source, /data-admin-tab="account">حسابي/);
+    assert.match(source, /data-admin-tab="account">[^<]*حسابي/);
     assert.match(source, /acceptingOffers/);
     assert.match(source, /جارٍ قبول الطلب/);
 });
@@ -189,7 +189,10 @@ test('V57: واجهة المشاوير بالدباب تحتوي خرائط ال
     assert.ok(app.includes('tripDestinationMap'));
     assert.ok(app.includes('/trips/estimate'));
     assert.ok(app.includes('/trips'));
-    assert.ok(app.includes('tripDistance'));
-    assert.ok(app.includes('tripFare'));
+    assert.ok(app.includes('tripEstimateDistance'));
+    assert.ok(app.includes('tripEstimateFare'));
+    assert.ok(app.includes('tripEstimateDuration'));
+    assert.ok(app.includes('id="tripEstimatePanel"'));
+    assert.ok(app.includes('id="tripEstimateStatus"'));
 });
 //# sourceMappingURL=ui-access.test.js.map

@@ -58,9 +58,9 @@ test('customer offer filters and favorites are interactive and saved locally', (
     assert.match(frontend, /khadamat\.favoriteCampaigns\.v1/);
 });
 test('customer shell uses versioned 2.19 assets to refresh cached layout', () => {
-    assert.match(customerShell, /app\.css\?v=2\.38/);
-    assert.match(customerShell, /app\.js\?v=2\.38/);
-    assert.match(customerShell, /sw\.js\?v=2\.38/);
+    assert.ok(customerShell.includes(`app.css?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
+    assert.ok(customerShell.includes(`app.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
+    assert.ok(customerShell.includes(`/sw.js?v=${JSON.parse(fs.readFileSync('package.json', 'utf8')).version}`));
 });
 test('admin category editor can store an uploaded-image URL without a database migration', async () => {
     const t = await startApp();

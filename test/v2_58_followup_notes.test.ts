@@ -7,9 +7,11 @@ const css = readFileSync('public/css/app.css', 'utf8');
 const catalog = readFileSync('src/modules/catalog.ts', 'utf8');
 
 test('nearby services require valid customer and service coordinates and sort by distance', () => {
-  assert.match(app, /key==='nearby'&&hasLoc&&Number\.isFinite\(d\)/);
-  assert.match(app, /cards\.sort\(\(a,b\)=>Number\(a\.dataset\.distanceKm\?\?Infinity\)-Number\(b\.dataset\.distanceKm\?\?Infinity\)\)/);
-  assert.match(app, /لا تتوفر إحداثيات موثوقة للخدمات القريبة حاليًا/);
+  assert.match(app, /function validCoordinates\(latValue:any,lngValue:any\)/);
+  assert.match(app, /if\(!loc\|\|!point\)return Infinity/);
+  assert.match(app, /key==='nearby'\&\&Number\.isFinite\(d\)/);
+  assert.match(app, /if\(key==='nearby'\)ranked\.sort\(\(a,b\)=>a\.d-b\.d/);
+  assert.match(app, /لا تتوفر إحداثيات فعلية كافية لترتيب الخدمات حسب القرب/);
 });
 
 test('new service and campaign filters do not invent freshness when timestamps are missing', () => {

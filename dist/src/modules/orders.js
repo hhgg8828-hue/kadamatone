@@ -11,7 +11,7 @@ import { serializeTrip } from './trips.js';
 import { executionEvent } from './execution.js';
 const createOrderSchema = s.obj({
     serviceId: s.str({ min: 1, max: 64 }),
-    description: s.str({ min: 1, max: 1000 }),
+    description: s.str({ min: 5, max: 1000 }),
     location: { ...locationSchema, optional: true },
     areaId: s.str({ max: 64, optional: true }),
     addressId: s.str({ max: 64, optional: true }),
