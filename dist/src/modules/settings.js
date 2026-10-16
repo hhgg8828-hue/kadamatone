@@ -3,8 +3,11 @@ import { E } from '../core/errors.js';
 import { parseJson, iso } from '../core/util.js';
 /** سجل الإعدادات: كل إعداد له قيمة افتراضية ومخطط تحقق. لا قيم أعمال مبرمجة داخل المنطق. */
 export const SETTINGS = {
-    'app.name': { def: 'خدمات', schema: s.str({ min: 1, max: 60 }), desc: 'اسم التطبيق الظاهر في الواجهات' },
-    'app.tagline': { def: 'كل خدمة تحتاجها في مكان واحد', schema: s.str({ max: 160 }), desc: 'العبارة التعريفية أسفل اسم التطبيق' },
+    'app.name': { def: 'خدمات الهيثم', schema: s.str({ min: 1, max: 60 }), desc: 'اسم العلامة التجارية الأساسي' },
+    'app.customer_name': { def: 'خدمات الهيثم', schema: s.str({ min: 1, max: 60 }), desc: 'اسم تطبيق العميل وواجهته' },
+    'app.provider_name': { def: 'خدمات الهيثم (مقدّم خدمة)', schema: s.str({ min: 1, max: 80 }), desc: 'اسم تطبيق مقدّم الخدمة وواجهته' },
+    'app.admin_name': { def: 'خدمات الهيثم (الإدارة)', schema: s.str({ min: 1, max: 80 }), desc: 'اسم تطبيق الإدارة وواجهته' },
+    'app.tagline': { def: 'كل خدمة تحتاجها... في مكان واحد.', schema: s.str({ max: 160 }), desc: 'العبارة التعريفية أسفل اسم التطبيق' },
     'app.symbol': { def: 'خ', schema: s.str({ max: 8 }), desc: 'الرمز المختصر الظاهر بجانب اسم التطبيق' },
     'app.news_ticker': { def: 'أهلًا بك في خدمات — اختر منطقتك لتظهر لك الخدمات المتاحة فيها.', schema: s.str({ max: 500 }), desc: 'نص الشريط الإخباري الظاهر في واجهة العميل؛ اتركه فارغًا لإخفائه' },
     'app.about': { def: 'منصة تجمع العملاء بمقدمي الخدمات وتسهّل طلب الخدمات ومتابعتها.', schema: s.str({ max: 2000 }), desc: 'نبذة قابلة للتعديل تظهر في معلومات التطبيق' },
@@ -45,8 +48,11 @@ export function createSettings(app) {
         for (const [k, v] of Object.entries(SETTINGS))
             cache[k] = v.def;
         for (const r of db.all('SELECT key, value FROM system_settings'))
-            if (r.key in SETTINGS)
-                cache[r.key] = parseJson(r.value);
+            if (r.key in SETTINGS) {
+                const value = parseJson(r.value);
+                // Migrate only the untouched legacy default; preserve any administrator-customized brand name.
+                cache[r.key] = r.key === 'app.name' && value === 'خدمات' ? 'خدمات الهيثم' : value;
+            }
     };
     return {
         get(key) { if (!cache)

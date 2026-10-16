@@ -2265,3 +2265,160 @@ html,body { max-width:100%; overflow-x:clip; }
 .customer-shell .customer-sticky-discovery .customer-category-showcase-top{position:relative!important;top:auto!important;z-index:auto!important;background:transparent!important;box-shadow:none!important;}
 :root[data-theme="dark"] .customer-shell .customer-sticky-discovery{background:var(--theme-surface,#1b2a40)!important;box-shadow:0 6px 18px rgba(0,0,0,.24);}
 @media(max-width:600px){.customer-shell .app-topbar{min-height:56px!important;}.customer-shell .customer-sticky-discovery{top:56px!important;}}
+
+
+/* v2.75: systematic light/dark surface and contrast pass. Keep branded accent colors; normalize neutral surfaces. */
+:root[data-theme="dark"] {
+  --theme-bg:#111e32; --theme-surface:#1b2a40; --theme-text:#eef4fc; --theme-muted:#b9c7da; --theme-line:#344861;
+  --surface:#1b2a40; --surface-2:#15243a; --ink:#eef4fc; --muted:#b9c7da; --line:#344861;
+}
+:root[data-theme="light"] {
+  --theme-bg:#f7f9fc; --theme-surface:#fff; --theme-text:#182230; --theme-muted:#667085; --theme-line:#e5eaf0;
+  --surface:#fff; --surface-2:#f7f9fc; --ink:#172b24; --muted:#64756c; --line:#e4e9f2;
+}
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .shell,
+:root[data-theme="dark"] .customer-shell,
+:root[data-theme="dark"] .admin-page,
+:root[data-theme="dark"] .provider-shell {background-color:var(--theme-bg);color:var(--theme-text);}
+:root[data-theme="dark"] .app-topbar,
+:root[data-theme="dark"] .modal>.card,
+:root[data-theme="dark"] .modal .card,
+:root[data-theme="dark"] .service-picker-head,
+:root[data-theme="dark"] .notification-modal-head,
+:root[data-theme="dark"] .about-app-head,
+:root[data-theme="dark"] .admin-tab-dialog-head,
+:root[data-theme="dark"] .checkout-reference-header,
+:root[data-theme="dark"] .customer-contact-options,
+:root[data-theme="dark"] .about-app-section,
+:root[data-theme="dark"] .about-app-services,
+:root[data-theme="dark"] .about-app-services span,
+:root[data-theme="dark"] .service-editor-section,
+:root[data-theme="dark"] .admin-category-card,
+:root[data-theme="dark"] .admin-category-service,
+:root[data-theme="dark"] .admin-category-empty,
+:root[data-theme="dark"] .admin-order-store-card,
+:root[data-theme="dark"] .account-app-footer,
+:root[data-theme="dark"] .appearance-options,
+:root[data-theme="dark"] .appearance-choice-group label,
+:root[data-theme="dark"] .order-submit-note,
+:root[data-theme="dark"] .checkout-payment-choice,
+:root[data-theme="dark"] .checkout-time-now,
+:root[data-theme="dark"] .checkout-time-later,
+:root[data-theme="dark"] .checkout-time-options,
+:root[data-theme="dark"] .checkout-reference-coupon,
+:root[data-theme="dark"] .checkout-reference-note,
+:root[data-theme="dark"] .checkout-reference-address-editor,
+:root[data-theme="dark"] .customer-category-showcase,
+:root[data-theme="dark"] .customer-category-rail,
+:root[data-theme="dark"] .customer-sticky-discovery,
+:root[data-theme="dark"] .customer-category-showcase-top,
+:root[data-theme="dark"] .all-categories-modal,
+:root[data-theme="dark"] .all-categories-grid .card,
+:root[data-theme="dark"] .customer-service-filters,
+:root[data-theme="dark"] .customer-service-row,
+:root[data-theme="dark"] .service-option,
+:root[data-theme="dark"] .suggestions,
+:root[data-theme="dark"] .suggestion,
+:root[data-theme="dark"] .account-menu-list,
+:root[data-theme="dark"] .account-menu-grid,
+:root[data-theme="dark"] .account-accessibility,
+:root[data-theme="dark"] .account-menu-row,
+:root[data-theme="dark"] .customer-account-menu,
+:root[data-theme="dark"] .customer-account-menu-row,
+:root[data-theme="dark"] .customer-account-area,
+:root[data-theme="dark"] .customer-account-footer,
+:root[data-theme="dark"] .customer-subscriptions-view,
+:root[data-theme="dark"] .customer-subscription-empty,
+:root[data-theme="dark"] .trip-location-card,
+:root[data-theme="dark"] .trip-items-disclosure,
+:root[data-theme="dark"] .order-detail-content,
+:root[data-theme="dark"] .order-details-accordion details,
+:root[data-theme="dark"] .table th,
+:root[data-theme="dark"] .table td {
+  background-color:var(--theme-surface)!important;color:var(--theme-text);border-color:var(--theme-line)!important;
+}
+:root[data-theme="dark"] .modal>.card .card,
+:root[data-theme="dark"] .modal .field,
+:root[data-theme="dark"] .service-editor-modal,
+:root[data-theme="dark"] .admin-tab-dialog-content,
+:root[data-theme="dark"] .checkout-reference-row .field,
+:root[data-theme="dark"] .checkout-time-options .field {background-color:var(--theme-surface)!important;color:var(--theme-text)!important;}
+:root[data-theme="dark"] .modal>.card h1,
+:root[data-theme="dark"] .modal>.card h2,
+:root[data-theme="dark"] .modal>.card h3,
+:root[data-theme="dark"] .modal>.card h4,
+:root[data-theme="dark"] .modal>.card p,
+:root[data-theme="dark"] .modal>.card span,
+:root[data-theme="dark"] .modal>.card b,
+:root[data-theme="dark"] .modal>.card strong,
+:root[data-theme="dark"] .modal>.card label,
+:root[data-theme="dark"] .modal>.card legend,
+:root[data-theme="dark"] .modal>.card li,
+:root[data-theme="dark"] .modal>.card th,
+:root[data-theme="dark"] .modal>.card td,
+:root[data-theme="dark"] .admin-page .card h1,
+:root[data-theme="dark"] .admin-page .card h2,
+:root[data-theme="dark"] .admin-page .card h3,
+:root[data-theme="dark"] .admin-page .card b,
+:root[data-theme="dark"] .admin-page .card strong,
+:root[data-theme="dark"] .admin-page .card label {color:var(--theme-text);}
+:root[data-theme="dark"] .modal input:not([type=checkbox]):not([type=radio]),
+:root[data-theme="dark"] .modal select,
+:root[data-theme="dark"] .modal textarea,
+:root[data-theme="dark"] .admin-page input:not([type=checkbox]):not([type=radio]),
+:root[data-theme="dark"] .admin-page select,
+:root[data-theme="dark"] .admin-page textarea,
+:root[data-theme="dark"] .provider-shell input:not([type=checkbox]):not([type=radio]),
+:root[data-theme="dark"] .provider-shell select,
+:root[data-theme="dark"] .provider-shell textarea {background:var(--theme-surface)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important;color-scheme:dark;}
+:root[data-theme="dark"] select option {background:#1b2a40;color:#eef4fc;}
+:root[data-theme="dark"] .modal .field label,
+:root[data-theme="dark"] .field label,
+:root[data-theme="dark"] .service-editor-modal h2,
+:root[data-theme="dark"] .service-editor-section h3 {color:var(--theme-text)!important;}
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] .modal .muted,
+:root[data-theme="dark"] .admin-page .muted,
+:root[data-theme="dark"] .modal small,
+:root[data-theme="dark"] .admin-page small {color:var(--theme-muted)!important;}
+:root[data-theme="dark"] .modal>.card .btn.secondary,
+:root[data-theme="dark"] .admin-page .btn.secondary,
+:root[data-theme="dark"] .provider-shell .btn.secondary {background:#22334b!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important;}
+:root[data-theme="dark"] .about-app-services span {background:var(--theme-surface)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important;}
+:root[data-theme="dark"] .customer-category-showcase-top .customer-category-rail {background:var(--theme-surface)!important;border-color:var(--theme-line)!important;}
+:root[data-theme="dark"] .customer-category-showcase-top .customer-category-tile {background:transparent!important;color:var(--theme-text)!important;}
+:root[data-theme="dark"] .customer-category-showcase-top .customer-category-tile.selected {background:#243c58!important;}
+:root[data-theme="dark"] .customer-shell .app-topbar {background:rgba(17,30,50,.96)!important;border-color:var(--theme-line)!important;}
+:root[data-theme="dark"] .customer-shell .customer-sticky-discovery {background:var(--theme-surface)!important;border-color:var(--theme-line)!important;}
+:root[data-theme="dark"] .customer-shell .customer-category-showcase-top {background:var(--theme-surface)!important;}
+:root[data-theme="dark"] .live-toast {background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important;}
+:root[data-theme="light"] body,
+:root[data-theme="light"] .shell,
+:root[data-theme="light"] .customer-shell,
+:root[data-theme="light"] .admin-page,
+:root[data-theme="light"] .provider-shell {color:var(--theme-text);}
+:root[data-theme="light"] .modal>.card,
+:root[data-theme="light"] .modal .card,
+:root[data-theme="light"] .about-app-services span,
+:root[data-theme="light"] .checkout-payment-choice,
+:root[data-theme="light"] .checkout-time-now,
+:root[data-theme="light"] .checkout-time-later,
+:root[data-theme="light"] .customer-category-showcase-top,
+:root[data-theme="light"] .customer-category-rail {background-color:#fff!important;color:#182230;border-color:#e5eaf0;}
+:root[data-theme="light"] .modal input:not([type=checkbox]):not([type=radio]),
+:root[data-theme="light"] .modal select,
+:root[data-theme="light"] .modal textarea,
+:root[data-theme="light"] .admin-page input:not([type=checkbox]):not([type=radio]),
+:root[data-theme="light"] .admin-page select,
+:root[data-theme="light"] .admin-page textarea {background:#fff!important;color:#182230!important;border-color:#d5dce8!important;color-scheme:light;}
+:root[data-theme="light"] .modal h1,
+:root[data-theme="light"] .modal h2,
+:root[data-theme="light"] .modal h3,
+:root[data-theme="light"] .modal label,
+:root[data-theme="light"] .admin-page .card h2,
+:root[data-theme="light"] .admin-page .card h3,
+:root[data-theme="light"] .admin-page .card label {color:#182230;}
+
+:root[data-theme="dark"] .card:not(.hero):not(.notice):not(.status):not(.campaign-card):not(.customer-empty-banner) {background-color:var(--theme-surface)!important;color:var(--theme-text);border-color:var(--theme-line)!important;}
+:root[data-theme="light"] .card:not(.hero):not(.notice):not(.status):not(.campaign-card):not(.customer-empty-banner) {color:var(--theme-text);}

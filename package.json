@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.74",
-  "description": "تصحيح تثبيت رأس التطبيق ومنطقة الاكتشاف حتى نهاية التصنيفات",
+  "version": "2.75",
+  "description": "توحيد الثيم وإدارة هوية التطبيق من لوحة الإدارة",
   "private": true,
   "type": "module",
   "engines": {
