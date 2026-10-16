@@ -1858,7 +1858,7 @@ function renderCustomer() {
         localStorage.setItem('khadamat.home.selectedCategory.v1', selectedHomeCategorySlug);
     else
         localStorage.removeItem('khadamat.home.selectedCategory.v1'); document.querySelectorAll('.customer-category-tile[data-cat]').forEach(c => { const active = !!selectedHomeCategorySlug && c.dataset.cat === selectedHomeCategorySlug; c.classList.toggle('selected', active); c.setAttribute('aria-pressed', active ? 'true' : 'false'); }); document.getElementById('allCategoriesBtn')?.classList.toggle('selected', !selectedHomeCategorySlug); applyServiceFilter(activeHomeServiceFilter); document.getElementById('servicesSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-    document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => applyHomeCategory(x.dataset.cat || '')));
+    document.querySelectorAll('[data-cat]').forEach(x => x.addEventListener('click', () => openCategory(x.dataset.cat || '')));
     const categoryViewKey = 'khadamat.home.categoriesView.v1';
     const serviceViewKey = 'khadamat.home.servicesView.v1';
     const setServiceView = (view) => { const next = view === 'grid' ? 'grid' : 'list'; localStorage.setItem(serviceViewKey, next); const list = document.getElementById('customerServiceList'); if (list) {
@@ -1875,7 +1875,7 @@ function renderCustomer() {
     const openAllCategories = () => { const cats = customerMainCategories(state.cats); let view = localStorage.getItem(categoryViewKey) === 'list' ? 'list' : 'grid'; const render = () => { const tiles = cats.map((c) => `<button type="button" class="all-category-choice card" data-all-category="${esc(c.slug)}"><span class="customer-category-art">${customerCategoryArtwork(c)}</span><b>${esc(c.name)}</b></button>`).join(''); return `<div class="all-categories-modal"><div class="all-categories-modal-head"><div><h2>كل التصنيفات</h2><p class="muted">اختر التصنيف لعرض الخدمات التابعة له.</p></div><button type="button" class="customer-view-toggle category-view-toggle ${view === 'grid' ? 'is-grid' : ''}" id="allCategoriesViewToggle" aria-label="${view === 'grid' ? 'التبديل إلى عرض الأسطر' : 'التبديل إلى عرض المربعات'}" title="${view === 'grid' ? 'عرض الأسطر' : 'عرض المربعات'}"><svg class="view-grid-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg><svg class="view-list-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/></svg></button></div><button type="button" class="all-categories-show-all" id="allCategoriesShowAll">عرض جميع الخدمات</button><div class="all-categories-grid ${view === 'list' ? 'category-view-list' : 'category-view-grid'}">${tiles || '<p class="muted">لا توجد تصنيفات متاحة حاليًا.</p>'}</div></div>`; }; showModal(render()); const bind = () => { document.getElementById('allCategoriesViewToggle')?.addEventListener('click', () => { view = view === 'grid' ? 'list' : 'grid'; localStorage.setItem(categoryViewKey, view); const content = document.querySelector('.all-categories-modal'); if (content) {
         content.outerHTML = render().replace(/^<div class="all-categories-modal">/, '<div class="all-categories-modal">');
         bind();
-    } }); document.querySelectorAll('[data-all-category]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCategory || ''; closeModal(); applyHomeCategory(slug); })); document.getElementById('allCategoriesShowAll')?.addEventListener('click', () => { closeModal(); applyHomeCategory(''); }); }; bind(); };
+    } }); document.querySelectorAll('[data-all-category]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.allCategory || ''; closeModal(); void openCategory(slug); })); document.getElementById('allCategoriesShowAll')?.addEventListener('click', () => { closeModal(); applyHomeCategory(''); }); }; bind(); };
     document.getElementById('allCategoriesBtn')?.addEventListener('click', openAllCategories);
     document.getElementById('allOffersBtn')?.addEventListener('click', () => { const offers = state.campaigns || []; showModal(`<div class="all-offers-modal"><h2>كل العروض</h2><p class="muted">اختر العرض لعرض تفاصيله أو الانتقال إلى الخدمات المرتبطة به.</p><div class="all-offers-grid">${offers.map((c) => `<button type="button" class="card all-offer-item" data-all-offer="${esc(c.id)}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy">` : `<span class="all-offer-placeholder">✦</span>`}<b>${esc(c.title)}</b><small>${esc(c.description || '')}</small></button>`).join('') || '<p class="muted">لا توجد عروض متاحة حاليًا.</p>'}</div></div>`); document.querySelectorAll('[data-all-offer]').forEach(b => b.addEventListener('click', () => { const c = offers.find((v) => v.id === b.dataset.allOffer); if (!c)
         return; closeModal(); const t = String(c.actionType || 'NONE'), v = String(c.actionValue || ''); if (t === 'CATEGORY' && v)
@@ -2339,11 +2339,11 @@ function openCampaignCategories(campaign) { let slugs = Array.isArray(campaign?.
 async function openCategory(slug) { let services = []; try {
     if (slug) {
         const j = await api('/categories/' + encodeURIComponent(slug) + '/services' + (state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : ''));
-        const activeIds = new Set((state.services || []).map((x) => x.id));
-        services = (j.services || []).filter((x) => activeIds.has(x.id));
+        const activeIds = new Set((state.services || []).map((x) => String(x.id)));
+        services = (j.services || []).filter((x) => activeIds.has(String(x.id)));
     }
     else {
-        services = state.services;
+        services = state.services || [];
     }
 }
 catch (e) {
@@ -2353,13 +2353,13 @@ catch (e) {
     walkCats(c.children); }); walkCats(state.cats); const cat = allCats.find((c) => c.slug === slug); const pharmacyLike = /pharm|medicine|medication|صيدلي|أدوية|دواء/i.test(String(slug) + ' ' + String(cat?.name || '')); if (pharmacyLike && services.length) {
     openPharmacyProductFlow(services);
     return;
-} if (!services.length) {
-    showModal('<div class="empty">لا توجد خدمات متاحة في هذا القسم حاليًا</div>');
-    return;
-} showModal(`<div class="service-picker-head"><div><h2>اختر الخدمة</h2><p class="muted">اختر الخدمة الفعلية التي تريد طلبها</p></div></div><div class="grid service-picker">${services.map(s => `<button class="card service service-option" data-service="${esc(s.id)}" type="button"><div class="service-option-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><div class="service-option-body"><b>${esc(s.name)}</b><p>${esc(s.description || 'اطلب هذه الخدمة وسيتم البحث عن مقدم خدمة مناسب')}</p><span class="choose-link">${state.user ? 'طلب الخدمة' : 'عرض التفاصيل'} ←</span></div></button>`).join('')}</div>`); document.querySelectorAll('[data-service]').forEach(x => x.addEventListener('click', () => { const id = x.dataset.service; if (state.user?.role === 'CUSTOMER')
+} const viewKey = 'khadamat.home.categoryServicesView.v1'; let view = localStorage.getItem(viewKey) === 'list' ? 'list' : 'grid'; const title = String(cat?.name || 'خدمات التصنيف'); const render = () => `<div class="all-categories-modal category-services-modal"><div class="all-categories-modal-head"><div><h2>${esc(title)}</h2><p class="muted">اختر الخدمة التي تريدها.</p></div><button type="button" class="customer-view-toggle category-view-toggle ${view === 'grid' ? 'is-grid' : ''}" id="categoryServicesViewToggle" aria-label="${view === 'grid' ? 'التبديل إلى عرض الأسطر' : 'التبديل إلى عرض المربعات'}" title="${view === 'grid' ? 'عرض الأسطر' : 'عرض المربعات'}"><svg class="view-grid-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg><svg class="view-list-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/></svg></button></div><div class="all-categories-grid category-services-grid ${view === 'list' ? 'category-view-list' : 'category-view-grid'}">${services.map(s => `<button type="button" class="category-service-choice" data-category-service="${esc(s.id)}"><span class="customer-category-art">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</span><b>${esc(s.name)}</b><small>${esc(state.user ? 'طلب الخدمة' : 'عرض التفاصيل')}</small></button>`).join('') || '<p class="empty">لا توجد خدمات متاحة في هذا التصنيف حاليًا.</p>'}</div></div>`; showModal(render()); const bind = () => { document.getElementById('categoryServicesViewToggle')?.addEventListener('click', () => { view = view === 'grid' ? 'list' : 'grid'; localStorage.setItem(viewKey, view); const modal = document.querySelector('.category-services-modal'); if (modal) {
+    modal.outerHTML = render();
+    bind();
+} }); document.querySelectorAll('[data-category-service]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.categoryService || ''; closeModal(); if (state.user?.role === 'CUSTOMER')
     openOrderForm(id);
 else
-    openServiceDetails(id); })); }
+    openServiceDetails(id); })); }; bind(); }
 async function openMotorcycleTripForm(service, savedAddresses) {
     const purposeLabels = { PASSENGER: 'نقل شخص', PARCEL: 'توصيل طلب أو غرض', ITEM_PURCHASE: 'شراء وإحضار غرض', MEDICINE: 'شراء دواء من الصيدلية', RESTAURANT_PICKUP: 'استلام طلب من مطعم', DOCUMENT_DELIVERY: 'استلام وتسليم مستندات', TECHNICIAN_PICKUP: 'إحضار فني أو عامل', STORE_SHOPPING: 'شراء أغراض من متجر', SMALL_CARGO: 'نقل أغراض صغيرة', HOME_PICKUP: 'استلام أو توصيل شيء من/إلى المنزل', OTHER: 'أخرى' };
     showModal(`<div class="trip-modal"><div class="trip-head"><div><h2>🛵 مشاوير بالدباب</h2><p class="muted">حدد نقطة الانطلاق والوجهة. يمكنك وضع العلامة على الخريطة حتى لو لم يكن للمكان اسم.</p></div></div><form id="tripForm">

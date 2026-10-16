@@ -2534,3 +2534,49 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .customer-shell .customer-view-toggle,:root[data-theme="dark"] .customer-shell .all-categories-grid .all-category-choice{background:var(--theme-surface,#1b2a40);color:var(--theme-text,#eef4fc);border-color:var(--theme-line,#344861)}
 :root[data-theme="dark"] .customer-shell .all-categories-show-all{background:#243c58;color:var(--theme-text,#eef4fc);border-color:#3d6b88}
 @media(max-width:360px){.customer-shell .customer-service-toolbar{gap:4px}.customer-shell .customer-view-toggle{flex-basis:36px;width:36px;min-width:36px;height:38px}.customer-shell .customer-service-filters button{padding-inline:8px}.customer-shell #customerServiceList.service-view-grid .customer-service-row{padding:10px 6px}}
+
+/* v2.79: keep category and category-service choices in consistent popup layouts. */
+.customer-shell .category-services-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.customer-shell .category-services-grid .category-service-choice{display:flex;min-width:0;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 8px;border:1px solid var(--theme-line,#e5ebe6);border-radius:13px;background:var(--theme-surface,#fff);color:var(--theme-text,#25342b);font:inherit;text-align:center;cursor:pointer}
+.customer-shell .category-services-grid .category-service-choice .customer-category-art{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:color-mix(in srgb,var(--primary,#176b4d) 10%,var(--theme-surface,#fff));color:var(--primary,#176b4d)}
+.customer-shell .category-services-grid .category-service-choice .customer-category-art svg{width:29px;height:29px}
+.customer-shell .category-services-grid .category-service-choice b{font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.customer-shell .category-services-grid .category-service-choice small{font-size:11px;color:var(--theme-muted,#6b7a70)}
+.customer-shell .category-services-grid.category-view-list{grid-template-columns:minmax(0,1fr);gap:7px}
+.customer-shell .category-services-grid.category-view-list .category-service-choice{min-height:64px;flex-direction:row;justify-content:flex-start;gap:12px;padding:8px 12px;text-align:right}
+.customer-shell .category-services-grid.category-view-list .category-service-choice .customer-category-art{width:44px;height:44px;flex:0 0 44px;border-radius:12px}
+.customer-shell .category-services-grid.category-view-list .category-service-choice b{flex:1;text-align:right}
+.customer-shell .category-services-grid.category-view-list .category-service-choice small{margin-inline-start:auto;white-space:nowrap}
+:root[data-theme="dark"] .customer-shell .category-services-grid .category-service-choice{background:var(--theme-surface,#1b2a40);color:var(--theme-text,#eef4fc);border-color:var(--theme-line,#344861)}
+/* Popup content is mounted under body, outside .customer-shell; style it globally. */
+.modal .all-categories-modal{min-width:0;max-height:min(75vh,720px);overflow:auto;padding:2px 1px 8px;direction:rtl}
+.modal .all-categories-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px}
+.modal .all-categories-modal-head h2{margin:0 0 4px;font-size:20px}
+.modal .all-categories-modal-head p{margin:0;font-size:13px}
+.modal .category-view-toggle{flex:0 0 42px;width:42px;height:42px;display:inline-flex;align-items:center;justify-content:center;padding:8px;border:1px solid var(--theme-line,#dfe8e1);border-radius:10px;background:var(--theme-surface,#fff);color:var(--theme-text,#25342b);cursor:pointer}
+.modal .category-view-toggle svg{width:21px;height:21px;fill:currentColor;stroke:currentColor;stroke-width:1.8}
+.modal .category-view-toggle .view-list-icon{display:none;fill:none;stroke-linecap:round;stroke-width:2.3}
+.modal .category-view-toggle.is-grid .view-grid-icon{display:none}
+.modal .category-view-toggle.is-grid .view-list-icon{display:block}
+.modal .all-categories-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.modal .all-categories-grid .all-category-choice{display:flex;min-width:0;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px 8px;border:1px solid var(--theme-line,#e5ebe6);border-radius:13px;background:var(--theme-surface,#fff);color:var(--theme-text,#25342b);font:inherit;text-align:center;cursor:pointer}
+.modal .all-categories-grid .all-category-choice .customer-category-art{width:50px;height:50px;display:grid;place-items:center;border-radius:15px;background:color-mix(in srgb,var(--primary,#176b4d) 10%,var(--theme-surface,#fff));color:var(--primary,#176b4d)}
+.modal .all-categories-grid .all-category-choice .customer-category-art svg{width:30px;height:30px}
+.modal .all-categories-grid .all-category-choice b{font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.modal .all-categories-grid.category-view-list{grid-template-columns:minmax(0,1fr);gap:7px}
+.modal .all-categories-grid.category-view-list .all-category-choice{min-height:66px;flex-direction:row;justify-content:flex-start;gap:12px;padding:8px 12px;text-align:right}
+.modal .all-categories-grid.category-view-list .all-category-choice .customer-category-art{width:44px;height:44px;flex:0 0 44px;border-radius:12px}
+.modal .all-categories-grid.category-view-list .all-category-choice b{flex:1;text-align:right}
+.modal .category-services-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.modal .category-services-grid .category-service-choice{display:flex;min-width:0;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 8px;border:1px solid var(--theme-line,#e5ebe6);border-radius:13px;background:var(--theme-surface,#fff);color:var(--theme-text,#25342b);font:inherit;text-align:center;cursor:pointer}
+.modal .category-services-grid .category-service-choice .customer-category-art{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:color-mix(in srgb,var(--primary,#176b4d) 10%,var(--theme-surface,#fff));color:var(--primary,#176b4d)}
+.modal .category-services-grid .category-service-choice .customer-category-art svg{width:29px;height:29px}
+.modal .category-services-grid .category-service-choice b{font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.modal .category-services-grid .category-service-choice small{font-size:11px;color:var(--theme-muted,#6b7a70)}
+.modal .category-services-grid.category-view-list{grid-template-columns:minmax(0,1fr);gap:7px}
+.modal .category-services-grid.category-view-list .category-service-choice{min-height:64px;flex-direction:row;justify-content:flex-start;gap:12px;padding:8px 12px;text-align:right}
+.modal .category-services-grid.category-view-list .category-service-choice .customer-category-art{width:44px;height:44px;flex:0 0 44px;border-radius:12px}
+.modal .category-services-grid.category-view-list .category-service-choice b{flex:1;text-align:right}
+.modal .category-services-grid.category-view-list .category-service-choice small{margin-inline-start:auto;white-space:nowrap}
+:root[data-theme="dark"] .modal .category-view-toggle,:root[data-theme="dark"] .modal .all-categories-grid .all-category-choice,:root[data-theme="dark"] .modal .category-services-grid .category-service-choice{background:var(--theme-surface,#1b2a40);color:var(--theme-text,#eef4fc);border-color:var(--theme-line,#344861)}
+:root[data-theme="dark"] .modal .all-categories-show-all{background:#243c58;color:var(--theme-text,#eef4fc);border-color:#3d6b88}
