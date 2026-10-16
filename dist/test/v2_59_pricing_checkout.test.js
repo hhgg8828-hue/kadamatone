@@ -21,7 +21,8 @@ test('category editor can manage category-level pricing', () => {
     assert.match(app, /defaultPricingType:String\(f\.get\('defaultPricingType'\)/);
 });
 test('checkout suggestions are real categories and active services, without hardcoded store fee', () => {
-    assert.match(app, /يمكنك أيضًا الطلب من التصنيفات التالية/);
+    assert.equal(/يمكنك أيضًا الطلب من التصنيفات التالية/.test(app), false);
+    assert.match(app, /يمكنك أيضًا الطلب من الأقسام التالية/);
     assert.match(app, /قد تعجبك هذه الخدمات أيضًا/);
     assert.match(app, /data-checkout-extra/);
     assert.equal(/رسوم توصيل منخفضة قدرها<\/b><strong>250 ر\.ي/.test(app), false);

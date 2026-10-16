@@ -9,13 +9,13 @@ export function registerPlatformRoutes(app, r) {
     const { db, settings, catalog } = app;
     r.get('/config', () => {
         const locale = settings.get('platform.default_locale');
-        return { appVersion: '2.76', country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
+        return { appVersion: '2.85', checkoutSuggestionsServicesEnabled: settings.get('checkout.suggested_services_enabled'), checkoutSuggestionsServicesIds: settings.get('checkout.suggested_services_ids'), checkoutSuggestionsSectionsEnabled: settings.get('checkout.suggested_sections_enabled'), checkoutSuggestionsSectionsIds: settings.get('checkout.suggested_sections_ids'), country: settings.get('platform.country'), currency: settings.get('platform.currency'), timezone: settings.get('platform.timezone'),
             appName: settings.get('app.name'), appCustomerName: settings.get('app.customer_name'), appProviderName: settings.get('app.provider_name'), appAdminName: settings.get('app.admin_name'), appTagline: settings.get('app.tagline'), appSymbol: settings.get('app.symbol'),
             newsTicker: settings.get('app.news_ticker'), aboutText: settings.get('app.about'), releaseNotes: settings.get('app.release_notes'), adminSmsPhone: settings.get('orders.admin_sms_phone'),
             defaultLocale: locale, supportedLocales: ['ar', 'en'], direction: locale === 'ar' ? 'rtl' : 'ltr', mapProvider: app.config.mapProvider };
     });
     r.get('/admin/settings', auth, adminLevel('ADMIN'), () => ({ settings: settings.all() }));
-    const publicBrandSettings = new Set(['app.name', 'app.customer_name', 'app.provider_name', 'app.admin_name', 'app.tagline', 'app.symbol', 'app.news_ticker', 'app.about', 'app.release_notes']);
+    const publicBrandSettings = new Set(['app.name', 'app.customer_name', 'app.provider_name', 'app.admin_name', 'app.tagline', 'app.symbol', 'app.news_ticker', 'app.about', 'app.release_notes', 'checkout.suggested_services_enabled', 'checkout.suggested_services_ids', 'checkout.suggested_sections_enabled', 'checkout.suggested_sections_ids']);
     r.put('/admin/settings/:key', auth, adminLevel('ADMIN'), (ctx) => {
         const key = ctx.params['key'];
         // Ordinary administrators may maintain customer-facing content; technical and financial settings remain SUPER_ADMIN-only.

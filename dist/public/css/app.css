@@ -2618,3 +2618,29 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .checkout-extra-qty button{background:#22334b!important;color:#eef4fc!important;border-color:#405875!important}
 :root[data-theme="dark"] .checkout-extra-detail-card{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
 :root[data-theme="dark"] .checkout-extra-detail-card .field label{color:#eef4fc!important}
+
+
+/* v2.85: clearer customer category artwork and colorful account menu icons */
+.customer-shell .customer-category-showcase-top .customer-category-art{background:linear-gradient(145deg,#e4f4eb,#d5eadf)!important;border:1px solid #a8cfba!important;color:#105c40!important;box-shadow:inset 0 0 0 1px rgba(16,92,64,.06)}
+.customer-shell .customer-category-showcase-top .customer-category-art .service-icon-svg{width:30px;height:30px;min-width:30px;min-height:30px;stroke-width:1.8}
+.customer-account-menu-row:nth-child(5n+1) .customer-account-menu-icon{background:#e4f2ff;color:#245e9c}
+.customer-account-menu-row:nth-child(5n+2) .customer-account-menu-icon{background:#fcebdc;color:#9b4e17}
+.customer-account-menu-row:nth-child(5n+3) .customer-account-menu-icon{background:#e4f5e9;color:#176b43}
+.customer-account-menu-row:nth-child(5n+4) .customer-account-menu-icon{background:#f0e8ff;color:#6941a5}
+.customer-account-menu-row:nth-child(5n) .customer-account-menu-icon{background:#ffe7ee;color:#a52e54}
+.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-4px!important}
+@media(max-width:520px){.customer-shell .customer-notification-location-wrap .customer-area-arrow{right:-4px!important}}
+:root[data-theme="dark"] .customer-shell .customer-category-showcase-top .customer-category-art{background:linear-gradient(145deg,#263f35,#1c3028)!important;border-color:#476a59!important;color:#e5fff0!important}
+:root[data-theme="dark"] .customer-account-menu-row .customer-account-menu-icon{filter:saturate(1.12);border:1px solid rgba(255,255,255,.12)}
+
+.admin-suggestion-toggle{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--theme-line,#dce5df);border-radius:12px;background:var(--theme-surface,#fff);font-weight:700}.admin-suggestion-toggle input,.admin-suggestion-options input{accent-color:var(--primary,#176b4d);width:18px;height:18px;flex:none}.admin-suggestion-picker{margin-top:12px;padding:12px;border:1px solid var(--theme-line,#dce5df);border-radius:12px}.admin-suggestion-picker>summary{font-weight:700;cursor:pointer}.admin-suggestion-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:280px;overflow:auto;padding:8px 0}.admin-suggestion-options label{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--theme-line,#dce5df);border-radius:9px;min-width:0}.admin-suggestion-options label span{min-width:0;overflow-wrap:anywhere}.admin-suggestion-options small{display:block;color:var(--theme-muted,#6d7b73);font-size:11px} :root[data-theme="dark"] .admin-suggestion-toggle,:root[data-theme="dark"] .admin-suggestion-picker,:root[data-theme="dark"] .admin-suggestion-options label{background:var(--theme-surface,#172333);color:var(--theme-text,#eef4fc);border-color:var(--theme-line,#344357)}@media(max-width:520px){.admin-suggestion-options{grid-template-columns:1fr}}
+
+/* Keep the selected service area beside the customer-facing brand name. */
+.customer-shell .brand-lockup>span:last-child{display:flex;align-items:center;gap:7px;min-width:0}
+.customer-shell .brand-lockup small{margin-top:0!important}
+@media(max-width:520px){.customer-shell .brand-lockup>span:last-child{gap:5px}.customer-shell .brand-lockup small{max-width:100px!important}}
+:root[data-theme="dark"] .customer-account-menu-row:nth-child(5n+1) .customer-account-menu-icon{background:#203b59!important;color:#b8dcff!important}
+:root[data-theme="dark"] .customer-account-menu-row:nth-child(5n+2) .customer-account-menu-icon{background:#4a3023!important;color:#ffd0a7!important}
+:root[data-theme="dark"] .customer-account-menu-row:nth-child(5n+3) .customer-account-menu-icon{background:#1e4632!important;color:#b6f0cb!important}
+:root[data-theme="dark"] .customer-account-menu-row:nth-child(5n+4) .customer-account-menu-icon{background:#3b2a57!important;color:#ddc8ff!important}
+:root[data-theme="dark"] .customer-account-menu-row:nth-child(5n) .customer-account-menu-icon{background:#4a2634!important;color:#ffc5d5!important}

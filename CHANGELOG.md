@@ -1,3 +1,10 @@
+## 2.85 — 2026-10-16
+- Searchable customer area picker; selected area is saved and reflected in the customer header.
+- Improve category icon size and contrast, and add colorful account-menu icons.
+- Adjust area-arrow horizontal spacing without changing its vertical alignment.
+- Remove duplicate “يمكنك أيضًا الطلب من التصنيفات التالية” block from checkout.
+- Add independently configurable checkout service/section suggestions, including saved selection lists in admin settings.
+
 ## 2.84 — استمرارية الجلسات وإكمال الخدمات الإضافية
 - توحيد تجديد جلسات العميل ومقدم الخدمة والإدارة؛ عمليات التجديد المتزامنة داخل الصفحة تشترك في طلب واحد.
 - إبقاء الجلسة محفوظة عند أخطاء الاتصال المؤقتة، وإعادة التحقق عند عودة التطبيق للواجهة بدل تسجيل الخروج غير المبرر.
