@@ -2255,3 +2255,13 @@ html,body { max-width:100%; overflow-x:clip; }
 .customer-shell .customer-category-showcase-top{position:sticky;top:72px;z-index:120;background:var(--theme-surface,#fff)!important;box-shadow:0 5px 12px rgba(20,45,35,.08);}
 :root[data-theme="dark"] .customer-shell .customer-category-showcase-top{background:var(--theme-surface,#1b2a40)!important;box-shadow:0 5px 14px rgba(0,0,0,.22);}
 @media(max-width:600px){.customer-shell .app-topbar{min-height:56px!important;}.customer-shell .customer-category-showcase-top{top:56px;}}
+
+
+/* v2.74 — keep the complete discovery area pinned from the app header through categories.
+   The ticker, quick-assist controls, and category rail must scroll as one fixed top group;
+   only the content that follows the category rail moves underneath it. */
+.customer-shell .app-topbar{position:sticky!important;top:0!important;z-index:131!important;margin-bottom:0!important;}
+.customer-shell .customer-sticky-discovery{position:sticky!important;top:58px!important;z-index:130!important;background:var(--theme-surface,#fff)!important;backdrop-filter:blur(12px);box-shadow:0 6px 16px rgba(24,65,47,.09);}
+.customer-shell .customer-sticky-discovery .customer-category-showcase-top{position:relative!important;top:auto!important;z-index:auto!important;background:transparent!important;box-shadow:none!important;}
+:root[data-theme="dark"] .customer-shell .customer-sticky-discovery{background:var(--theme-surface,#1b2a40)!important;box-shadow:0 6px 18px rgba(0,0,0,.24);}
+@media(max-width:600px){.customer-shell .app-topbar{min-height:56px!important;}.customer-shell .customer-sticky-discovery{top:56px!important;}}

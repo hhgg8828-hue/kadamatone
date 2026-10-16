@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.73",
-  "description": "تحسينات شاملة للوضع الداكن وتصفية الخدمات وإصلاح حفظ الخدمات",
+  "version": "2.74",
+  "description": "تصحيح تثبيت رأس التطبيق ومنطقة الاكتشاف حتى نهاية التصنيفات",
   "private": true,
   "type": "module",
   "engines": {
