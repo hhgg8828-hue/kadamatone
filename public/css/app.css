@@ -2658,39 +2658,12 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .exit-confirm-card h2,:root[data-theme="dark"] .admin-order-workflow h3{color:#eef4fc!important}
 :root[data-theme="dark"] .admin-order-workflow .muted{color:#b9c7da!important}
 
-/* v2.87: accessible dark surfaces for the provider capability/skills editor. */
-:root[data-theme="dark"] .provider-shell .capability-dropdown,
-:root[data-theme="dark"] .provider-shell #capabilityEditor .capability-dropdown {
-  background:#1b2a40!important;
-  color:#eef4fc!important;
-  border-color:#344861!important;
-  box-shadow:none!important;
-}
-:root[data-theme="dark"] .provider-shell .capability-dropdown summary,
-:root[data-theme="dark"] .provider-shell .capability-dropdown summary span,
-:root[data-theme="dark"] .provider-shell .capability-dropdown summary b {
-  color:#eef4fc!important;
-}
-:root[data-theme="dark"] .provider-shell .capability-options {
-  background:#1b2a40!important;
-}
-:root[data-theme="dark"] .provider-shell .capability-options label {
-  background:#22334b!important;
-  background-image:none!important;
-  color:#eef4fc!important;
-  border-color:#3b536e!important;
-}
-:root[data-theme="dark"] .provider-shell .capability-options label span {
-  color:#eef4fc!important;
-}
-:root[data-theme="dark"] .provider-shell .capability-options input {
-  accent-color:#70d6a8!important;
-}
-:root[data-theme="dark"] .provider-shell .selected-capabilities .status {
-  background:#234b3d!important;
-  color:#c7f7df!important;
-  border-color:#39745d!important;
-}
-:root[data-theme="dark"] .provider-shell #capabilityMsg {
-  color:#b9c7da;
-}
+
+/* v2.87: capability/skills picker remains readable in dark mode. */
+:root[data-theme="dark"] .provider-shell .capability-dropdown{background:#172438!important;color:#eef4fc!important;border-color:#405875!important;box-shadow:none!important}
+:root[data-theme="dark"] .provider-shell .capability-dropdown summary{background:#172438!important;color:#eef4fc!important}
+:root[data-theme="dark"] .provider-shell .capability-dropdown summary b{color:#9be6bf!important}
+:root[data-theme="dark"] .provider-shell .capability-options label{background:#22334b!important;background-image:none!important;color:#eef4fc!important;border-color:#405875!important}
+:root[data-theme="dark"] .provider-shell .capability-options label span{color:#eef4fc!important}
+:root[data-theme="dark"] .provider-shell .capability-options input{accent-color:#70d6a8}
+:root[data-theme="dark"] .provider-shell .selected-capabilities .status{background:#203b32!important;color:#c9f7dc!important;border-color:#3c6d55!important}

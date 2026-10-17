@@ -36,7 +36,7 @@ export const SETTINGS = {
     'orders.max_active_per_customer': { def: 10, schema: s.int({ min: 1, max: 200 }), desc: 'أقصى عدد طلبات نشطة للعميل' },
     'quotes.default_valid_hours': { def: 48, schema: s.int({ min: 1, max: 720 }), desc: 'صلاحية عرض السعر بالساعات' },
     'trips.enabled': { def: true, schema: s.bool(), desc: 'تفعيل نظام المشاوير بالدباب' },
-    'trips.base_fare': { def: 500, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة بداية المشوار بالريال' },
+    'trips.base_fare': { def: 0, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة بداية المشوار بالريال' },
     'trips.per_km_fare': { def: 300, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة كل كيلومتر للمشوار بالريال' },
     'trips.minimum_fare': { def: 1000, schema: s.num({ min: 0, max: 1000000 }), desc: 'الحد الأدنى لأجرة المشوار بالريال' },
     'trips.waiting_per_minute_fare': { def: 50, schema: s.num({ min: 0, max: 1000000 }), desc: 'أجرة دقيقة الانتظار للمشاوير' },

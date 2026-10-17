@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
   "version": "2.87",
-  "description": "تحسين تباين مهارات مقدم الخدمة في الوضع الليلي",
+  "description": "تحسين وضع المهارات الداكن وتسعير المشاوير حسب مسار القيادة الفعلي",
   "private": true,
   "type": "module",
   "engines": {

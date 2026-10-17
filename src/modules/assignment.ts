@@ -266,9 +266,13 @@ export function registerAssignmentRoutes(app: App, r: Router): void {
         // احسب أجرة المشوار قبل انتقال الطلب إلى COMPLETED حتى تُحسب العمولة والتسوية والدفع على الأجرة النهائية.
         const tripRow=db.get<any>(`SELECT t.* FROM trip_orders t JOIN orders oo ON oo.id=t.order_id JOIN services s ON s.id=oo.service_id WHERE t.order_id=? AND s.slug='motorcycle-trips'`,o.id);
         if(tripRow){
-          const pts=db.all<any>('SELECT lat,lng FROM trip_location_history WHERE order_id=? ORDER BY id',o.id);
-          let actualKm=0; for(let i=1;i<pts.length;i++){ const R=6371; const dLat=(Number(pts[i].lat)-Number(pts[i-1].lat))*Math.PI/180; const dLng=(Number(pts[i].lng)-Number(pts[i-1].lng))*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(Number(pts[i-1].lat)*Math.PI/180)*Math.cos(Number(pts[i].lat)*Math.PI/180)*Math.sin(dLng/2)**2; actualKm += 2*R*Math.asin(Math.sqrt(a)); }
-          if(actualKm>0.05){ actualKm=Math.round(actualKm*10)/10; const base=Math.max(Number(tripRow.minimum_fare),Number(tripRow.base_fare)+actualKm*Number(tripRow.per_km_fare)); const finalFare=Math.round((base+Number(tripRow.waiting_total_minutes||0)*Number(tripRow.waiting_per_minute_fare||0))/50)*50; db.run('UPDATE trip_orders SET distance_km=?,fare=?,updated_at=? WHERE order_id=?',actualKm,finalFare,iso(app.clock.now()),o.id); db.run('UPDATE orders SET agreed_price=?,price_snapshot=?,updated_at=?,version=version+1 WHERE id=? AND version=?',finalFare,finalFare,iso(app.clock.now()),o.id,o.version); currentOrder=db.get<OrderRow>('SELECT * FROM orders WHERE id=?',o.id)!; }
+          // Keep the route distance calculated by the road-routing engine at estimate/creation.
+          // Summing straight-line distances between GPS samples underestimates road travel and
+          // must not replace the real route distance when closing the order.
+          const routeKm=Number(tripRow.distance_km||0);
+          const base=Math.max(Number(tripRow.minimum_fare),Number(tripRow.base_fare)+routeKm*Number(tripRow.per_km_fare));
+          const finalFare=Math.round(base+Number(tripRow.waiting_total_minutes||0)*Number(tripRow.waiting_per_minute_fare||0));
+          if(routeKm>0){ db.run('UPDATE trip_orders SET fare=?,updated_at=? WHERE order_id=?',finalFare,iso(app.clock.now()),o.id); db.run('UPDATE orders SET agreed_price=?,price_snapshot=?,updated_at=?,version=version+1 WHERE id=? AND version=?',finalFare,finalFare,iso(app.clock.now()),o.id,o.version); currentOrder=db.get<OrderRow>('SELECT * FROM orders WHERE id=?',o.id)!; }
         }
       }
       const updated = orders.applyTransition(currentOrder, b.to, 'PROVIDER', ctx);
