@@ -27,10 +27,10 @@ test('temporary service editor validates finite dates and requires end after sta
     assert.match(app, /!Number\.isFinite\(startMs\)\|\|!Number\.isFinite\(endMs\)\|\|endMs<=startMs/);
     assert.match(app, /تحقق من تاريخ البداية والنهاية؛ يجب أن تكون النهاية بعد البداية/);
 });
-test('recent trip locations are stored locally and offered in the origin/destination chooser', () => {
-    assert.match(app, /khadamat\.locationHistory\.v1/);
-    assert.match(app, /data-trip-recent/);
-    assert.match(app, /موقع استخدمته سابقًا/);
+test('trip locations are chosen from saved locations and every map pin is saved for reuse', () => {
+    assert.match(app, /data-tt-saved/);
+    assert.match(app, /api\('\/me\/addresses',\{method:'POST'/);
+    assert.match(app, /من المواقع المحفوظة/);
 });
 test('theme and interaction polish is present for dark-mode placeholders and filters', () => {
     assert.match(css, /:root\[data-theme="dark"\] input::placeholder/);

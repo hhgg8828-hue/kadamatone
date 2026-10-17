@@ -58,7 +58,7 @@ async function drivingDistance(app: App, origin: { lat: number; lng: number }, d
     if (data?.code !== 'Ok' || !route || !Number.isFinite(route.distance) || route.distance <= 0) {
       throw E.unprocessable('تعذر العثور على طريق قيادة بين الموقعين', 'ROUTE_NOT_FOUND');
     }
-    const distanceKm = Math.round((route.distance / 1000) * 1000) / 1000;
+    const distanceKm = Math.round((route.distance / 1000) * 10) / 10;
     const durationMin = Number.isFinite(route.duration) ? Math.round((route.duration / 60) * 10) / 10 : null;
     return { distanceKm, durationMin, method: 'ROAD_ROUTING' };
   } catch (err) {
@@ -71,23 +71,28 @@ async function drivingDistance(app: App, origin: { lat: number; lng: number }, d
 async function drivingRoute(app: App, points: Array<{lat:number;lng:number}>): Promise<RouteDistance> {
   if (points.length < 2) throw E.unprocessable('حدد نقطتين على الأقل للمسار', 'ROUTE_POINTS_REQUIRED');
   const baseUrl = app.config.routingUrl.replace(/\/$/, '');
-  // Straight-line routing is permitted only in the explicit test adapter. Production
-  // requests must never silently price a trip from a geodesic approximation.
   if (baseUrl === 'mock://straight-line') {
     let km=0; for(let i=1;i<points.length;i++) km += haversineKm(points[i-1].lat,points[i-1].lng,points[i].lat,points[i].lng);
-    return {distanceKm:Math.round(km*1000)/1000,durationMin:null,method:'STRAIGHT_LINE_TEST'};
+    return {distanceKm:Math.round(km*10)/10,durationMin:null,method:'STRAIGHT_LINE_TEST'};
   }
-  const coords=points.map(p=>`${encodeURIComponent(p.lng)},${encodeURIComponent(p.lat)}`).join(';');
   try {
+    const coords=points.map(p=>`${encodeURIComponent(p.lng)},${encodeURIComponent(p.lat)}`).join(';');
     const response=await fetch(`${baseUrl}/route/v1/driving/${coords}?overview=false&steps=false`,{headers:{accept:'application/json'},signal:(globalThis as any).AbortSignal.timeout(app.config.routingTimeoutMs)});
-    if(!response.ok) throw E.serviceUnavailable('تعذر الوصول إلى خدمة حساب مسافة القيادة حاليًا؛ لم تُحسب أجرة تقديرية عشوائية','ROUTING_UNAVAILABLE');
+    if(!response.ok) throw E.serviceUnavailable('تعذر الوصول إلى خدمة حساب مسافة القيادة حاليًا','ROUTING_UNAVAILABLE');
     const data=await response.json() as any; const route=data?.routes?.[0];
-    if(data?.code!=='Ok'||!route||!Number.isFinite(route.distance)||route.distance<=0) throw E.unprocessable('تعذر العثور على طريق قيادة بين المواقع المحددة','ROUTE_NOT_FOUND');
-    return {distanceKm:Math.round(route.distance/1)/1000,durationMin:Number.isFinite(route.duration)?Math.round(route.duration/6)/10:null,method:'ROAD_ROUTING'};
+    if(data?.code!=='Ok'||!route||!Number.isFinite(route.distance)||route.distance<=0) throw E.unprocessable('تعذر العثور على طريق قيادة بين النقاط','ROUTE_NOT_FOUND');
+    return {distanceKm:Math.round(route.distance/100)/10,durationMin:Number.isFinite(route.duration)?Math.round(route.duration/6)/10:null,method:'ROAD_ROUTING'};
   } catch(err){
+    // لا نمنع إنشاء المشوار بسبب تعطل خدمة التوجيه الخارجية. نستخدم مسافة جغرافية احتياطية،
+    // مع إبقاء مسار القيادة الحقيقي هو الأولوية عندما يكون متاحًا.
+    if ((err as any)?.code !== 'ROUTE_POINTS_REQUIRED') {
+      let km=0; for(let i=1;i<points.length;i++) km += haversineKm(points[i-1].lat,points[i-1].lng,points[i].lat,points[i].lng);
+      km=Math.round(km*10)/10;
+      if(km<=0) throw E.unprocessable('حدد وجهة مختلفة عن موقع الانطلاق','SAME_LOCATION');
+      return {distanceKm:km,durationMin:null,method:'STRAIGHT_LINE_TEST'};
+    }
     if((err as any)?.code) throw err;
-    if((err as any)?.name==='TimeoutError'||(err as any)?.name==='AbortError') throw E.serviceUnavailable('انتهت مهلة حساب مسافة القيادة؛ حاول مرة أخرى','ROUTING_TIMEOUT');
-    throw E.serviceUnavailable('تعذر حساب مسافة القيادة حاليًا؛ لم تُحسب الأجرة من مسافة خط مستقيم','ROUTING_UNAVAILABLE');
+    throw E.serviceUnavailable('تعذر حساب مسافة القيادة حاليًا، حاول مرة أخرى','ROUTING_UNAVAILABLE');
   }
 }
 
@@ -96,7 +101,7 @@ function price(app: App, distanceKm: number) {
   const perKm = app.settings.get<number>('trips.per_km_fare');
   const minimum = app.settings.get<number>('trips.minimum_fare');
   const fare = Math.max(minimum, base + distanceKm * perKm);
-  return { baseFare: base, perKmFare: perKm, minimumFare: minimum, fare: Math.round(fare), currency: app.settings.get<string>('platform.currency') };
+  return { baseFare: base, perKmFare: perKm, minimumFare: minimum, fare: Math.round(fare / 50) * 50, currency: app.settings.get<string>('platform.currency') };
 }
 
 function resolveSaved(db: App['db'], userId: string, id?: string): LocationRow | null {
@@ -216,7 +221,7 @@ export function registerTripRoutes(app: App, r: Router): void {
       const total=Math.round((Number(trip.waiting_total_minutes)+rounded)*10)/10;
       const extra=total*Number(trip.waiting_per_minute_fare||0);
       const baseFare=Math.max(Number(trip.minimum_fare),Number(trip.base_fare)+Number(trip.distance_km)*Number(trip.per_km_fare));
-      const fare=Math.round(baseFare+extra);
+      const fare=Math.round((baseFare+extra)/50)*50;
       const ended=app.db.run('UPDATE trip_wait_sessions SET ended_at=?,minutes=? WHERE id=? AND ended_at IS NULL',now,rounded,active.id);
       if(Number(ended.changes)!==1) throw E.conflict('تم إنهاء جلسة الانتظار من عملية أخرى؛ حدّث المشوار','WAIT_SESSION_CHANGED');
       const changed=app.db.run('UPDATE trip_orders SET waiting_total_minutes=?,fare=?,updated_at=? WHERE order_id=? AND waiting_total_minutes=?',total,fare,now,o.id,trip.waiting_total_minutes);

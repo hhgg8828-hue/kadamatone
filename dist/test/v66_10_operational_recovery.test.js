@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startApp, registerUser, loginAdmin } from './helpers.js';
-test('V66.14: لا يسعّر المشوار بمسافة خط مستقيم عند تعطل التوجيه الخارجي', async () => {
+test('V66.14: مشوار الدباب لا يتوقف إذا تعطل التوجيه الخارجي ويستخدم احتياط المسافة', async () => {
     const t = await startApp({ ROUTING_URL: 'https://127.0.0.1:1', ROUTING_TIMEOUT_MS: '50' });
     try {
         const c = await registerUser(t.api);
         const r = await t.api('POST', '/api/v1/trips/estimate', { token: c.body.accessToken, body: { origin: { lat: 13.9759, lng: 44.1709 }, destination: { lat: 13.98, lng: 44.18 }, stops: [] } });
-        assert.equal(r.status, 503, r.text);
-        assert.match(String(r.body?.error?.code || r.body?.code || r.text), /ROUTING/);
-        const o = await t.api('POST', '/api/v1/trips', { token: c.body.accessToken, headers: { 'Idempotency-Key': 'trip-no-route-1' }, body: { origin: { lat: 13.9759, lng: 44.1709 }, destination: { lat: 13.98, lng: 44.18 }, purpose: 'PARCEL', description: 'مشوار تجريبي للعميل', contactPhone: c.creds.phone } });
-        assert.notEqual(o.status, 201, 'يجب ألا ينشأ طلب مسعّر من مسافة تقريبية عند تعطل التوجيه');
+        assert.equal(r.status, 200, r.text);
+        assert.ok(r.body.distanceKm > 0);
+        assert.equal(r.body.method, 'STRAIGHT_LINE_TEST');
+        const o = await t.api('POST', '/api/v1/trips', { token: c.body.accessToken, headers: { 'Idempotency-Key': 'trip-fallback-1' }, body: { origin: { lat: 13.9759, lng: 44.1709 }, destination: { lat: 13.98, lng: 44.18 }, purpose: 'PASSENGER', description: 'مشوار تجريبي للعميل', contactPhone: c.creds.phone } });
+        assert.equal(o.status, 201, o.text);
+        assert.ok(o.body.order?.id);
     }
     finally {
         await t.close();

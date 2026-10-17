@@ -46,7 +46,7 @@ function securityHeaders(config) {
             "default-src 'self'",
             "script-src 'self' https://cdnjs.cloudflare.com",
             "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
-            "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com",
+            "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://cdnjs.cloudflare.com",
             "connect-src 'self' https://nominatim.openstreetmap.org",
             "font-src 'self' data:",
             "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'",
