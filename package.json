@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
   "version": "2.87",
-  "description": "تحسين ألوان قدرات مقدم الخدمة في الوضع الليلي",
+  "description": "إصلاح تباين مهارات مقدم الخدمة ومسار القيادة الفعلي وحفظ كميات بنود الطلب",
   "private": true,
   "type": "module",
   "engines": {

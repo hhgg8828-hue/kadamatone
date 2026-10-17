@@ -265,6 +265,7 @@ export function registerOrderRoutes(app, r) {
             if (extraServices.length) {
                 formData.additionalServices = extraServices;
                 formData.primaryUnitPriceSnapshot = effectiveUnitPrice;
+                formData.primaryQuantitySnapshot = quantityForPrice(fields, formData);
             }
             const orderDescription = extraServices.length ? `${b.description}\nالخدمات الإضافية ضمن الطلب:\n${extraServices.map((x, i) => `${i + 1}. ${x.name} — الكمية: ${x.quantity} — ${x.unitPrice === null ? 'السعر يحدد لاحقًا' : `سعر الوحدة ${x.unitPrice} ${x.currency}`}`).join('\n')}` : b.description;
             const orderPricingType = svc.pricing_type === 'FIXED' && extraServices.some(x => x.pricingType !== 'FIXED') ? 'QUOTE' : svc.pricing_type;

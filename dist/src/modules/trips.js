@@ -47,7 +47,8 @@ async function drivingDistance(app, origin, destination) {
         }
         const distanceKm = Math.round((route.distance / 1000) * 10) / 10;
         const durationMin = Number.isFinite(route.duration) ? Math.round((route.duration / 60) * 10) / 10 : null;
-        return { distanceKm, durationMin, method: 'ROAD_ROUTING' };
+        const coordinates = Array.isArray(route.geometry?.coordinates) ? route.geometry.coordinates.filter((p) => Array.isArray(p) && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]))).map((p) => [Number(p[0]), Number(p[1])]) : undefined;
+        return { distanceKm, durationMin, method: 'ROAD_ROUTING', ...(coordinates?.length ? { coordinates } : {}) };
     }
     catch (err) {
         if (err?.code)
@@ -69,30 +70,22 @@ async function drivingRoute(app, points) {
     }
     try {
         const coords = points.map(p => `${encodeURIComponent(p.lng)},${encodeURIComponent(p.lat)}`).join(';');
-        const response = await fetch(`${baseUrl}/route/v1/driving/${coords}?overview=false&steps=false`, { headers: { accept: 'application/json' }, signal: globalThis.AbortSignal.timeout(app.config.routingTimeoutMs) });
+        const response = await fetch(`${baseUrl}/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`, { headers: { accept: 'application/json' }, signal: globalThis.AbortSignal.timeout(app.config.routingTimeoutMs) });
         if (!response.ok)
             throw E.serviceUnavailable('تعذر الوصول إلى خدمة حساب مسافة القيادة حاليًا', 'ROUTING_UNAVAILABLE');
         const data = await response.json();
         const route = data?.routes?.[0];
         if (data?.code !== 'Ok' || !route || !Number.isFinite(route.distance) || route.distance <= 0)
             throw E.unprocessable('تعذر العثور على طريق قيادة بين النقاط', 'ROUTE_NOT_FOUND');
-        return { distanceKm: Math.round(route.distance / 100) / 10, durationMin: Number.isFinite(route.duration) ? Math.round(route.duration / 6) / 10 : null, method: 'ROAD_ROUTING' };
+        const coordinates = Array.isArray(route.geometry?.coordinates) ? route.geometry.coordinates.filter((p) => Array.isArray(p) && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]))).map((p) => [Number(p[0]), Number(p[1])]) : undefined;
+        return { distanceKm: Math.round(route.distance / 100) / 10, durationMin: Number.isFinite(route.duration) ? Math.round(route.duration / 6) / 10 : null, method: 'ROAD_ROUTING', ...(coordinates?.length ? { coordinates } : {}) };
     }
     catch (err) {
-        // لا نمنع إنشاء المشوار بسبب تعطل خدمة التوجيه الخارجية. نستخدم مسافة جغرافية احتياطية،
-        // مع إبقاء مسار القيادة الحقيقي هو الأولوية عندما يكون متاحًا.
-        if (err?.code !== 'ROUTE_POINTS_REQUIRED') {
-            let km = 0;
-            for (let i = 1; i < points.length; i++)
-                km += haversineKm(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
-            km = Math.round(km * 10) / 10;
-            if (km <= 0)
-                throw E.unprocessable('حدد وجهة مختلفة عن موقع الانطلاق', 'SAME_LOCATION');
-            return { distanceKm: km, durationMin: null, method: 'STRAIGHT_LINE_TEST' };
-        }
+        // الأسعار الحقيقية لا تُحسب بخط مستقيم: عند تعطل خدمة التوجيه نوقف التقدير
+        // ونطلب إعادة المحاولة بدل إظهار أجرة قد تكون مضللة.
         if (err?.code)
             throw err;
-        throw E.serviceUnavailable('تعذر حساب مسافة القيادة حاليًا، حاول مرة أخرى', 'ROUTING_UNAVAILABLE');
+        throw E.serviceUnavailable('تعذر حساب مسار القيادة حاليًا. تحقق من الاتصال ثم أعد المحاولة.', 'ROUTING_UNAVAILABLE');
     }
 }
 function price(app, distanceKm) {
@@ -120,7 +113,7 @@ export function registerTripRoutes(app, r) {
             throw E.unprocessable('نظام المشاوير غير متاح حاليًا', 'TRIPS_DISABLED');
         const b = parse(s.obj({ origin: tripLocation, destination: tripLocation, stops: s.arr(tripLocation, { max: 5, optional: true, default: [] }) }), ctx.body);
         const route = await drivingRoute(app, [b.origin, ...(b.stops || []), b.destination]);
-        return { distanceKm: route.distanceKm, durationMin: route.durationMin, ...price(app, route.distanceKm), method: route.method, note: 'المسافة محسوبة حسب مسار القيادة على الطرق، وليست خطًا مستقيمًا بين النقطتين.' };
+        return { distanceKm: route.distanceKm, durationMin: route.durationMin, ...price(app, route.distanceKm), method: route.method, ...(route.coordinates ? { coordinates: route.coordinates } : {}) };
     });
     r.post('/trips', auth, roles('CUSTOMER'), async (ctx) => {
         if (!app.settings.get('trips.enabled'))
