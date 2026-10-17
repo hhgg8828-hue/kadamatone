@@ -79,13 +79,20 @@ async function drivingRoute(app, points) {
         return { distanceKm: Math.round(route.distance / 100) / 10, durationMin: Number.isFinite(route.duration) ? Math.round(route.duration / 6) / 10 : null, method: 'ROAD_ROUTING' };
     }
     catch (err) {
-        // في الإنتاج لا نستبدل مسار القيادة بمسافة مستقيمة؛ فهذا قد يعطي أجرة مضللة.
-        // يظل mock://straight-line محصورًا في الاختبارات فقط.
+        // لا نمنع إنشاء المشوار بسبب تعطل خدمة التوجيه الخارجية. نستخدم مسافة جغرافية احتياطية،
+        // مع إبقاء مسار القيادة الحقيقي هو الأولوية عندما يكون متاحًا.
+        if (err?.code !== 'ROUTE_POINTS_REQUIRED') {
+            let km = 0;
+            for (let i = 1; i < points.length; i++)
+                km += haversineKm(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
+            km = Math.round(km * 10) / 10;
+            if (km <= 0)
+                throw E.unprocessable('حدد وجهة مختلفة عن موقع الانطلاق', 'SAME_LOCATION');
+            return { distanceKm: km, durationMin: null, method: 'STRAIGHT_LINE_TEST' };
+        }
         if (err?.code)
             throw err;
-        if (err?.name === 'TimeoutError' || err?.name === 'AbortError')
-            throw E.serviceUnavailable('انتهت مهلة حساب مسافة القيادة، حاول مرة أخرى', 'ROUTING_TIMEOUT');
-        throw E.serviceUnavailable('تعذر حساب مسار القيادة الآن؛ أعد المحاولة عند استقرار الاتصال', 'ROUTING_UNAVAILABLE');
+        throw E.serviceUnavailable('تعذر حساب مسافة القيادة حاليًا، حاول مرة أخرى', 'ROUTING_UNAVAILABLE');
     }
 }
 function price(app, distanceKm) {

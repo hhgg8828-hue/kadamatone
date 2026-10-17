@@ -73,7 +73,7 @@ test('V66.15: زر الإعلان والخدمة المؤقتة لهما مسا�
 test('V66.15: إشعار CHAT_MESSAGE لا يعيد بناء صفحة مقدم الخدمة أثناء فتح المحادثة', async () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     assert.match(app, /const chatIsOpen=!!document\.getElementById\('chatMessages'\)/);
-    assert.match(app, /\&\& !\(n\.type==='CHAT_MESSAGE' \&\& chatIsOpen\)/);
+    assert.match(app, /\&\&\s*!\(n\.type==='CHAT_MESSAGE'\s*\&\&\s*chatIsOpen\)/);
     assert.match(app, /notification-provider-chat/);
     assert.match(app, /await openOrderChat\(orderId\)/);
 });

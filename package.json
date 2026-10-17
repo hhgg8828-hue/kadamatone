@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.88",
-  "description": "تحديثات المتاجر المقترحة والمزامنة الفورية وتتبع الكميات وسير عمل الإدارة",
+  "version": "2.87",
+  "description": "تحسين تباين مهارات مقدم الخدمة في الوضع الليلي",
   "private": true,
   "type": "module",
   "engines": {
