@@ -2658,29 +2658,19 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .exit-confirm-card h2,:root[data-theme="dark"] .admin-order-workflow h3{color:#eef4fc!important}
 :root[data-theme="dark"] .admin-order-workflow .muted{color:#b9c7da!important}
 
-
-/* v2.87: provider service/skill selection cards must stay readable in dark mode. */
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check,
-:root[data-theme="dark"] .provider-shell #servicesEditor label.service-check,
-:root[data-theme="dark"] .provider-shell .provider-services .service-check {
-  background:#1b2a40!important; background-image:none!important; color:#eef4fc!important;
-  border-color:#3b536e!important; box-shadow:none!important;
-}
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check b,
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check span,
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check small,
-:root[data-theme="dark"] .provider-shell .provider-services .service-check b,
-:root[data-theme="dark"] .provider-shell .provider-services .service-check span,
-:root[data-theme="dark"] .provider-shell .provider-services .service-check small { color:#eef4fc!important; }
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check small,
-:root[data-theme="dark"] .provider-shell .provider-services .service-check small { color:#b9c7da!important; }
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check input[type="checkbox"],
-:root[data-theme="dark"] .provider-shell .provider-services .service-check input[type="checkbox"] {
-  accent-color:#70d6a8; background-color:#22334b!important; border-color:#8ba3bd!important;
-}
-:root[data-theme="dark"] .provider-shell #servicesEditor .service-check:has(input:checked),
-:root[data-theme="dark"] .provider-shell .provider-services .service-check:has(input:checked) {
-  border-color:#70d6a8!important; box-shadow:inset 0 0 0 1px rgba(112,214,168,.35)!important;
-}
-:root[data-theme="light"] .provider-shell #servicesEditor .service-check,
-:root[data-theme="light"] .provider-shell .provider-services .service-check { color:#182b22; }
+/* v2.87: provider capability/skill picker must remain readable in both themes. */
+.provider-shell .capability-dropdown{background:var(--card,#fff);color:var(--text,#24332b);border-color:var(--border,#dce5df)}
+.provider-shell .capability-dropdown summary{color:var(--text,#24332b)}
+.provider-shell .capability-dropdown summary b{color:var(--primary,#176b4d)}
+.provider-shell .capability-options label{background:var(--surface-soft,#f6f8f7);color:var(--text,#24332b);border-color:var(--border,#e1e8e3)}
+.provider-shell .capability-options label span{color:inherit}
+.provider-shell .selected-capabilities .status{background:#e7f5ed;color:#175a3c;border:1px solid #c7e5d3}
+:root[data-theme="dark"] .provider-shell .capability-dropdown{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
+:root[data-theme="dark"] .provider-shell .capability-dropdown summary,
+:root[data-theme="dark"] .provider-shell .capability-dropdown summary span{color:#eef4fc!important}
+:root[data-theme="dark"] .provider-shell .capability-dropdown summary b{color:#8de2ba!important}
+:root[data-theme="dark"] .provider-shell .capability-options label{background:#22334b!important;color:#eef4fc!important;border-color:#405875!important}
+:root[data-theme="dark"] .provider-shell .capability-options label span{color:#eef4fc!important}
+:root[data-theme="dark"] .provider-shell .capability-options input{accent-color:#70d6a8}
+:root[data-theme="dark"] .provider-shell .selected-capabilities .status{background:#173d35!important;color:#b9f1d3!important;border-color:#356d5e!important}
+:root[data-theme="dark"] .provider-shell #capabilityMsg{color:#b9c7da}

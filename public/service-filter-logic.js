@@ -42,7 +42,7 @@ export function parseTrackingProductLines(description, serviceName, formData = {
     return [];
   });
   const quantityKeys = /^(quantity|qty|count|units?|numberofitems|itemsquantity|workers?|workercount|workerscount|passengers?|passengercount|people|peoplecount|persons|personscount|riders?|riderscount|numberofpeople|numberofpassengers|numberofworkers)$/i;
-  const rawQuantity = Object.entries(formData || {}).find(([key, value]) => quantityKeys.test(String(key).toLowerCase().replace(/[^a-z0-9]/g, '')) && value !== null && value !== undefined && String(value).trim() !== '')?.[1];
+  const rawQuantity = Object.entries(formData || {}).find(([key, value]) => quantityKeys.test(key) && value !== null && value !== undefined && String(value).trim() !== '')?.[1];
   const parsedDescriptionQuantity = trackingLines.map(line => line.match(/(?:الكمية|عدد العمال|عدد العاملين|عدد الركاب|عدد الأشخاص|عدد القطع)\s*(?:×|x|[:：])\s*(\d+)/i)?.[1]).find(Boolean);
   const numericQuantity = Number(rawQuantity ?? parsedDescriptionQuantity ?? 1);
   const quantity = Number.isFinite(numericQuantity) && numericQuantity >= 1 ? Math.floor(numericQuantity) : 1;
