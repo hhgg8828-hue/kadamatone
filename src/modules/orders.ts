@@ -243,7 +243,7 @@ export function registerOrderRoutes(app: App, r: Router): void {
       }
       for(const extra of extraServices){const rules=db.all<{area_id:string}>('SELECT area_id FROM service_area_rules WHERE service_id=?',extra.serviceId).map(x=>x.area_id);if(!rules.length)continue;if(!locationProvided)throw E.unprocessable('حدد موقع الخدمة للتحقق من توفر الخدمات الإضافية في منطقتك','LOCATION_REQUIRED_FOR_COVERAGE');const chain=locRow.area_id?catalog.areaChain(locRow.area_id):[];if(!rules.some(areaId=>chain.includes(areaId)))throw E.unprocessable(`إحدى الخدمات الإضافية غير متاحة في منطقة الموقع المحدد`,'ADDITIONAL_SERVICE_NOT_AVAILABLE_IN_AREA');}
 
-      if(extraServices.length){formData.additionalServices=extraServices;formData.primaryUnitPriceSnapshot=effectiveUnitPrice;formData.primaryQuantitySnapshot=quantityForPrice(fields,formData);}
+      if(extraServices.length){formData.additionalServices=extraServices;formData.primaryUnitPriceSnapshot=effectiveUnitPrice;}
       const orderDescription=extraServices.length?`${b.description}\nالخدمات الإضافية ضمن الطلب:\n${extraServices.map((x,i)=>`${i+1}. ${x.name} — الكمية: ${x.quantity} — ${x.unitPrice===null?'السعر يحدد لاحقًا':`سعر الوحدة ${x.unitPrice} ${x.currency}`}`).join('\n')}`:b.description;
       const orderPricingType=svc.pricing_type==='FIXED'&&extraServices.some(x=>x.pricingType!=='FIXED')?'QUOTE':svc.pricing_type;
       if(orderDescription.length>1000)throw E.unprocessable('تفاصيل الطلب والخدمات الإضافية طويلة جدًا؛ قلّل الخدمات الإضافية أو اختصر الوصف','ORDER_DESCRIPTION_TOO_LONG');

@@ -2659,20 +2659,21 @@ html,body { max-width:100%; overflow-x:clip; }
 :root[data-theme="dark"] .admin-order-workflow .muted{color:#b9c7da!important}
 
 
-/* v2.87: provider skill/capability selector contrast in both themes. */
-.provider-shell .capability-dropdown{background:#fff;color:#182230;border-color:#d9e4de}
-.provider-shell .capability-dropdown summary{background:#f7faf8;color:#182230}
-.provider-shell .capability-options label{background:#f8fafc;color:#182230;border-color:#dfe6ed}
-.provider-shell .capability-options label span{color:inherit}
-.provider-shell .selected-capabilities .status{background:#e8f5ef;color:#075d46;border-color:#cfe7da}
-:root[data-theme="dark"] .provider-shell .capability-dropdown{background:#1b2a40!important;color:#eef4fc!important;border-color:#344861!important}
-:root[data-theme="dark"] .provider-shell .capability-dropdown summary{background:#22334b!important;color:#eef4fc!important}
-:root[data-theme="dark"] .provider-shell .capability-dropdown summary span,:root[data-theme="dark"] .provider-shell .capability-dropdown summary b{color:#eef4fc!important}
-:root[data-theme="dark"] .provider-shell .capability-options label{background:#22334b!important;color:#eef4fc!important;border-color:#3b536e!important}
-:root[data-theme="dark"] .provider-shell .capability-options label span{color:#eef4fc!important}
-:root[data-theme="dark"] .provider-shell .capability-options input{accent-color:#70d6a8}
-:root[data-theme="dark"] .provider-shell .selected-capabilities .status{background:#23483a!important;color:#c7f5dc!important;border-color:#34745b!important}
-/* Customers only need the route metrics; hide technical status/explanation copy. */
-.trip-estimate-heading>b,:root[data-theme="dark"] .trip-estimate-heading>b{display:none!important}
-.trip-estimate-heading>span,#tripEstimateNote{display:none!important}
-.trip-estimate-heading{margin-bottom:0}
+/* v2.88: provider capability/skill selector contrast in dark mode. */
+.provider-shell #providerCapabilitiesCard .capability-dropdown,
+#providerCapabilitiesCard .capability-dropdown{background:#fff;color:#20352b;border-color:#cbdcd1}
+#providerCapabilitiesCard .capability-dropdown summary{color:#20352b}
+#providerCapabilitiesCard .capability-dropdown summary b{color:#176b4d}
+#providerCapabilitiesCard .capability-options label{background:#f6faf7;color:#243b30;border-color:#d9e7de}
+#providerCapabilitiesCard .capability-options label span{color:inherit}
+#providerCapabilitiesCard .capability-options input{accent-color:#176b4d;flex:none}
+#providerCapabilitiesCard .selected-capabilities .status{background:#e3f4e9;color:#145c3e;border:1px solid #b7ddc6}
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-dropdown{background:#172438!important;color:#eef4fc!important;border-color:#344861!important}
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-dropdown summary,
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-dropdown summary span{color:#eef4fc!important}
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-dropdown summary b{color:#9be5bd!important}
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-options label{background:#22334b!important;color:#eef4fc!important;border-color:#405875!important}
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-options label span{color:#eef4fc!important}
+:root[data-theme="dark"] #providerCapabilitiesCard .capability-options input{accent-color:#70d6a8}
+:root[data-theme="dark"] #providerCapabilitiesCard .selected-capabilities .status{background:#1d4634!important;color:#c9f7dc!important;border-color:#347455!important}
+:root[data-theme="dark"] #providerCapabilitiesCard .muted{color:#b9c7da!important}

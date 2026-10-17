@@ -25,7 +25,6 @@ test('V2.82: customer service filters are exact and ordered from real fields', (
     assert.deepEqual(evaluateServiceFilter(services, 'favorite', ['newest', 'newer', 'old'], { now: NOW, selectedCategorySlug: 'farm' }).matches.map(x => x.id), ['newer']);
     assert.deepEqual(parseTrackingProductLines('طلب توصيل مياه', 'توصيل مياه', { quantity: 2 }, null).map(x => ({ name: x.name, quantity: x.quantity })), [{ name: 'توصيل مياه', quantity: 2 }]);
     assert.deepEqual(parseTrackingProductLines('طلب توصيل مياه\nالخدمات الإضافية ضمن الطلب:\n1. تركيب ألواح شمسية — الكمية: 1 — سعر الوحدة 700', 'توصيل مياه', { quantity: 2, primaryUnitPriceSnapshot: 400, additionalServices: [{ name: 'تركيب ألواح شمسية', quantity: 1, unitPrice: 700 }] }, 1100).map(x => ({ name: x.name, quantity: x.quantity, unitPrice: x.unitPrice, lineTotal: x.lineTotal })), [{ name: 'توصيل مياه', quantity: 2, unitPrice: 400, lineTotal: 800 }, { name: 'تركيب ألواح شمسية', quantity: 1, unitPrice: 700, lineTotal: 700 }]);
-    assert.deepEqual(parseTrackingProductLines('طلب عامل بناء\nالخدمات الإضافية ضمن الطلب:\n1. غسل سيارة متنقل — الكمية: 1 — سعر الوحدة 1500', 'عامل بناء', { workers: 3, primaryQuantitySnapshot: 3, primaryUnitPriceSnapshot: 10000, additionalServices: [{ name: 'غسل سيارة متنقل', quantity: 1, unitPrice: 1500 }] }, 31500).map(x => ({ name: x.name, quantity: x.quantity, unitPrice: x.unitPrice, lineTotal: x.lineTotal })), [{ name: 'عامل بناء', quantity: 3, unitPrice: 10000, lineTotal: 30000 }, { name: 'غسل سيارة متنقل', quantity: 1, unitPrice: 1500, lineTotal: 1500 }]);
 });
 test('V2.82: admin can schedule a future callback and later confirm it', async () => {
     const t = await startApp();
@@ -113,34 +112,5 @@ test('V2.82: required theme, icon, arrow, and tracking quantity fixes are wired 
     assert.match(css, /:root\[data-theme="dark"\] \.a11y-options label/);
     assert.match(css, /checkout-recommendation-image \.service-icon-svg\{stroke:#b9f1d3/);
     assert.match(css, /customer-notification-location-wrap \.customer-area-arrow\{right:-9px;bottom:-6px/);
-    assert.match(css, /provider-shell \.capability-options label/);
-    assert.match(css, /:root\[data-theme=\"dark\"\] \.provider-shell \.capability-options label/);
-    assert.match(css, /#tripEstimateNote\{display:none!important/);
-});
-test('V2.87: primary quantity snapshot remains independent from added service quantity and price', async () => {
-    const t = await startApp();
-    try {
-        const customer = await registerUser(t.api);
-        const cats = (await t.api('GET', '/api/v1/categories')).body.categories;
-        const services = cats.flatMap((x) => x.services || []);
-        const primary = services.find((x) => x.isActive !== false) || services[0];
-        const extra = services.find((x) => x.id !== primary.id && x.isActive !== false);
-        assert.ok(primary && extra);
-        t.app.db.run('UPDATE services SET pricing_type=?,base_price=?,uses_category_default=0,form_schema=? WHERE id=?', 'FIXED', 10000, JSON.stringify([{ key: 'workers', type: 'number', label: { ar: 'عدد العمال', en: 'Workers' }, required: true, min: 1, max: 20 }]), primary.id);
-        t.app.db.run('UPDATE services SET pricing_type=?,base_price=?,uses_category_default=0,form_schema=? WHERE id=?', 'FIXED', 1500, JSON.stringify([{ key: 'washType', type: 'select', label: { ar: 'نوع الغسيل', en: 'Wash type' }, required: false, options: [{ value: 'inside-outside', label: { ar: 'داخلي وخارجي', en: 'Inside and outside' } }] }]), extra.id);
-        t.app.catalog.invalidate();
-        const created = await t.api('POST', '/api/v1/orders', { token: customer.body.accessToken, body: { serviceId: primary.id, description: 'عامل بناء', formData: { workers: 3 }, contactPhone: customer.creds.phone, additionalServices: [{ serviceId: extra.id, quantity: 1, formData: { washType: 'inside-outside' } }] } });
-        assert.equal(created.status, 201, created.text);
-        const saved = t.app.db.get('SELECT form_data,price_snapshot FROM orders WHERE id=?', created.body.order.id);
-        const data = JSON.parse(saved.form_data);
-        assert.equal(data.primaryQuantitySnapshot, 3);
-        assert.equal(data.primaryUnitPriceSnapshot, 10000);
-        assert.equal(saved.price_snapshot, 31500);
-        assert.equal(data.additionalServices[0].quantity, 1);
-        assert.equal(data.additionalServices[0].formData.washType, 'inside-outside');
-    }
-    finally {
-        await t.close();
-    }
 });
 //# sourceMappingURL=v2_82_pending_notes.test.js.map

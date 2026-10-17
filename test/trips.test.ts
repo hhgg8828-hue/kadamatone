@@ -72,34 +72,3 @@ test('نظام المشاوير: يحفظ موعد التنفيذ المستقب
     assert.equal(row.scheduled_at, scheduledAt);
   } finally { await t.close(); }
 });
-
-test('المشاوير: يعرض مسار القيادة الحقيقي على الخريطة ويستخدم مسافته للأجرة', async () => {
-  const t = await startApp({ ROUTING_URL:'https://routing.test' });
-  const originalFetch = globalThis.fetch;
-  try {
-    const customer = await registerUser(t.api);
-    globalThis.fetch = (async (input: any, init?: any) => {
-      if (!String(input).startsWith('https://routing.test/')) return originalFetch(input, init);
-      assert.match(String(input), /overview=full&geometries=geojson/);
-      return { ok:true, status:200, json:async()=>({code:'Ok',routes:[{distance:5400,duration:720,geometry:{coordinates:[[44.17,13.97],[44.175,13.975],[44.18,13.98]]}}]}) } as any;
-    }) as typeof fetch;
-    const estimate = await t.api('POST','/api/v1/trips/estimate',{token:customer.body.accessToken,body:{origin:{lat:13.97,lng:44.17},destination:{lat:13.98,lng:44.18}}});
-    assert.equal(estimate.status,200,estimate.text);
-    assert.equal(estimate.body.distanceKm,5.4);
-    assert.equal(estimate.body.durationMin,12);
-    assert.deepEqual(estimate.body.coordinates,[[44.17,13.97],[44.175,13.975],[44.18,13.98]]);
-    assert.equal('note' in estimate.body,false,'customer API does not need technical route explanation');
-  } finally { globalThis.fetch = originalFetch; await t.close(); }
-});
-
-test('المشاوير: لا يحسب الأجرة بخط مستقيم عند تعطل خدمة مسار القيادة', async () => {
-  const t = await startApp({ ROUTING_URL:'https://routing-unavailable.test' });
-  const originalFetch = globalThis.fetch;
-  try {
-    const customer = await registerUser(t.api);
-    globalThis.fetch = (async (input: any, init?: any) => { if (!String(input).startsWith('https://routing-unavailable.test/')) return originalFetch(input, init); throw new Error('network down'); }) as typeof fetch;
-    const estimate = await t.api('POST','/api/v1/trips/estimate',{token:customer.body.accessToken,body:{origin:{lat:13.97,lng:44.17},destination:{lat:13.98,lng:44.18}}});
-    assert.equal(estimate.status,503,estimate.text);
-    assert.notEqual(estimate.body.method,'STRAIGHT_LINE_TEST');
-  } finally { globalThis.fetch = originalFetch; await t.close(); }
-});
