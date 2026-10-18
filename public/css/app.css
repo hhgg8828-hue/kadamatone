@@ -2728,3 +2728,30 @@ button,a,input,select,textarea,[role="button"]{-webkit-tap-highlight-color:trans
 
 /* v2.94: provider quick navigation uses buttons to avoid hash/history side effects. */
 .provider-quick-nav button{font:inherit;cursor:pointer}
+
+/* v2.97: smoother service navigation and grouped multi-store invoice */
+.modal{animation:khadamat-modal-in .22s cubic-bezier(.2,.75,.25,1) both}
+.modal>.card{animation:khadamat-dialog-in .24s cubic-bezier(.2,.75,.25,1) both;transform-origin:center}
+@keyframes khadamat-modal-in{from{opacity:0}to{opacity:1}}
+@keyframes khadamat-dialog-in{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+.customer-category-tile,.category-service-choice,.checkout-recommendation-card,[data-open-service],[data-temp-id]{transition:transform .2s ease,opacity .2s ease,box-shadow .2s ease}
+.customer-category-tile:active,.category-service-choice:active,.checkout-recommendation-card:active,[data-open-service]:active,[data-temp-id]:active{transform:scale(.985)}
+.checkout-invoice-store-tables{display:grid;gap:13px}
+.checkout-invoice-store-group{overflow:hidden;border:1px solid var(--line);border-radius:15px;background:var(--card,#fff)}
+.checkout-invoice-group-heading{display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--primary-soft);border-bottom:1px solid var(--line)}
+.checkout-invoice-group-icon{display:grid;place-items:center;min-width:34px;height:34px;border-radius:10px;background:#fff;color:var(--primary);padding:4px}
+.checkout-invoice-group-icon svg{width:24px;height:24px}
+.checkout-invoice-group-heading b{flex:1;min-width:0;overflow-wrap:anywhere}
+.checkout-invoice-group-heading small{font-size:11px;color:var(--muted);white-space:nowrap}
+.checkout-invoice-store-group .order-details-table-wrap{overflow-x:auto}
+.checkout-invoice-store-group .order-details-table{width:100%;min-width:470px;border-collapse:collapse}
+.checkout-invoice-store-group .order-details-table th,.checkout-invoice-store-group .order-details-table td{padding:10px 8px}
+.trip-map{position:relative}
+.trip-map-controls{position:absolute;z-index:500;top:10px;right:10px;display:flex;gap:5px;flex-wrap:wrap;max-width:calc(100% - 20px)}
+.trip-map-controls button{border:1px solid #d0d5dd;border-radius:9px;background:#fff;color:#344054;padding:8px 10px;font:inherit;font-size:12px;font-weight:800;box-shadow:0 2px 7px #0002;cursor:pointer}
+.trip-map-controls button.active{background:#176b4d;color:#fff;border-color:#176b4d}
+@media(prefers-reduced-motion:reduce){.modal,.modal>.card{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+@media(max-width:600px){.checkout-invoice-group-heading{align-items:flex-start;flex-wrap:wrap}.checkout-invoice-group-heading small{white-space:normal}.trip-map-controls button{padding:7px 8px;font-size:11px}}
+
+/* v2.99: map picker uses a fixed center pin while the map moves beneath it. */
+.trip-map-picker{position:relative;touch-action:pan-x pan-y}.trip-map-picker .trip-picker-pin{position:absolute;z-index:450;left:50%;top:50%;width:40px;height:52px;transform:translate(-50%,-92%);pointer-events:none;filter:drop-shadow(0 2px 2px #0004)}.trip-map-picker .trip-picker-pin svg{display:block;width:100%;height:100%}.trip-map-picker .leaflet-marker-icon{opacity:0!important}.trip-map-picker .trip-map-controls{top:8px;right:8px}

@@ -224,3 +224,15 @@
 - Added the ArcGIS tile host to `img-src` so Esri map tiles can render under CSP.
 - Additional checkout services now retain available store/category identifiers and display-name metadata for subsequent per-store invoice grouping work.
 - Validation: TypeScript production build passes. Full `npm test` did not finish within the execution time limit; end-to-end browser/mobile map testing remains outstanding.
+
+
+## v2.98 — 2026-10-18
+- Improved service-opening feedback and reduced repeated taps during loading.
+- Added reduced-motion-aware modal transitions.
+- Grouped checkout invoice rows into separate store tables.
+- Added standard/satellite map switching and high-accuracy location attempt on opening ride maps.
+- Switched shared-trip Leaflet assets from unpkg to cdnjs for CSP compatibility.
+
+## 2.99
+- خريطة اختيار المشوار تستخدم دبوسًا ثابتًا في المنتصف وتحفظ مركز الخريطة بعد تحريكها.
+- تثبيت/توثيق أن تسعير المشوار يعتمد على مسار القيادة الحقيقي لا المسافة المستقيمة، مع منع fallback صامت في الإنتاج.

@@ -1795,7 +1795,7 @@ async function openCustomerLocationSetup(auto) {
             }
             catch { }
             closeModal();
-            toast('تم حفظ الموقع', `تم اختيار ${match.area.name} وحفظ موقعك ضمن العناوين المحفوظة.`);
+            toast('تم حفظ الموقع', `تم اختيار ${match.area.name} وحفظ موقعك ضمن المواقع المحفوظة.`);
             await customer();
         }, err => { btn.disabled = false; if (status)
             status.textContent = err.code === 1 ? 'لم تمنح إذن الموقع. يمكنك اختيار المدينة يدويًا، ولن يتوقف استخدام التطبيق.' : 'تعذر تحديد الموقع الآن. تحقق من إعدادات الموقع أو اختر المدينة يدويًا.'; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
@@ -2024,11 +2024,12 @@ function renderCustomer() {
         openOrderFormBySlug(v);
     else
         openCampaignDetails(c); }));
-    document.querySelectorAll('[data-open-service]').forEach(x => x.addEventListener('click', () => { const id = x.dataset.openService || ''; if (!id)
-        return; if (!state.user) {
+    document.querySelectorAll('[data-open-service]').forEach(x => x.addEventListener('click', () => { const el = x; const id = el.dataset.openService || ''; if (!id || el.dataset.opening === '1')
+        return; el.dataset.opening = '1'; el.setAttribute('aria-busy', 'true'); if (!state.user) {
         openServiceDetails(id);
+        window.setTimeout(() => { el.dataset.opening = '0'; el.removeAttribute('aria-busy'); }, 500);
         return;
-    } openOrderForm(id); }));
+    } toast('جارٍ فتح الخدمة', 'لحظة ونجهّز لك صفحة الطلب.'); void openOrderForm(id).catch(e => alert(e.message)).finally(() => { el.dataset.opening = '0'; el.removeAttribute('aria-busy'); }); }));
     const serviceFavoritesKey = () => `khadamat.favoriteServices.v1:${state.user?.id || 'guest'}`;
     const serviceFavorites = () => { try {
         const scoped = localStorage.getItem(serviceFavoritesKey());
@@ -2401,7 +2402,7 @@ function openCampaignCategories(campaign) { let slugs = Array.isArray(campaign?.
     return;
 } const cats = []; const walk = (xs) => (xs || []).forEach((c) => { cats.push(c); if (Array.isArray(c.children))
     walk(c.children); }); walk(state.cats); showModal(`<div><h2>اختر التصنيف</h2><p class="muted">هذا العرض يشمل أكثر من تصنيف.</p><div class="grid all-categories-grid">${slugs.map(slug => { const c = cats.find(x => x.slug === slug); return `<button type="button" class="card service-option" data-campaign-category="${esc(slug)}"><b>${esc(c?.name || slug)}</b><span class="muted">عرض الخدمات ←</span></button>`; }).join('')}</div></div>`); document.querySelectorAll('[data-campaign-category]').forEach(b => b.addEventListener('click', () => { const slug = b.dataset.campaignCategory || ''; closeModal(); openCategory(slug); })); }
-async function openCategory(slug) { let services = []; try {
+async function openCategory(slug) { let services = []; toast('جارٍ فتح القسم', 'نحمّل الخدمات المتاحة الآن…'); try {
     if (slug) {
         const j = await api('/categories/' + encodeURIComponent(slug) + '/services' + (state.selectedAreaId ? '?areaId=' + encodeURIComponent(state.selectedAreaId) : ''));
         const activeIds = new Set((state.services || []).map((x) => String(x.id)));
@@ -2465,12 +2466,31 @@ async function openMotorcycleTripForm(service, savedAddresses) {
         }
         catch { }
         const map = L.map(el, { scrollWheelZoom: false }).setView(initialPoint, initialPoint[0] === 15.55 && initialPoint[1] === 48.52 ? 7 : 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
-        const marker = L.marker(initialPoint, { draggable: true });
-        maps[kind] = { map, marker };
-        marker.on('dragend', () => setPoint(kind, marker.getLatLng().lat, marker.getLatLng().lng, 'map'));
-        map.on('click', (e) => setPoint(kind, e.latlng.lat, e.latlng.lng, 'map'));
+        const standard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' });
+        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles © Esri' });
+        standard.addTo(map);
+        const marker = L.marker(initialPoint, { draggable: false, opacity: 0 });
+        maps[kind] = { map, marker, standard, satellite, layer: 'standard' };
+        el.classList.add('trip-map-picker');
+        el.insertAdjacentHTML('beforeend', `<div class="trip-picker-pin" aria-hidden="true"><svg viewBox="0 0 40 52"><path d="M20 1C9.5 1 1 9.5 1 20c0 13 19 31 19 31s19-18 19-31C39 9.5 30.5 1 20 1Z" fill="#e53935" stroke="white" stroke-width="2"/><circle cx="20" cy="20" r="7" fill="#a31515"/></svg></div><div class="trip-map-controls"><button type="button" data-trip-layer="standard">خريطة عادية</button><button type="button" data-trip-layer="satellite">قمر صناعي</button><button type="button" data-trip-map-gps="${kind}">موقعي</button></div>`);
+        el.querySelectorAll('[data-trip-layer]').forEach((b) => b.addEventListener('click', () => { const target = b.getAttribute('data-trip-layer'); const state = maps[kind]; if (!state)
+            return; if (target === 'satellite') {
+            state.map.removeLayer(state.standard);
+            state.satellite.addTo(state.map);
+            state.layer = 'satellite';
+        }
+        else {
+            state.map.removeLayer(state.satellite);
+            state.standard.addTo(state.map);
+            state.layer = 'standard';
+        } el.querySelectorAll('[data-trip-layer]').forEach((x) => x.classList.toggle('active', x === b)); }));
+        el.querySelector('[data-trip-map-gps]')?.addEventListener('click', () => gps(kind));
+        map.on('moveend', () => { const center = map.getCenter(); setPoint(kind, center.lat, center.lng, 'map', 'الموقع المحدد على الخريطة'); });
         setTimeout(() => map.invalidateSize(), 100);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => { if (!maps[kind])
+                return; const current = [pos.coords.latitude, pos.coords.longitude]; map.setView(current, 17); setPoint(kind, current[0], current[1], 'gps', `موقعي الحالي — الدقة ${Math.round(pos.coords.accuracy)} متر`); }, () => { }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 });
+        }
         return true;
     }
     catch {
@@ -2495,12 +2515,7 @@ async function openMotorcycleTripForm(service, savedAddresses) {
     document.getElementById('tripDestinationMapBtn')?.addEventListener('click', () => ensureTripMap('destination'));
     document.getElementById('tripOriginSaved').addEventListener('change', e => loadSaved('origin', e.target.value));
     document.getElementById('tripDestinationSaved').addEventListener('change', e => loadSaved('destination', e.target.value));
-    const openTripAddressSheet = (kind) => { document.getElementById('tripAddressSheet')?.remove(); const title = kind === 'origin' ? 'اختر عنوان الاستلام' : 'اختر عنوان التوصيل'; const sheet = document.createElement('div'); sheet.id = 'tripAddressSheet'; sheet.className = 'trip-address-sheet'; sheet.innerHTML = `<button type="button" class="trip-sheet-backdrop" aria-label="إغلاق"></button><section class="trip-address-sheet-panel"><div class="trip-sheet-handle"></div><h3>${title}</h3><div class="trip-sheet-options"><button type="button" class="trip-sheet-option" id="tripSheetSaved"><span class="trip-sheet-icon">📍</span><b>من العناوين المحفوظة</b></button><button type="button" class="trip-sheet-option" id="tripSheetMap"><span class="trip-sheet-icon">🗺️</span><b>من الخريطة</b></button></div><div id="tripSheetSavedList" class="trip-sheet-saved-list hide-section">${savedAddresses.map((a) => `<button type="button" class="trip-saved-address" data-trip-saved="${esc(a.id)}"><span>📍</span><span><b>${esc(a.label)}</b><small>${a.isDefault ? 'العنوان الافتراضي' : 'عنوان محفوظ'}</small></span></button>`).join('')}${(() => { try {
-        return JSON.parse(localStorage.getItem('khadamat.locationHistory.v1') || '[]').slice(0, 6).map((h) => `<button type="button" class="trip-saved-address" data-trip-recent="${esc(String(h.lat) + ',' + String(h.lng))}"><span>🕘</span><span><b>${esc(h.label || 'موقع سابق')}</b><small>موقع استخدمته سابقًا</small></span></button>`).join('');
-    }
-    catch {
-        return '';
-    } })()}${!savedAddresses.length ? '<p class="muted">لا توجد عناوين محفوظة؛ يمكنك اختيار موقع استخدمته سابقًا أو فتح الخريطة.</p>' : ''}</div></section>`; document.getElementById('modal')?.appendChild(sheet); sheet.querySelector('.trip-sheet-backdrop')?.addEventListener('click', () => sheet.remove()); sheet.querySelector('#tripSheetSaved')?.addEventListener('click', () => sheet.querySelector('#tripSheetSavedList')?.classList.toggle('hide-section')); sheet.querySelectorAll('[data-trip-saved]').forEach(btn => btn.addEventListener('click', () => { const a = savedAddresses.find((x) => x.id === btn.dataset.tripSaved); if (!a)
+    const openTripAddressSheet = (kind) => { document.getElementById('tripAddressSheet')?.remove(); const title = kind === 'origin' ? 'اختر عنوان الاستلام' : 'اختر عنوان التوصيل'; const sheet = document.createElement('div'); sheet.id = 'tripAddressSheet'; sheet.className = 'trip-address-sheet'; sheet.innerHTML = `<button type="button" class="trip-sheet-backdrop" aria-label="إغلاق"></button><section class="trip-address-sheet-panel"><div class="trip-sheet-handle"></div><h3>${title}</h3><div class="trip-sheet-options"><button type="button" class="trip-sheet-option" id="tripSheetSaved"><span class="trip-sheet-icon">📍</span><b>من المواقع المحفوظة</b></button><button type="button" class="trip-sheet-option" id="tripSheetMap"><span class="trip-sheet-icon">🗺️</span><b>من الخريطة</b></button></div><div id="tripSheetSavedList" class="trip-sheet-saved-list hide-section">${savedAddresses.map((a) => `<button type="button" class="trip-saved-address" data-trip-saved="${esc(a.id)}"><span>📍</span><span><b>${esc(a.label)}</b><small>${a.isDefault ? 'العنوان الافتراضي' : 'عنوان محفوظ'}</small></span></button>`).join('')}${!savedAddresses.length ? '<p class="muted">لا توجد عناوين محفوظة؛ يمكنك اختيار موقع استخدمته سابقًا أو فتح الخريطة.</p>' : ''}</div></section>`; document.getElementById('modal')?.appendChild(sheet); sheet.querySelector('.trip-sheet-backdrop')?.addEventListener('click', () => sheet.remove()); sheet.querySelector('#tripSheetSaved')?.addEventListener('click', () => sheet.querySelector('#tripSheetSavedList')?.classList.toggle('hide-section')); sheet.querySelectorAll('[data-trip-saved]').forEach(btn => btn.addEventListener('click', () => { const a = savedAddresses.find((x) => x.id === btn.dataset.tripSaved); if (!a)
         return; setPoint(kind, Number(a.location.lat), Number(a.location.lng), 'saved', a.label); const select = document.getElementById(kind === 'origin' ? 'tripOriginSaved' : 'tripDestinationSaved'); if (select)
         select.value = a.id; sheet.remove(); })); sheet.querySelectorAll('[data-trip-recent]').forEach(btn => btn.addEventListener('click', () => { const [lat, lng] = String(btn.dataset.tripRecent || '').split(',').map(Number); if (!Number.isFinite(lat) || !Number.isFinite(lng))
         return; setPoint(kind, lat, lng, 'recent', (btn.querySelector('b')?.textContent || 'موقع سابق').trim()); sheet.remove(); })); sheet.querySelector('#tripSheetMap')?.addEventListener('click', () => { sheet.remove(); ensureTripMap(kind); }); };
@@ -3024,7 +3039,7 @@ async function openOrderForm(serviceId, initial = null) {
       <section class="checkout-reference-recommendations" id="checkoutSuggestionsRoot"><div class="checkout-extra-services-title" id="checkoutSuggestedServicesHeading"><b>قد تعجبك هذه الخدمات أيضًا</b></div><div id="checkoutRelatedServices"></div><div class="checkout-stores-title" id="checkoutSuggestedSectionsHeading"><b>يمكنك أيضًا الطلب من الأقسام التالية</b></div><div class="checkout-store-rail-layout" id="checkoutSuggestedSectionsContent"><button type="button" class="checkout-all-stores-fixed" id="checkoutAllStores">عرض الكل</button><div id="checkoutRestaurantStores"><span class="muted">جارٍ تحميل الأقسام…</span></div></div><div id="checkoutCategoryServicesInline" class="checkout-category-services-inline hide-section"></div></section>
       <section class="checkout-reference-totals"><div class="checkout-total-row"><span>الإجمالي</span><b id="checkoutSubtotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</b></div><div class="checkout-total-row"><span>التوصيل</span><b id="checkoutDeliveryFee">${Number.isFinite(Number(initial?.deliveryFee)) ? esc(String(Number(initial.deliveryFee))) : '—'} ر.ي</b></div><div class="checkout-total-row checkout-grand-total"><span>الإجمالي الكلي</span><b id="checkoutGrandTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal + deliveryFee)) : 'يحدد لاحقًا'} ر.ي</b></div></section>
       ${(state.campaigns || []).filter((c) => c.title).slice(0, 1).map((c) => `<section class="checkout-reference-subscription">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}">` : ''}<div><b>${esc(c.title)}</b>${c.description ? `<p>${esc(c.description)}</p>` : ''}</div>${c.buttonLabel ? `<button type="button" class="checkout-reference-ad-button">${esc(c.buttonLabel)}</button>` : ''}</section>`).join('')}
-      <!-- id="addReviewPharmacyProduct" id="saveReviewPharmacyProduct": pharmacy products are edited in the prior cart stage before confirmation. --><section class="checkout-reference-invoice"><header class="checkout-invoice-store-head"><button type="button" id="checkoutDeleteInvoice" aria-label="حذف تفاصيل المنتج">♧</button><div class="checkout-invoice-store-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><b>${esc(String(initial?.storeName || s.name))}</b><button type="button" id="toggleInvoice" aria-label="طي الفاتورة">⌃</button></header><div id="checkoutInvoiceBody"><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody id="checkoutInvoiceRows">${Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length ? initial.pharmacyProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>—</td><td>${esc(String(p.quantity || 1))}</td><td>—</td></tr>`).join('') : (() => { const qf = (s.formSchema || []).find((f) => isQuantityField(f)); const qty = Math.max(1, Math.floor(Number(qf ? fdReview.get(String(qf.key)) : 1) || 1)); const price = Number(s.basePrice); const valid = s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(price); const total = valid ? price * qty : NaN; return `<tr><td>${esc(s.name)}</td><td>${valid ? esc(String(price)) : '—'}</td><td>${qty}</td><td>${Number.isFinite(total) ? esc(String(total)) : '—'}</td></tr>`; })()}</tbody></table></div><div id="checkoutAdditionalDetails" class="checkout-additional-details"></div><div class="checkout-invoice-total"><b>الإجمالي</b><strong id="checkoutInvoiceTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</strong></div></div></section>
+      <!-- id="addReviewPharmacyProduct" id="saveReviewPharmacyProduct": pharmacy products are edited in the prior cart stage before confirmation. --><section class="checkout-reference-invoice"><header class="checkout-invoice-store-head"><button type="button" id="checkoutDeleteInvoice" aria-label="حذف تفاصيل المنتج">♧</button><div class="checkout-invoice-store-icon">${serviceIconSvg(s.name, s.icon || s.categoryName || '')}</div><b>${esc(String(initial?.storeName || s.name))}</b><button type="button" id="toggleInvoice" aria-label="طي الفاتورة">⌃</button></header><div id="checkoutInvoiceBody"><div id="checkoutInvoiceTables" class="checkout-invoice-store-tables" aria-live="polite"><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody id="checkoutInvoiceRows">${Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length ? initial.pharmacyProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>—</td><td>${esc(String(p.quantity || 1))}</td><td>—</td></tr>`).join('') : (() => { const qf = (s.formSchema || []).find((f) => isQuantityField(f)); const qty = Math.max(1, Math.floor(Number(qf ? fdReview.get(String(qf.key)) : 1) || 1)); const price = Number(s.basePrice); const valid = s.basePrice !== null && s.basePrice !== undefined && Number.isFinite(price); const total = valid ? price * qty : NaN; return `<tr><td>${esc(s.name)}</td><td>${valid ? esc(String(price)) : '—'}</td><td>${qty}</td><td>${Number.isFinite(total) ? esc(String(total)) : '—'}</td></tr>`; })()}</tbody></table></div></div><div id="checkoutAdditionalDetails" class="checkout-additional-details"></div><div class="checkout-invoice-total"><b>الإجمالي</b><strong id="checkoutInvoiceTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</strong></div></div></section>
       <div class="checkout-reference-footer"><div class="checkout-reference-footer-total"><span>الإجمالي</span><b id="checkoutFooterTotal">${Number.isFinite(pricedSubtotal) ? esc(String(pricedSubtotal)) : 'يحدد لاحقًا'} ر.ي</b></div><div class="checkout-reference-footer-buttons"><button type="button" class="btn" id="reviewConfirmOrder">تنفيذ الطلب</button><button type="button" class="btn secondary" id="reviewBackToEdit">تعديل السلة</button></div></div>`;
             const originalChildren = Array.from(orderForm.children);
             originalChildren.forEach(el => el.classList.add('order-review-hidden'));
@@ -3037,26 +3052,35 @@ async function openOrderForm(serviceId, initial = null) {
                     checkoutFields.classList.add('hide-section');
             }
             const updateCheckoutAdditionalServices = () => {
-                const tbody = document.getElementById('checkoutInvoiceRows');
-                if (!tbody)
+                const invoiceHost = document.getElementById('checkoutInvoiceTables');
+                if (!invoiceHost)
                     return;
                 const primaryQuantity = Math.max(1, selectedQuantity);
                 const primaryUnit = validUnitPrice ? unitPrice : null;
                 const primaryTotal = primaryUnit === null ? null : primaryUnit * primaryQuantity;
-                const rows = [];
+                const primaryStoreId = String(s.storeId || s.store?.id || s.categoryId || s.category?.id || 'store:' + String(initial?.storeName || s.storeName || s.categoryName || s.name));
+                const primaryStoreName = String(initial?.storeName || s.storeName || s.store?.name || s.categoryName || s.category?.name || s.name || 'المتجر');
+                const groups = [{ id: primaryStoreId, name: primaryStoreName, items: [] }];
                 if (Array.isArray(initial?.pharmacyProducts) && initial.pharmacyProducts.length) {
                     for (const p of initial.pharmacyProducts)
-                        rows.push(`<tr><td>${esc(p.name)}</td><td>—</td><td>${Math.max(1, Number(p.quantity) || 1)}</td><td>—</td></tr>`);
+                        groups[0].items.push(`<tr><td>${esc(p.name)}</td><td>—</td><td>${Math.max(1, Number(p.quantity) || 1)}</td><td>—</td></tr>`);
                 }
                 else
-                    rows.push(`<tr><td>${esc(s.name)}</td><td>${primaryUnit === null ? '—' : esc(String(primaryUnit))}</td><td>${primaryQuantity}</td><td>${primaryTotal === null ? '—' : esc(String(primaryTotal))}</td></tr>`);
+                    groups[0].items.push(`<tr><td>${esc(s.name)}</td><td>${primaryUnit === null ? '—' : esc(String(primaryUnit))}</td><td>${primaryQuantity}</td><td>${primaryTotal === null ? '—' : esc(String(primaryTotal))}</td></tr>`);
                 for (const extra of checkoutAdditionalServices) {
                     const q = extra.supportsQuantity ? Math.max(1, Math.min(999, Number(extra.quantity) || 1)) : 1;
                     const price = extra.basePrice !== null && extra.basePrice !== undefined && Number.isFinite(Number(extra.basePrice)) && extra.pricingType === 'FIXED' ? Number(extra.basePrice) : null;
                     const quantityCell = extra.supportsQuantity ? `<div class="checkout-extra-qty"><button type="button" data-extra-qty="-1" data-extra-id="${esc(extra.id)}" aria-label="تقليل كمية ${esc(extra.name)}">−</button><span>${q}</span><button type="button" data-extra-qty="1" data-extra-id="${esc(extra.id)}" aria-label="زيادة كمية ${esc(extra.name)}">+</button></div>` : '1';
-                    rows.push(`<tr><td>${esc(extra.name)} <button type="button" class="text-link checkout-remove-extra" data-remove-extra="${esc(extra.id)}" aria-label="إزالة ${esc(extra.name)}">إزالة</button></td><td>${price === null ? 'يحدد لاحقًا' : esc(String(price))}</td><td>${quantityCell}</td><td>${price === null ? '—' : esc(String(price * q))}</td></tr>`);
+                    const row = `<tr><td>${esc(extra.name)} <button type="button" class="text-link checkout-remove-extra" data-remove-extra="${esc(extra.id)}" aria-label="إزالة ${esc(extra.name)}">إزالة</button></td><td>${price === null ? 'يحدد لاحقًا' : esc(String(price))}</td><td>${quantityCell}</td><td>${price === null ? '—' : esc(String(price * q))}</td></tr>`;
+                    const gid = String(extra.storeId || 'store:' + String(extra.storeName || 'متجر الخدمة'));
+                    let group = groups.find((g) => g.id === gid);
+                    if (!group) {
+                        group = { id: gid, name: String(extra.storeName || 'متجر الخدمة'), items: [] };
+                        groups.push(group);
+                    }
+                    group.items.push(row);
                 }
-                tbody.innerHTML = rows.join('');
+                invoiceHost.innerHTML = groups.map((g, i) => `<section class="checkout-invoice-store-group"><header class="checkout-invoice-group-heading"><span class="checkout-invoice-group-icon">${i === 0 ? serviceIconSvg(s.name, s.icon || s.categoryName || '') : '▦'}</span><b>${esc(g.name)}</b>${i === 0 ? '<small>الطلب الأساسي</small>' : '<small>طلب من متجر آخر</small>'}</header><div class="order-details-table-wrap"><table class="order-details-table"><thead><tr><th>المنتج / الخدمة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>${g.items.join('')}</tbody></table></div></section>`).join('');
                 const detailsHost = document.getElementById('checkoutAdditionalDetails');
                 if (detailsHost)
                     detailsHost.innerHTML = checkoutAdditionalServices.map(extra => { const fields = (extra.formSchema || []).filter((f) => !isQuantityField(f)); if (!fields.length)
