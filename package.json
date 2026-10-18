@@ -1,6 +1,6 @@
 {
   "name": "khadamat",
-  "version": "2.99",
+  "version": "3.00",
   "description": "منصة خدمات لطلب الخدمات وإدارة الطلبات وعروض الأسعار",
   "private": true,
   "type": "module",
