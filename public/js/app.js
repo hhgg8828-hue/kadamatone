@@ -118,12 +118,12 @@ async function ensureLeaflet() {
             const link = document.createElement('link');
             link.id = cssId;
             link.rel = 'stylesheet';
-            link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
             document.head.appendChild(link);
         }
         const load = (src) => new Promise((ok, bad) => { const script = document.createElement('script'); script.src = src; script.async = true; script.onload = () => ok(window.L); script.onerror = () => bad(new Error('MAP_CDN_FAILED')); document.head.appendChild(script); });
         const timer = window.setTimeout(() => reject(new Error('MAP_LOAD_TIMEOUT')), 8000);
-        load('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js').catch(() => load('https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js')).then(L => { window.clearTimeout(timer); if (L)
+        load('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js').then(L => { window.clearTimeout(timer); if (L)
             resolve(L);
         else
             reject(new Error('MAP_NOT_AVAILABLE')); }).catch(e => { window.clearTimeout(timer); reject(e); });
@@ -3099,7 +3099,7 @@ async function openOrderForm(serviceId, initial = null) {
                 const extra = response.service || listed;
                 const formSchema = Array.isArray(extra.formSchema) ? extra.formSchema : [];
                 const supportsQuantity = formSchema.some((f) => isQuantityField(f));
-                checkoutAdditionalServices.push({ id: extra.id, name: extra.name, pricingType: extra.pricingType, basePrice: extra.basePrice, currency: extra.currency || state.config.currency || 'ر.ي', formSchema, formData: {}, supportsQuantity, quantity: 1 });
+                checkoutAdditionalServices.push({ id: extra.id, name: extra.name, storeId: extra.storeId || extra.store?.id || extra.providerId || extra.categoryId || extra.category?.id || 'store:' + String(extra.storeName || extra.categoryName || 'خدمات'), storeName: extra.storeName || extra.store?.name || extra.provider?.displayName || extra.categoryName || extra.category?.name || 'متجر الخدمة', storeLogo: extra.storeLogo || extra.store?.logoUrl || extra.store?.imageUrl || null, pricingType: extra.pricingType, basePrice: extra.basePrice, currency: extra.currency || state.config.currency || 'ر.ي', formSchema, formData: {}, supportsQuantity, quantity: 1 });
                 updateCheckoutAdditionalServices();
                 toast('أُضيفت إلى الطلب', `${extra.name} أُضيفت إلى الفاتورة الحالية دون استبدال الخدمة الأصلية.`);
             }

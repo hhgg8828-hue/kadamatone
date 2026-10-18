@@ -218,3 +218,9 @@
 - تعديل وصف الواجهة وزر الدخول لتمييز الرمز التجريبي عن التحقق الحقيقي من ملكية الهاتف.
 - تحويل روابط التنقل الثمانية في لوحة مقدم الخدمة إلى أزرار تمرير داخل الصفحة دون تغيير hash أو سجل المتصفح، لتفادي ظهور رسالة الخروج عند التنقل الداخلي.
 - منع تفعيل وضع الرمز التجريبي ما لم تكن APP_ENV=staging، مع إبقاء فحوص إعدادات الإنتاج.
+
+## 2.96 — checkout/map compatibility follow-up
+- Leaflet assets now load exclusively from cdnjs, matching the application's Content Security Policy.
+- Added the ArcGIS tile host to `img-src` so Esri map tiles can render under CSP.
+- Additional checkout services now retain available store/category identifiers and display-name metadata for subsequent per-store invoice grouping work.
+- Validation: TypeScript production build passes. Full `npm test` did not finish within the execution time limit; end-to-end browser/mobile map testing remains outstanding.
