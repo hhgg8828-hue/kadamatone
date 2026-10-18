@@ -194,6 +194,6 @@ test('V57: واجهة المشاوير بالدباب: من عنوان إلى ع
     assert.ok(app.includes('id="ttCost"'));
     assert.ok(app.includes('id="ttDistance"'));
     assert.ok(app.includes('id="ttConfirm"'));
-    assert.ok(app.includes('وسائل الدفع ('));
+    assert.ok(app.includes('id="ttPayTitle">الدفع ('));
 });
 //# sourceMappingURL=ui-access.test.js.map

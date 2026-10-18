@@ -30,7 +30,7 @@ test('temporary service editor validates finite dates and requires end after sta
 test('trip locations are chosen from saved locations and every map pin is saved for reuse', () => {
     assert.match(app, /data-tt-saved/);
     assert.match(app, /api\('\/me\/addresses',\{method:'POST'/);
-    assert.match(app, /من المواقع المحفوظة/);
+    assert.match(app, /من العناوين المحفوظة/);
 });
 test('theme and interaction polish is present for dark-mode placeholders and filters', () => {
     assert.match(css, /:root\[data-theme="dark"\] input::placeholder/);

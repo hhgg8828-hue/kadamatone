@@ -27,7 +27,7 @@ test('V2.38 delivery addresses use a bottom sheet with saved-address and map cho
   const app = fs.readFileSync('public/app.ts', 'utf8');
   assert.ok(app.includes('data-tt-pick="origin"'));
   assert.ok(app.includes('data-tt-pick="destination"'));
-  assert.ok(app.includes('من المواقع المحفوظة'));
+  assert.ok(app.includes('من العناوين المحفوظة'));
   assert.ok(app.includes('من الخريطة'));
   assert.ok(app.includes('id="ttDate"'));
   assert.ok(app.includes('id="ttTime"'));

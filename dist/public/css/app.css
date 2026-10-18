@@ -2765,3 +2765,58 @@ html,body { max-width:100%; overflow-x:clip; }
 .tt-sheet .trip-sheet-option b,.tt-sheet .trip-saved-address b{color:var(--text)}
 .tt-foot-cost{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-weight:800}
 .tt-foot-cost b{color:var(--tt-brand);font-size:20px}
+/* نموذج توصيل ون: عنوانان جنب بعض، نوع الطلب منسدل، وورقة خيارين */
+.tt-flow,.tt-map-screen{--tt-accent:#1f8f68}
+:root[data-theme="dark"] .tt-flow,:root[data-theme="dark"] .tt-map-screen,:root[data-theme="dark"] .tt-sheet{--tt-accent:#3ecf9a}
+.tt-sheet{--tt-accent:#1f8f68}
+.tt-box{background:var(--tt-card);border:1.5px solid var(--tt-line);border-radius:16px;color:var(--tt-text);font:inherit}
+.tt-route-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:8px}
+.tt-route-row .tt-box.tt-point{flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:14px 12px;min-height:76px;text-align:start}
+.tt-route-row .tt-point small{color:var(--tt-muted);font-size:13px}
+.tt-route-row .tt-point b{font-size:16px;max-width:100%}
+.tt-swap-inline{align-self:center;border:0;background:transparent;color:var(--tt-accent);font-size:28px;line-height:1;cursor:pointer;padding:0 2px}
+.tt-select-box{display:block;padding:0}
+.tt-select-box select,.tt-when select,.tt-when input{width:100%;min-height:54px;padding:12px 14px;border:0;background:transparent;color:var(--tt-text);font:inherit;font-size:16px}
+.tt-when-title{font-weight:800;font-size:17px;margin-top:6px}
+.tt-when .tt-box{padding:0;overflow:hidden}
+.tt-when input.tt-box,.tt-when select.tt-box{border:1.5px solid var(--tt-line);background:var(--tt-card);border-radius:16px;padding:12px 14px}
+.tt-notes{width:100%;min-height:150px;padding:14px;border:1.5px solid var(--tt-line);border-radius:20px;background:var(--tt-card);color:var(--tt-text);font:inherit;resize:vertical}
+.tt-sheet-panel{padding:26px 18px 34px!important;border-radius:28px 28px 0 0}
+.tt-sheet-options{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.tt-sheet-option{display:flex;flex-direction:column;align-items:center;gap:12px;padding:10px 6px;border:0;background:transparent;color:var(--text);font:inherit;font-size:18px;font-weight:700;text-align:center;cursor:pointer}
+.tt-sheet-option svg{color:var(--tt-accent)}
+.tt-body .tt-select-box{display:block;border:1.5px solid var(--tt-line)!important;border-radius:16px!important;background:var(--tt-card)!important;overflow:hidden;padding:0}
+/* صفحة «تأكيد الطلب» بنمط توصيل ون */
+.tt-sec{padding:6px 16px 14px!important;border-radius:26px!important}
+.tt-sec-head{display:flex;align-items:center;gap:12px;padding:12px 0 10px;border-bottom:1.5px solid var(--tt-line);margin-bottom:4px}
+.tt-sec-head h3{margin:0;font-size:19px;color:var(--tt-text)}
+.tt-ico{flex:0 0 48px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--tt-accent) 14%,transparent);color:var(--tt-accent)}
+.tt-ico-fill{background:var(--tt-brand);color:#fff}
+.tt-ico-plain{background:transparent;flex-basis:36px;width:36px;height:36px}
+.tt-line{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1.5px solid var(--tt-line)}
+.tt-line:last-child{border-bottom:0}
+.tt-line-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tt-line-copy small{color:var(--tt-muted);font-size:14px}
+.tt-line-copy b{font-size:18px;overflow-wrap:anywhere}
+.tt-pay-row{position:relative;display:flex;align-items:center;gap:14px;padding:16px 2px;border-bottom:0}
+.tt-pay-row i{flex:0 0 24px;height:24px;border-radius:50%;border:2px solid var(--tt-text);background:transparent;opacity:.85}
+.tt-pay-row.selected i{border:7px solid var(--tt-gold);opacity:1}
+.tt-pay-row span{flex:1;font-size:17px;font-weight:600}
+.tt-gold-btn{border:0;border-radius:999px;padding:12px 26px;background:var(--tt-gold);color:#3a2a00;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.tt-chevron{border:0;background:transparent;color:var(--tt-text);font-size:24px;cursor:pointer;padding:0 8px}
+.tt-wallet-note{padding:8px 2px;color:var(--tt-muted);font-size:14px}
+.tt-cost{background:var(--tt-card)!important;border:1px solid var(--tt-line)!important}
+.tt-cost-line{display:flex;justify-content:space-between;align-items:center;padding:14px 0 6px;font-weight:800;font-size:18px}
+.tt-cost-line b{color:var(--tt-accent);font-size:26px}
+.tt-actions{display:grid;grid-template-columns:1.7fr 1fr;gap:12px;margin-top:4px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.tt-actions .btn{padding:16px;border-radius:18px;font-size:18px;font-weight:800}
+.tt-cancel-btn{background:transparent!important;border:2px solid var(--tt-accent)!important;color:var(--tt-accent)!important}
+.modal>.card:has(.tt-flow){max-height:none!important;height:100dvh!important;min-height:100dvh}
+.tt-cost-line{gap:10px}
+.tt-cost-line span{flex:1;font-size:17px}
+.tt-cost-line b{flex:0 0 auto;white-space:nowrap;font-size:24px}
+.tt-gold-btn{padding:10px 18px;font-size:14px;white-space:nowrap}
+.tt-pay-row span{font-size:16px}
+.tt-actions{grid-template-columns:1fr 1.7fr!important}
+.tt-pay-row span{white-space:nowrap}
+.tt-gold-btn{padding:9px 14px}
