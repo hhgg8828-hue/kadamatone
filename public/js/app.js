@@ -118,12 +118,12 @@ async function ensureLeaflet() {
             const link = document.createElement('link');
             link.id = cssId;
             link.rel = 'stylesheet';
-            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+            link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
             document.head.appendChild(link);
         }
         const load = (src) => new Promise((ok, bad) => { const script = document.createElement('script'); script.src = src; script.async = true; script.onload = () => ok(window.L); script.onerror = () => bad(new Error('MAP_CDN_FAILED')); document.head.appendChild(script); });
         const timer = window.setTimeout(() => reject(new Error('MAP_LOAD_TIMEOUT')), 8000);
-        load('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js').then(L => { window.clearTimeout(timer); if (L)
+        load('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js').catch(() => load('https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js')).then(L => { window.clearTimeout(timer); if (L)
             resolve(L);
         else
             reject(new Error('MAP_NOT_AVAILABLE')); }).catch(e => { window.clearTimeout(timer); reject(e); });
@@ -783,7 +783,7 @@ function openAbout() {
     <section class="about-app-section"><h3>كيف يعمل التطبيق؟</h3><p>بدلًا من أن تبحث بنفسك عن شخص يقدم الخدمة التي تحتاجها، كل ما عليك هو تحديد الخدمة وإرسال طلبك.</p><p>يقوم التطبيق بتنظيم الطلب وربطه بمقدم الخدمة المناسب، مع إمكانية متابعة حالة الطلب إلى أن يتم إنجازه.</p><p class="about-app-slogan">لا تبحث عن مقدم الخدمة... اطلب الخدمة فقط.</p></section>
     <section class="about-app-section"><h3>هدفنا</h3><p>هدفنا هو <strong>خدمتكم وتسهيل حياتكم اليومية</strong> من خلال توفير طريقة أسهل للوصول إلى الخدمات، وربط العملاء بمقدمي الخدمات، وفتح المجال أمام أصحاب المهن والعمال ومقدمي الخدمات للوصول إلى عملاء جدد.</p><p>نسعى إلى تطوير التطبيق باستمرار وإضافة المزيد من الخدمات والمزايا، بما يلبي احتياجات المجتمع ويجعل طلب الخدمة أكثر سهولة وتنظيمًا.</p></section>
     <section class="about-app-contact"><h3>للتواصل والاستفسارات</h3><div class="about-contact-row"><span>📧 <b>البريد الإلكتروني:</b></span><a dir="ltr" href="mailto:HaithamPro77@gmail.com">HaithamPro77@gmail.com</a></div><div class="about-contact-row"><span>📱 <b>واتساب:</b></span><a dir="ltr" href="https://wa.me/967711000121" target="_blank" rel="noopener">00967711000121</a></div><div class="about-contact-row"><span>☎️ <b>رقم التواصل:</b></span><a dir="ltr" href="tel:+967778100022">00967778100022</a></div></section>
-    <section class="about-app-section"><h3>ما الجديد في هذا الإصدار؟</h3><p>${esc(state.config?.releaseNotes || 'تحسينات على تجربة الاستخدام.')}</p><small>الإصدار ${esc(state.config?.appVersion || '2.87')}</small></section><footer class="about-app-footer"><strong>تطبيق ${esc(state.config?.appName || 'خدمات الهيثم')}</strong><span>${esc(state.config?.appTagline || 'كل خدمة تحتاجها... في مكان واحد.')}</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
+    <section class="about-app-section"><h3>ما الجديد في هذا الإصدار؟</h3><p>${esc(state.config?.releaseNotes || 'تحسينات على تجربة الاستخدام.')}</p><small>الإصدار ${esc(state.config?.appVersion || '2.90')}</small></section><footer class="about-app-footer"><strong>تطبيق ${esc(state.config?.appName || 'خدمات الهيثم')}</strong><span>${esc(state.config?.appTagline || 'كل خدمة تحتاجها... في مكان واحد.')}</span><small>من إنشاء وتطوير المهندس هيثم القاضي</small></footer>
   </article>`);
 }
 function roleHome(role) { return role === 'PROVIDER' ? '/provider' : role === 'ADMIN' ? '/admin' : '/customer'; }
@@ -866,7 +866,7 @@ async function openAccount() {
         ['logout', '↪', 'تسجيل الخروج', 'الخروج من الحساب'],
         ['delete', '⌫', 'حذف الحساب نهائيًا', 'حذف الحساب وبيانات التواصل']
     ];
-    showModal(`<div class="customer-account-home"><div class="customer-account-area" id="accountHomeArea"><span class="customer-account-area-pin">⌖</span><span><small>المنطقة الحالية</small><b>${esc(areaName)}</b></span><span class="customer-account-area-arrow">‹</span></div><div class="customer-account-menu">${rows.map(([key, icon, title, sub]) => `<button type="button" class="customer-account-menu-row" data-account-page="${key}"><span class="customer-account-menu-icon">${icon}</span><span class="customer-account-menu-copy"><b>${title}</b><small>${sub}</small></span><span class="customer-account-menu-chevron">‹</span></button>`).join('')}</div><footer class="customer-account-footer"><span class="customer-account-footer-mark">خ</span><span><b>خدمات</b><small>تم تطويره بواسطة المهندس هيثم القاضي</small><small>الإصدار ${esc(String(state.config?.appVersion || '2.87'))}</small></span></footer></div>`);
+    showModal(`<div class="customer-account-home"><div class="customer-account-area" id="accountHomeArea"><span class="customer-account-area-pin">⌖</span><span><small>المنطقة الحالية</small><b>${esc(areaName)}</b></span><span class="customer-account-area-arrow">‹</span></div><div class="customer-account-menu">${rows.map(([key, icon, title, sub]) => `<button type="button" class="customer-account-menu-row" data-account-page="${key}"><span class="customer-account-menu-icon">${icon}</span><span class="customer-account-menu-copy"><b>${title}</b><small>${sub}</small></span><span class="customer-account-menu-chevron">‹</span></button>`).join('')}</div><footer class="customer-account-footer"><span class="customer-account-footer-mark">خ</span><span><b>خدمات</b><small>تم تطويره بواسطة المهندس هيثم القاضي</small><small>الإصدار ${esc(String(state.config?.appVersion || '2.90'))}</small></span></footer></div>`);
     const modal = document.getElementById('modal');
     const title = modal?.querySelector('.card > .row:first-child span');
     if (title)
@@ -980,7 +980,7 @@ async function openAccountEditor() {
             state.areas = a.areas || [];
         }
         const large = localStorage.getItem(A11Y_KEYS.largeText) === '1', contrast = localStorage.getItem(A11Y_KEYS.highContrast) === '1', reduce = localStorage.getItem(A11Y_KEYS.reduceMotion) === '1';
-        showModal(`<h2 class="account-form-title">تعديل الحساب</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" minlength="2" maxlength="80" required></div><details class="account-phone-disclosure"><summary>رقم الهاتف المسجل <span>${esc(u.phone || '')}</span></summary><div class="field"><label>رقم الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></details>${!isProvider ? `<div class="field customer-account-area-field"><label for="accountCurrentArea">المنطقة الحالية</label><select id="accountCurrentArea" name="currentArea"><option value="">اختر المنطقة التي تطلب منها</option>${(state.areas || []).filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select><small class="muted">هذه منطقة طلباتك كعميل، وليست منطقة تقديم الخدمة.</small></div>` : ''}<div class="field"><label>رقم تواصل إضافي (اختياري)</label><input name="secondaryPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="مثال: +9677xxxxxxxx" value="${esc(u.secondaryPhone || '')}"><small class="muted">لن يحل محل رقم تسجيل الدخول. اتركه فارغًا لإزالته.</small></div>${!isProvider ? `<div class="field"><label>تحديد الموقع</label><button class="btn secondary" type="button" id="accountSetLocation">📍 تحديد موقعي الحالي</button><small id="accountLocationStatus" class="muted">يمكنك تحديد الموقع الآن أو لاحقًا عند الطلب.</small></div>` : ''}</div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<div class="account-accessibility card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>سهولة الاستخدام</b><p class="muted">إعدادات اختيارية مفيدة لكبار السن ومن يحتاج نصًا أكبر أو حركة أقل.</p></div><span class="status">تُحفظ على هذا الجهاز</span></div><div class="appearance-options"><b>مظهر التطبيق</b><div class="appearance-choice-group" role="group" aria-label="مظهر التطبيق"><label><input type="radio" name="khadamatTheme" value="light" ${(localStorage.getItem(THEME_KEY) || 'system') === 'light' ? 'checked' : ''}> ☀️ نهاري</label><label><input type="radio" name="khadamatTheme" value="dark" ${(localStorage.getItem(THEME_KEY) || 'system') === 'dark' ? 'checked' : ''}> 🌙 ليلي</label><label><input type="radio" name="khadamatTheme" value="system" ${(localStorage.getItem(THEME_KEY) || 'system') === 'system' ? 'checked' : ''}> 📱 حسب نظام الهاتف</label></div></div><div class="a11y-options"><label><input type="checkbox" id="a11yLargeText" ${large ? 'checked' : ''}> تكبير النص والأزرار</label><label><input type="checkbox" id="a11yHighContrast" ${contrast ? 'checked' : ''}> تباين أعلى</label><label><input type="checkbox" id="a11yReduceMotion" ${reduce ? 'checked' : ''}> تقليل الحركة</label></div></div><button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form><section class="account-menu-list"><h3>إدارة الحساب</h3><details open><summary>الحساب والإعدادات</summary><div class="account-menu-grid"><button type="button" class="btn secondary small" id="accountMenuOrders">طلباتي</button><button type="button" class="btn secondary small" id="accountMenuSubscriptions">الاشتراكات</button><button type="button" class="btn secondary small" id="accountMenuBalance">رصيدي</button><button type="button" class="btn secondary small" id="accountMenuAddresses">العناوين</button><button type="button" class="btn secondary small" id="accountMenuCity">تغيير المدينة</button><button type="button" class="btn secondary small" id="accountMenuContact">التواصل معنا</button><button type="button" class="btn secondary small" id="accountMenuPrivacy">سياسة الخصوصية</button><button type="button" class="btn secondary small" id="accountMenuShare">مشاركة التطبيق</button><button type="button" class="btn secondary small" id="accountMenuHowTo">كيفية استخدام التطبيق</button><button type="button" class="btn secondary small" id="accountMenuAppearance">مظهر التطبيق</button><button type="button" class="btn secondary small" id="accountMenuSuggestions">إدارة الاقتراحات</button><button type="button" class="btn secondary small" id="accountMenuAdvanced">الإعدادات المتقدمة</button><button type="button" class="btn secondary small" id="accountMenuLogout">تسجيل الخروج</button></div></details><div class="account-app-footer"><span class="account-app-logo">${esc(String(state.config?.appSymbol || 'خ'))}</span><b>${esc(String(state.config?.appName || 'خدمات الهيثم'))}</b><small>الإصدار ${esc(String(state.config?.appVersion || '2.87'))}</small><small>تم تطويره بواسطة المهندس هيثم القاضي</small></div></section><hr><div class="card account-delete-card"><h3>حذف الحساب</h3><p class="muted">سيُعطّل الحساب وتُخفى بيانات التواصل الشخصية. قد يتعذر الحذف ما دامت لديك طلبات نشطة.</p><button class="btn danger" id="deleteAccountBtn" type="button">حذف حسابي نهائيًا</button></div>`);
+        showModal(`<h2 class="account-form-title">تعديل الحساب</h2><form id="accountForm">${isProvider ? `<div class="account-avatar-editor">${u.avatarUrl ? `<img class="account-avatar-preview" src="${esc(u.avatarUrl)}" alt="صورتي">` : '<div class="account-avatar-preview avatar-empty">👤</div>'}<div><b>الصورة الشخصية</b><p class="muted">JPG أو PNG أو WebP، بحد أقصى 5MB.</p><input id="providerAvatarFile" type="file" accept="image/jpeg,image/png,image/webp"></div></div>` : ''}<div class="grid"><div class="field"><label>الاسم</label><input name="fullName" value="${esc(u.fullName || '')}" minlength="2" maxlength="80" required></div><details class="account-phone-disclosure"><summary>رقم الهاتف المسجل <span>${esc(u.phone || '')}</span></summary><div class="field"><label>رقم الهاتف</label><input name="phone" value="${esc(u.phone || '')}" disabled></div><div class="field"><label>البريد الإلكتروني</label><input name="email" value="${esc(u.email || '')}" disabled></div></details>${!isProvider ? `<div class="field customer-account-area-field"><label for="accountCurrentArea">المنطقة الحالية</label><select id="accountCurrentArea" name="currentArea"><option value="">اختر المنطقة التي تطلب منها</option>${(state.areas || []).filter((a) => (a.localityType || a.type) !== 'COUNTRY' && a.type !== 'COUNTRY').map((a) => `<option value="${esc(a.id)}" ${state.selectedAreaId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select><small class="muted">هذه منطقة طلباتك كعميل، وليست منطقة تقديم الخدمة.</small></div>` : ''}<div class="field"><label>رقم تواصل إضافي (اختياري)</label><input name="secondaryPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="مثال: +9677xxxxxxxx" value="${esc(u.secondaryPhone || '')}"><small class="muted">لن يحل محل رقم تسجيل الدخول. اتركه فارغًا لإزالته.</small></div>${!isProvider ? `<div class="field"><label>تحديد الموقع</label><button class="btn secondary" type="button" id="accountSetLocation">📍 تحديد موقعي الحالي</button><small id="accountLocationStatus" class="muted">يمكنك تحديد الموقع الآن أو لاحقًا عند الطلب.</small></div>` : ''}</div>${isProvider ? `<div class="field"><label>اسم النشاط</label><input name="displayName" value="${esc(u.provider?.displayName || '')}" maxlength="80"></div><div class="field"><label>نبذة</label><textarea name="bio" maxlength="1000">${esc(u.provider?.bio || '')}</textarea></div>` : ''}<div class="account-accessibility card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>سهولة الاستخدام</b><p class="muted">إعدادات اختيارية مفيدة لكبار السن ومن يحتاج نصًا أكبر أو حركة أقل.</p></div><span class="status">تُحفظ على هذا الجهاز</span></div><div class="appearance-options"><b>مظهر التطبيق</b><div class="appearance-choice-group" role="group" aria-label="مظهر التطبيق"><label><input type="radio" name="khadamatTheme" value="light" ${(localStorage.getItem(THEME_KEY) || 'system') === 'light' ? 'checked' : ''}> ☀️ نهاري</label><label><input type="radio" name="khadamatTheme" value="dark" ${(localStorage.getItem(THEME_KEY) || 'system') === 'dark' ? 'checked' : ''}> 🌙 ليلي</label><label><input type="radio" name="khadamatTheme" value="system" ${(localStorage.getItem(THEME_KEY) || 'system') === 'system' ? 'checked' : ''}> 📱 حسب نظام الهاتف</label></div></div><div class="a11y-options"><label><input type="checkbox" id="a11yLargeText" ${large ? 'checked' : ''}> تكبير النص والأزرار</label><label><input type="checkbox" id="a11yHighContrast" ${contrast ? 'checked' : ''}> تباين أعلى</label><label><input type="checkbox" id="a11yReduceMotion" ${reduce ? 'checked' : ''}> تقليل الحركة</label></div></div><button class="btn">حفظ التغييرات</button><p id="accountMsg" class="muted"></p></form><section class="account-menu-list"><h3>إدارة الحساب</h3><details open><summary>الحساب والإعدادات</summary><div class="account-menu-grid"><button type="button" class="btn secondary small" id="accountMenuOrders">طلباتي</button><button type="button" class="btn secondary small" id="accountMenuSubscriptions">الاشتراكات</button><button type="button" class="btn secondary small" id="accountMenuBalance">رصيدي</button><button type="button" class="btn secondary small" id="accountMenuAddresses">العناوين</button><button type="button" class="btn secondary small" id="accountMenuCity">تغيير المدينة</button><button type="button" class="btn secondary small" id="accountMenuContact">التواصل معنا</button><button type="button" class="btn secondary small" id="accountMenuPrivacy">سياسة الخصوصية</button><button type="button" class="btn secondary small" id="accountMenuShare">مشاركة التطبيق</button><button type="button" class="btn secondary small" id="accountMenuHowTo">كيفية استخدام التطبيق</button><button type="button" class="btn secondary small" id="accountMenuAppearance">مظهر التطبيق</button><button type="button" class="btn secondary small" id="accountMenuSuggestions">إدارة الاقتراحات</button><button type="button" class="btn secondary small" id="accountMenuAdvanced">الإعدادات المتقدمة</button><button type="button" class="btn secondary small" id="accountMenuLogout">تسجيل الخروج</button></div></details><div class="account-app-footer"><span class="account-app-logo">${esc(String(state.config?.appSymbol || 'خ'))}</span><b>${esc(String(state.config?.appName || 'خدمات الهيثم'))}</b><small>الإصدار ${esc(String(state.config?.appVersion || '2.90'))}</small><small>تم تطويره بواسطة المهندس هيثم القاضي</small></div></section><hr><div class="card account-delete-card"><h3>حذف الحساب</h3><p class="muted">سيُعطّل الحساب وتُخفى بيانات التواصل الشخصية. قد يتعذر الحذف ما دامت لديك طلبات نشطة.</p><button class="btn danger" id="deleteAccountBtn" type="button">حذف حسابي نهائيًا</button></div>`);
         const accountEditorModal = document.getElementById('modal');
         const accountEditorHeader = accountEditorModal?.querySelector('.card > .row:first-child span');
         if (accountEditorHeader)
@@ -2423,278 +2423,231 @@ catch (e) {
 else
     openServiceDetails(id); })); }; bind(); }
 async function openMotorcycleTripForm(service, savedAddresses) {
-    const TYPES = [['PARCEL', 'توصيل غرض'], ['PASSENGER', 'نقل شخص'], ['ITEM_PURCHASE', 'شراء وإحضار'], ['DOCUMENT_DELIVERY', 'مستندات'], ['OTHER', 'أخرى']];
-    const pad = (n) => String(n).padStart(2, '0');
-    const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const label12 = (t) => { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${pad(m)} ${h < 12 ? 'ص' : 'م'}`; };
-    const balance = Number(state.user?.balance || 0);
-    const PAY = [{ id: 'CASH', name: 'الدفع عند الاستلام', extra: '', on: true }, { id: 'BALANCE', name: 'الدفع من رصيدي', extra: ` (${balance.toLocaleString('ar')})`, on: false }, { id: 'CARD', name: 'الدفع ببطاقة بنكية', extra: '', on: false }, { id: 'WALLET', name: 'الدفع بمحفظة إلكترونية', extra: '', on: false }];
-    const st = { origin: null, destination: null, type: 'PARCEL', details: '', date: dateKey(new Date()), time: 'now', payment: 'CASH', phone: String(state.user?.phone || ''), estimate: null, saved: [...savedAddresses] };
-    const slots = () => { const out = []; const today = dateKey(new Date()); if (st.date === today)
-        out.push(['now', 'الآن']); for (let h = 6; h <= 23; h++)
-        for (const m of [0, 30]) {
-            if (h === 23 && m === 30)
-                continue;
-            const t = `${pad(h)}:${pad(m)}`;
-            if (st.date === today && new Date(`${st.date}T${t}`).getTime() < Date.now() + 10 * 60000)
-                continue;
-            out.push([t, label12(t)]);
-        } return out; };
-    const fixTime = () => { const list = slots(); if (!list.some(x => x[0] === st.time))
-        st.time = list[0]?.[0] || 'now'; };
-    const curName = (c) => c === 'YER' ? 'ريال' : c;
-    const whenText = () => st.time === 'now' ? 'الآن' : `${st.date} — ${label12(st.time)}`;
-    const typeLabel = () => (TYPES.find(x => x[0] === st.type) || TYPES[0])[1];
-    showModal(`<div class="tt-flow" id="ttFlow"></div>`);
-    const flow = () => document.getElementById('ttFlow');
-    const head = (title, backId) => `<header class="tt-head"><button type="button" class="tt-back" id="${backId}" aria-label="رجوع">→</button><h2>${title}</h2></header>`;
-    // ---------- الخريطة الحية (قمر صناعي) ----------
-    const openMap = async (kind) => {
-        const host = document.getElementById('modal');
-        if (!host)
-            return;
-        document.getElementById('ttMapScreen')?.remove();
-        const screen = document.createElement('div');
-        screen.id = 'ttMapScreen';
-        screen.className = 'tt-map-screen';
-        screen.innerHTML = `${head(kind === 'origin' ? 'حدد موقع الانطلاق' : 'حدد موقع الوصول', 'ttMapBack')}<div class="tt-map-wrap"><div id="ttMap" class="tt-map"></div><div class="tt-map-status" id="ttMapStatus">جارٍ تحديد موقعك…</div><button type="button" class="tt-fab tt-fab-locate" id="ttLocate" aria-label="موقعي الحالي">◎</button><button type="button" class="tt-fab tt-fab-layer" id="ttLayer" aria-label="تبديل نوع الخريطة">🛰️</button></div><div class="tt-map-panel"><label class="tt-field"><span>اسم الموقع</span><input id="ttPlaceName" maxlength="40" placeholder="مثال: البيت، المحل، السوق" value="${esc(st[kind]?.label || '')}"></label><button type="button" class="btn tt-save-btn" id="ttSaveLoc">حفظ الموقع</button></div>`;
-        host.appendChild(screen);
-        document.getElementById('ttMapBack').onclick = () => screen.remove();
-        const mapEl = document.getElementById('ttMap');
-        const statusEl = document.getElementById('ttMapStatus');
-        let L;
+    const purposeLabels = { PASSENGER: 'نقل شخص', PARCEL: 'توصيل طلب أو غرض', ITEM_PURCHASE: 'شراء وإحضار غرض', MEDICINE: 'شراء دواء من الصيدلية', RESTAURANT_PICKUP: 'استلام طلب من مطعم', DOCUMENT_DELIVERY: 'استلام وتسليم مستندات', TECHNICIAN_PICKUP: 'إحضار فني أو عامل', STORE_SHOPPING: 'شراء أغراض من متجر', SMALL_CARGO: 'نقل أغراض صغيرة', HOME_PICKUP: 'استلام أو توصيل شيء من/إلى المنزل', OTHER: 'أخرى' };
+    showModal(`<div class="trip-modal"><div class="trip-head"><div><h2>🛵 مشاوير بالدباب</h2><p class="muted">حدد نقطة الانطلاق والوجهة. يمكنك وضع العلامة على الخريطة حتى لو لم يكن للمكان اسم.</p></div></div><form id="tripForm">
+    <div class="field"><label>نوع الطلب</label><select id="tripPurpose" required>${Object.entries(purposeLabels).map(([k, v]) => `<option value="${k}" ${k === 'PARCEL' ? 'selected' : ''}>${v}</option>`).join('')}</select><small class="muted">الاختيار الافتراضي: توصيل طلب أو غرض. يمكنك تغييره من القائمة حسب حاجتك.</small></div><div id="tripPurposeOtherWrap" class="field hide-section"><label for="tripPurposeOther">وضح الغرض الآخر (اختياري)</label><textarea id="tripPurposeOther" maxlength=500 placeholder="اكتب الغرض إذا رغبت"></textarea></div><div id="purchaseDetailsCard" class="card hide-section" style="margin-bottom:10px"><h3>تفاصيل الشراء (اختيارية)</h3><p class="muted">املأ ما تحتاجه فقط؛ يمكنك تركها فارغة.</p><div class="grid"><input id="purchaseMaxPrice" type="number" min="0" placeholder="الحد الأقصى للسعر (اختياري)"><input id="purchaseQuantity" type="number" min="1" placeholder="الكمية (اختياري)"><input id="purchaseAlternatives" maxlength="500" placeholder="بديل مقبول (اختياري)"><label><input id="purchaseApproval" type="checkbox"> أريد الموافقة إذا تغير السعر أو المنتج</label></div></div>
+    <div class="trip-address-pair"><button type="button" class="trip-address-choice" id="chooseTripOrigin"><small>من عنوان</small><b id="tripOriginChoiceLabel">اختر نقطة الاستلام</b></button><button type="button" class="trip-address-swap" id="swapTripAddresses" aria-label="تبديل العنوانين">⇄</button><button type="button" class="trip-address-choice" id="chooseTripDestination"><small>إلى عنوان</small><b id="tripDestinationChoiceLabel">اختر وجهة التوصيل</b></button></div><section class="trip-estimate-panel card" id="tripEstimatePanel" aria-live="polite"><div class="trip-estimate-heading"><b>تقدير أجرة المشوار</b><span id="tripEstimateStatus" class="muted">حدد نقطة الانطلاق والوجهة لاحتساب الأجرة.</span></div><div class="trip-estimate-metrics"><div><small>المسافة</small><strong id="tripEstimateDistance">—</strong></div><div><small>المدة التقريبية</small><strong id="tripEstimateDuration">—</strong></div><div><small>الأجرة التقديرية</small><strong id="tripEstimateFare">—</strong></div></div><small class="muted" id="tripEstimateNote">التقدير تقريبي وقد يتغير بحسب المسار الفعلي.</small></section>
+    <div class="trip-location-card hide-section"><div class="row trip-location-head"><b>📍 نقطة الانطلاق</b><button type="button" class="btn secondary small" id="tripOriginGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripOriginMapBtn">فتح الخريطة</button></div><select id="tripOriginSaved"><option value="">تحديد نقطة جديدة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripOriginMap" class="trip-map hide"></div><p id="tripOriginText" class="muted">اختر موقع الاستلام من الخريطة أو من عناوينك المحفوظة.</p><textarea id="tripOriginNote" maxlength="300" placeholder="وصف إضافي: أنا في منطقة كذا، جوار كذا، شارع كذا"></textarea><input id="tripOriginLat" type="hidden"><input id="tripOriginLng" type="hidden"></div>
+    <div class="trip-location-card hide-section"><div class="row trip-location-head"><b>🎯 الوجهة</b><button type="button" class="btn secondary small" id="tripDestinationGps">استخدام موقعي</button><button type="button" class="btn secondary small" id="tripDestinationMapBtn">فتح الخريطة</button></div><select id="tripDestinationSaved"><option value="">تحديد الوجهة من الخريطة</option>${savedAddresses.map(a => `<option value="${esc(a.id)}">${esc(a.label)}${a.isDefault ? ' — الافتراضي' : ''}</option>`).join('')}</select><div id="tripDestinationMap" class="trip-map hide"></div><p id="tripDestinationText" class="muted">اختر موقع الوصول من الخريطة أو من عناوينك المحفوظة.</p><textarea id="tripDestinationNote" maxlength="300" placeholder="وصف إضافي لمكان الوصول: جوار كذا، شارع كذا..."></textarea><input id="tripDestinationLat" type="hidden"><input id="tripDestinationLng" type="hidden"></div>
+    <details class="trip-items-disclosure"><summary>أضف أغراضك هنا <span aria-hidden="true">⌄</span></summary><textarea id="tripDescription" maxlength="1000" placeholder="اكتب الأغراض أو تفاصيل المشوار (اختياري)"></textarea></details><div class="field"><label>وقت تنفيذ الطلب</label><div class="trip-schedule-fields"><div class="field"><label for="tripScheduledDate">التاريخ</label><input id="tripScheduledDate" type="date"></div><div class="field"><label for="tripScheduledTime">الوقت</label><select id="tripScheduledTime"><option value="now">الآن</option><option value="06:00">6:00</option><option value="07:00">7:00</option><option value="08:00">8:00</option><option value="09:00">9:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option></select></div></div><input id="tripScheduledAt" type="hidden"><input type="radio" name="tripScheduleMode" value="now" checked hidden aria-hidden="true"><input type="radio" name="tripScheduleMode" value="later" hidden aria-hidden="true"><small class="muted" id="tripScheduleHint">سيبدأ التنفيذ الآن.</small></div><div class="field"><label for="tripPhone">رقم التواصل</label><input id="tripPhone" value="${esc(state.user.phone || '')}" required></div><div class="field"><label for="tripNotes">ملاحظات الطلب</label><textarea id="tripNotes" maxlength="500" placeholder="اكتب ملاحظاتك هنا (اختياري)"></textarea></div><p id="tripMsg"></p><button class="btn submit-order-btn" id="tripSubmit" type="submit" disabled>إرسال طلب المشوار</button></form></div>`);
+    const L = null;
+    const maps = {};
+    let requestEstimate = null;
+    let mapLoading = { origin: false, destination: false };
+    const setPoint = (kind, lat, lng, source, addressText) => { const m = maps[kind]; if (m?.marker)
+        m.marker.setLatLng([lat, lng]); if (kind === 'origin') {
+        localStorage.setItem('khadamat.currentLocation.v1', JSON.stringify({ lat, lng, source: source === 'map' ? 'map' : source === 'gps' ? 'gps' : 'saved', capturedAt: new Date().toISOString() }));
+    } const k = kind === 'origin' ? 'Origin' : 'Destination'; document.getElementById(`trip${k}Lat`).value = String(lat); document.getElementById(`trip${k}Lng`).value = String(lng); const label = addressText || `الموقع المحدد: ${lat.toFixed(5)}، ${lng.toFixed(5)}`; document.getElementById(`trip${k}Text`).textContent = label; const choice = document.getElementById(kind === 'origin' ? 'tripOriginChoiceLabel' : 'tripDestinationChoiceLabel'); if (choice)
+        choice.textContent = label; try {
+        const history = JSON.parse(localStorage.getItem('khadamat.locationHistory.v1') || '[]').filter((x) => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)));
+        const entry = { label, lat, lng, kind, usedAt: new Date().toISOString() };
+        const next = [entry, ...history.filter((x) => Math.abs(Number(x.lat) - lat) > 0.0001 || Math.abs(Number(x.lng) - lng) > 0.0001)].slice(0, 12);
+        localStorage.setItem('khadamat.locationHistory.v1', JSON.stringify(next));
+    }
+    catch { } requestEstimate?.(); };
+    const ensureTripMap = async (kind) => { if (maps[kind])
+        return true; if (mapLoading[kind])
+        return false; mapLoading[kind] = true; try {
+        const L = await ensureLeaflet();
+        const el = document.getElementById(kind === 'origin' ? 'tripOriginMap' : 'tripDestinationMap');
+        if (!el)
+            return false;
+        el.closest('.trip-location-card')?.classList.remove('hide-section');
+        el.classList.remove('hide');
+        let initialPoint = [15.55, 48.52];
         try {
-            L = await ensureLeaflet();
+            const saved = JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
+            if (Number.isFinite(Number(saved?.lat)) && Number.isFinite(Number(saved?.lng)))
+                initialPoint = [Number(saved.lat), Number(saved.lng)];
         }
-        catch {
-            mapEl.innerHTML = `<div class="tt-map-unavailable"><b>تعذر تحميل الخريطة</b><p>تحقق من الاتصال بالإنترنت ثم أعد المحاولة.</p><button type="button" class="btn" id="ttMapRetry">إعادة المحاولة</button></div>`;
-            statusEl.remove();
-            document.getElementById('ttMapRetry')?.addEventListener('click', () => { screen.remove(); openMap(kind); });
+        catch { }
+        const map = L.map(el, { scrollWheelZoom: false }).setView(initialPoint, initialPoint[0] === 15.55 && initialPoint[1] === 48.52 ? 7 : 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+        const marker = L.marker(initialPoint, { draggable: true });
+        maps[kind] = { map, marker };
+        marker.on('dragend', () => setPoint(kind, marker.getLatLng().lat, marker.getLatLng().lng, 'map'));
+        map.on('click', (e) => setPoint(kind, e.latlng.lat, e.latlng.lng, 'map'));
+        setTimeout(() => map.invalidateSize(), 100);
+        return true;
+    }
+    catch {
+        const el = document.getElementById(kind === 'origin' ? 'tripOriginMap' : 'tripDestinationMap');
+        if (el) {
+            el.closest('.trip-location-card')?.classList.remove('hide-section');
+            el.classList.remove('hide');
+            el.innerHTML = `<div class="trip-map-unavailable"><b>الخريطة غير متاحة حاليًا</b><p class="muted">تحقق من اتصال الإنترنت ثم حاول مرة أخرى، أو استخدم موقعك الحالي أو اختر عنوانًا محفوظًا.</p><div class="row"><button type="button" class="btn small" data-trip-map-retry="${kind}">إعادة المحاولة</button><button type="button" class="btn secondary small" data-trip-map-gps="${kind}">استخدام موقعي</button></div></div>`;
+            el.querySelector('[data-trip-map-retry]')?.addEventListener('click', () => { delete maps[kind]; ensureTripMap(kind); });
+            el.querySelector('[data-trip-map-gps]')?.addEventListener('click', () => gps(kind));
+        }
+        return false;
+    }
+    finally {
+        mapLoading[kind] = false;
+    } };
+    const loadSaved = async (kind, id) => { if (!id)
+        return; const a = savedAddresses.find(x => x.id === id); if (!a)
+        return; if (maps[kind]?.map)
+        maps[kind].map.setView([Number(a.location.lat), Number(a.location.lng)], 16); setPoint(kind, Number(a.location.lat), Number(a.location.lng), 'saved', `الموقع المحفوظ: ${a.label}`); };
+    document.getElementById('tripOriginMapBtn')?.addEventListener('click', () => ensureTripMap('origin'));
+    document.getElementById('tripDestinationMapBtn')?.addEventListener('click', () => ensureTripMap('destination'));
+    document.getElementById('tripOriginSaved').addEventListener('change', e => loadSaved('origin', e.target.value));
+    document.getElementById('tripDestinationSaved').addEventListener('change', e => loadSaved('destination', e.target.value));
+    const openTripAddressSheet = (kind) => { document.getElementById('tripAddressSheet')?.remove(); const title = kind === 'origin' ? 'اختر عنوان الاستلام' : 'اختر عنوان التوصيل'; const sheet = document.createElement('div'); sheet.id = 'tripAddressSheet'; sheet.className = 'trip-address-sheet'; sheet.innerHTML = `<button type="button" class="trip-sheet-backdrop" aria-label="إغلاق"></button><section class="trip-address-sheet-panel"><div class="trip-sheet-handle"></div><h3>${title}</h3><div class="trip-sheet-options"><button type="button" class="trip-sheet-option" id="tripSheetSaved"><span class="trip-sheet-icon">📍</span><b>من العناوين المحفوظة</b></button><button type="button" class="trip-sheet-option" id="tripSheetMap"><span class="trip-sheet-icon">🗺️</span><b>من الخريطة</b></button></div><div id="tripSheetSavedList" class="trip-sheet-saved-list hide-section">${savedAddresses.map((a) => `<button type="button" class="trip-saved-address" data-trip-saved="${esc(a.id)}"><span>📍</span><span><b>${esc(a.label)}</b><small>${a.isDefault ? 'العنوان الافتراضي' : 'عنوان محفوظ'}</small></span></button>`).join('')}${(() => { try {
+        return JSON.parse(localStorage.getItem('khadamat.locationHistory.v1') || '[]').slice(0, 6).map((h) => `<button type="button" class="trip-saved-address" data-trip-recent="${esc(String(h.lat) + ',' + String(h.lng))}"><span>🕘</span><span><b>${esc(h.label || 'موقع سابق')}</b><small>موقع استخدمته سابقًا</small></span></button>`).join('');
+    }
+    catch {
+        return '';
+    } })()}${!savedAddresses.length ? '<p class="muted">لا توجد عناوين محفوظة؛ يمكنك اختيار موقع استخدمته سابقًا أو فتح الخريطة.</p>' : ''}</div></section>`; document.getElementById('modal')?.appendChild(sheet); sheet.querySelector('.trip-sheet-backdrop')?.addEventListener('click', () => sheet.remove()); sheet.querySelector('#tripSheetSaved')?.addEventListener('click', () => sheet.querySelector('#tripSheetSavedList')?.classList.toggle('hide-section')); sheet.querySelectorAll('[data-trip-saved]').forEach(btn => btn.addEventListener('click', () => { const a = savedAddresses.find((x) => x.id === btn.dataset.tripSaved); if (!a)
+        return; setPoint(kind, Number(a.location.lat), Number(a.location.lng), 'saved', a.label); const select = document.getElementById(kind === 'origin' ? 'tripOriginSaved' : 'tripDestinationSaved'); if (select)
+        select.value = a.id; sheet.remove(); })); sheet.querySelectorAll('[data-trip-recent]').forEach(btn => btn.addEventListener('click', () => { const [lat, lng] = String(btn.dataset.tripRecent || '').split(',').map(Number); if (!Number.isFinite(lat) || !Number.isFinite(lng))
+        return; setPoint(kind, lat, lng, 'recent', (btn.querySelector('b')?.textContent || 'موقع سابق').trim()); sheet.remove(); })); sheet.querySelector('#tripSheetMap')?.addEventListener('click', () => { sheet.remove(); ensureTripMap(kind); }); };
+    document.getElementById('chooseTripOrigin')?.addEventListener('click', () => openTripAddressSheet('origin'));
+    document.getElementById('chooseTripDestination')?.addEventListener('click', () => openTripAddressSheet('destination'));
+    document.getElementById('swapTripAddresses')?.addEventListener('click', () => { const ol = document.getElementById('tripOriginLat').value, og = document.getElementById('tripOriginLng').value, dl = document.getElementById('tripDestinationLat').value, dg = document.getElementById('tripDestinationLng').value, ot = document.getElementById('tripOriginNote'), dt = document.getElementById('tripDestinationNote'); const on = ot.value, originLabel = document.getElementById('tripOriginText')?.textContent || '', destinationLabel = document.getElementById('tripDestinationText')?.textContent || ''; ot.value = dt.value; dt.value = on; if ([dl, dg].every(v => v !== '')) {
+        setPoint('origin', Number(dl), Number(dg), 'swap', destinationLabel);
+    } if ([ol, og].every(v => v !== '')) {
+        setPoint('destination', Number(ol), Number(og), 'swap', originLabel);
+    } });
+    const gps = async (kind) => { if (!navigator.geolocation) {
+        alert('المتصفح لا يدعم GPS');
+        return;
+    } navigator.geolocation.getCurrentPosition(pos => { if (maps[kind]?.map)
+        maps[kind].map.setView([pos.coords.latitude, pos.coords.longitude], 17); setPoint(kind, pos.coords.latitude, pos.coords.longitude, 'gps', `تم تحديد الموقع عبر GPS — الدقة ${Math.round(pos.coords.accuracy)} متر`); }, err => alert(err.code === 1 ? 'اسمح للتطبيق باستخدام الموقع من إعدادات الهاتف.' : 'تعذر تحديد الموقع، استخدم موقعًا محفوظًا أو اكتب وصف المكان.'), { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 }); };
+    const tripPurposeEl = document.getElementById('tripPurpose');
+    const updatePurposeOther = () => document.getElementById('tripPurposeOtherWrap')?.classList.toggle('hide-section', tripPurposeEl.value !== 'OTHER');
+    tripPurposeEl.addEventListener('change', updatePurposeOther);
+    updatePurposeOther();
+    const purchaseDetailsCard = document.getElementById('purchaseDetailsCard');
+    const updatePurchaseDetails = () => { const purchasePurposes = ['ITEM_PURCHASE', 'MEDICINE', 'STORE_SHOPPING']; purchaseDetailsCard?.classList.toggle('hide-section', !purchasePurposes.includes(tripPurposeEl.value)); };
+    tripPurposeEl.addEventListener('change', updatePurchaseDetails);
+    updatePurchaseDetails();
+    const tripDateInput = document.getElementById('tripScheduledDate');
+    if (!tripDateInput.value) {
+        const now = new Date();
+        tripDateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+    const tripTimeInput = document.getElementById('tripScheduledTime');
+    const syncTripSchedule = () => { const hint = document.getElementById('tripScheduleHint'); const hidden = document.getElementById('tripScheduledAt'); if (tripTimeInput.value === 'now') {
+        hidden.value = '';
+        if (hint)
+            hint.textContent = 'سيبدأ التنفيذ الآن.';
+        return;
+    } if (!tripDateInput.value) {
+        tripDateInput.value = new Date().toISOString().slice(0, 10);
+    } hidden.value = `${tripDateInput.value}T${tripTimeInput.value}`; if (hint)
+        hint.textContent = `موعد التنفيذ: ${tripDateInput.value} — ${tripTimeInput.value}`; };
+    tripDateInput.addEventListener('change', syncTripSchedule);
+    tripTimeInput.addEventListener('change', syncTripSchedule);
+    document.getElementById('tripOriginGps').addEventListener('click', () => gps('origin'));
+    document.getElementById('tripDestinationGps').addEventListener('click', () => gps('destination'));
+    // تحديد نقطة الانطلاق تلقائيًا عند فتح المشوار، مع استمرار إمكانية استخدام موقع محفوظ أو الخريطة.
+    setTimeout(() => gps('origin').catch(() => { }), 150);
+    let estimateTimer;
+    let lastEstimateKey = '';
+    let estimateRequestSeq = 0;
+    const updateEstimate = async () => { const ol = Number(document.getElementById('tripOriginLat').value), og = Number(document.getElementById('tripOriginLng').value), dl = Number(document.getElementById('tripDestinationLat').value), dg = Number(document.getElementById('tripDestinationLng').value); const valid = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180; const hasOrigin = valid(ol, og), hasDestination = valid(dl, dg); const submit = document.getElementById('tripSubmit'); const status = document.getElementById('tripEstimateStatus'); if (submit)
+        submit.disabled = !(hasOrigin && hasDestination); if (!hasOrigin || !hasDestination) {
+        estimateRequestSeq++;
+        lastEstimateKey = '';
+        if (status)
+            status.textContent = 'حدد نقطة الانطلاق والوجهة لاحتساب الأجرة.';
+        for (const id of ['tripEstimateDistance', 'tripEstimateDuration', 'tripEstimateFare']) {
+            const el = document.getElementById(id);
+            if (el)
+                el.textContent = '—';
+        }
+        return;
+    } if (Math.abs(ol - dl) < 0.000001 && Math.abs(og - dg) < 0.000001) {
+        estimateRequestSeq++;
+        lastEstimateKey = '';
+        if (submit)
+            submit.disabled = true;
+        if (status)
+            status.textContent = 'اختر وجهة مختلفة عن نقطة الانطلاق.';
+        return;
+    } const key = [ol, og, dl, dg].map(v => v.toFixed(6)).join(','); if (key === lastEstimateKey)
+        return; lastEstimateKey = key; const seq = ++estimateRequestSeq; if (status)
+        status.textContent = 'جارٍ حساب المسافة والأجرة…'; try {
+        const result = await api('/trips/estimate', { method: 'POST', body: JSON.stringify({ origin: { lat: ol, lng: og, addressText: document.getElementById('tripOriginNote')?.value.trim() || '' }, destination: { lat: dl, lng: dg, addressText: document.getElementById('tripDestinationNote')?.value.trim() || '' }, stops: [] }) });
+        if (seq !== estimateRequestSeq || !document.getElementById('tripEstimatePanel'))
+            return;
+        const distance = document.getElementById('tripEstimateDistance'), duration = document.getElementById('tripEstimateDuration'), fare = document.getElementById('tripEstimateFare');
+        if (distance)
+            distance.textContent = `${Number(result.distanceKm).toFixed(1)} كم`;
+        if (duration)
+            duration.textContent = result.durationMin != null ? `${Math.max(1, Math.round(Number(result.durationMin)))} دقيقة` : 'غير متاحة';
+        if (fare)
+            fare.textContent = `${Number(result.fare).toLocaleString('ar')} ${String(result.currency || currencyLabel())}`;
+        if (status)
+            status.textContent = 'تم احتساب التقدير حسب المسار المتاح.';
+        const note = document.getElementById('tripEstimateNote');
+        if (note)
+            note.textContent = String(result.note || 'الأجرة تقديرية وقد تتغير بحسب المسار الفعلي.');
+    }
+    catch {
+        if (seq !== estimateRequestSeq)
+            return;
+        lastEstimateKey = '';
+        if (status)
+            status.textContent = 'تعذر حساب الأجرة الآن؛ تحقق من الاتصال ثم أعد المحاولة.';
+    } };
+    requestEstimate = () => { if (estimateTimer)
+        clearTimeout(estimateTimer); estimateTimer = setTimeout(() => { void updateEstimate(); }, 350); };
+    document.getElementById('tripForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('tripSubmit'), msg = document.getElementById('tripMsg');
+        const body = { origin: { lat: Number(document.getElementById('tripOriginLat').value), lng: Number(document.getElementById('tripOriginLng').value), addressText: document.getElementById('tripOriginNote').value.trim(), source: 'map' }, destination: ([Number(document.getElementById('tripDestinationLat').value), Number(document.getElementById('tripDestinationLng').value)].every(Number.isFinite) ? { lat: Number(document.getElementById('tripDestinationLat').value), lng: Number(document.getElementById('tripDestinationLng').value), addressText: document.getElementById('tripDestinationNote').value.trim(), source: 'map' } : undefined), purpose: document.getElementById('tripPurpose').value, purposeNote: document.getElementById('tripPurposeOther').value.trim(), ...(['ITEM_PURCHASE', 'MEDICINE', 'STORE_SHOPPING'].includes(document.getElementById('tripPurpose').value) ? { purchaseMaxPrice: Number(document.getElementById('purchaseMaxPrice').value) || undefined, purchaseQuantity: Number(document.getElementById('purchaseQuantity').value) || undefined, purchaseAlternatives: document.getElementById('purchaseAlternatives').value.trim() || undefined, purchaseRequiresApproval: document.getElementById('purchaseApproval').checked } : {}), stops: [], description: document.getElementById('tripDescription').value.trim() || 'مشوار بالدباب', contactPhone: document.getElementById('tripPhone').value.trim(), ...(tripTimeInput.value !== 'now' ? { scheduledAt: String(document.getElementById('tripScheduledAt').value || '') ? new Date(String(document.getElementById('tripScheduledAt').value)).toISOString() : new Date(`${tripDateInput.value}T${tripTimeInput.value}`).toISOString() } : {}), notes: document.getElementById('tripNotes').value.trim() };
+        if (body.scheduledAt && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
+            msg.textContent = 'اختر تاريخًا ووقتًا في المستقبل.';
+            msg.className = 'error';
             return;
         }
-        let start = [15.55, 48.52];
-        let zoom = 7;
-        let hasStart = false;
-        const known = st[kind] || (kind === 'destination' ? st.origin : null);
-        if (known) {
-            start = [known.lat, known.lng];
-            zoom = 17;
-            hasStart = true;
+        btn.disabled = true;
+        btn.textContent = 'جارٍ إرسال الطلب...';
+        try {
+            const j = await api('/trips', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
+            closeModal();
+            await customer();
+            await openOrder(j.order.id);
         }
-        else {
-            try {
-                const saved = JSON.parse(localStorage.getItem('khadamat.currentLocation.v1') || 'null');
-                if (Number.isFinite(Number(saved?.lat)) && Number.isFinite(Number(saved?.lng))) {
-                    start = [Number(saved.lat), Number(saved.lng)];
-                    zoom = 16;
-                    hasStart = true;
-                }
-            }
-            catch { }
-        }
-        const map = L.map(mapEl, { zoomControl: false, attributionControl: true }).setView(start, zoom);
-        const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Tiles © Esri' });
-        const names = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18 });
-        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' });
-        let satOn = true;
-        sat.addTo(map);
-        names.addTo(map);
-        document.getElementById('ttLayer').addEventListener('click', () => { satOn = !satOn; if (satOn) {
-            map.removeLayer(street);
-            sat.addTo(map);
-            names.addTo(map);
-        }
-        else {
-            map.removeLayer(sat);
-            map.removeLayer(names);
-            street.addTo(map);
-        } document.getElementById('ttLayer').textContent = satOn ? '🛰️' : '🗺️'; });
-        const pinIcon = L.divIcon({ className: 'tt-pin', html: '<svg viewBox="0 0 36 46" width="36" height="46" aria-hidden="true"><path d="M18 1C9 1 2 8 2 17c0 12 16 27 16 27s16-15 16-27C34 8 27 1 18 1z" fill="#d92d20" stroke="#fff" stroke-width="2.5"/><circle cx="18" cy="17" r="6" fill="#fff"/></svg>', iconSize: [36, 46], iconAnchor: [18, 44] });
-        const marker = L.marker(start, { draggable: true, icon: pinIcon }).addTo(map);
-        let accuracyCircle = null;
-        const setPos = (lat, lng, fly, accuracy) => { marker.setLatLng([lat, lng]); if (fly)
-            map.setView([lat, lng], 18); if (accuracy && accuracy < 2000) {
-            if (accuracyCircle)
-                accuracyCircle.setLatLng([lat, lng]).setRadius(accuracy);
-            else
-                accuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#2e90fa', weight: 1, fillColor: '#2e90fa', fillOpacity: .15 }).addTo(map);
-        } };
-        marker.on('dragend', () => { const p = marker.getLatLng(); setPos(p.lat, p.lng, false); });
-        map.on('click', (e) => setPos(e.latlng.lat, e.latlng.lng, false));
-        setTimeout(() => map.invalidateSize(), 150);
-        const locate = () => { statusEl.textContent = 'جارٍ تحديد موقعك…'; statusEl.classList.remove('hide'); if (!navigator.geolocation) {
-            statusEl.textContent = 'حرّك الدبوس إلى الموقع المطلوب';
-            return;
-        } navigator.geolocation.getCurrentPosition(p => { setPos(p.coords.latitude, p.coords.longitude, true, p.coords.accuracy); statusEl.textContent = 'حرّك الدبوس إلى الموقع المطلوب'; try {
-            localStorage.setItem('khadamat.currentLocation.v1', JSON.stringify({ lat: p.coords.latitude, lng: p.coords.longitude, source: 'gps', capturedAt: new Date().toISOString() }));
-        }
-        catch { } }, () => { statusEl.textContent = 'حرّك الدبوس إلى الموقع المطلوب'; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); };
-        document.getElementById('ttLocate').addEventListener('click', locate);
-        if (hasStart && known)
-            statusEl.textContent = 'حرّك الدبوس إلى الموقع المطلوب';
-        else
-            locate();
-        document.getElementById('ttSaveLoc').addEventListener('click', async () => {
-            const btn = document.getElementById('ttSaveLoc');
-            btn.disabled = true;
-            const p = marker.getLatLng();
-            const typed = document.getElementById('ttPlaceName').value.trim().slice(0, 40);
-            const label = typed || (kind === 'origin' ? 'موقع الانطلاق' : 'موقع الوصول');
-            let addr = null;
-            try {
-                const j = await api('/me/addresses', { method: 'POST', body: JSON.stringify({ label, isDefault: false, location: { lat: p.lat, lng: p.lng, source: 'map', addressText: label } }) });
-                addr = j.address || null;
-            }
-            catch { }
-            if (addr)
-                st.saved.unshift(addr);
-            st[kind] = { lat: p.lat, lng: p.lng, label, addressId: addr?.id };
-            st.estimate = null;
-            screen.remove();
-            renderForm();
-        });
-    };
-    // ---------- اختيار: موقع محفوظ أو الخريطة ----------
-    const openSourceSheet = (kind) => {
-        document.getElementById('ttSheet')?.remove();
-        const sheet = document.createElement('div');
-        sheet.id = 'ttSheet';
-        sheet.className = 'trip-address-sheet tt-sheet';
-        sheet.innerHTML = `<button type="button" class="trip-sheet-backdrop" aria-label="إغلاق"></button><section class="trip-address-sheet-panel tt-sheet-panel"><div class="tt-sheet-options"><button type="button" class="tt-sheet-option" id="ttSheetSaved"><svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M32 6c-10 0-18 8-18 18 0 14 18 34 18 34s18-20 18-34C50 14 42 6 32 6z"/><circle cx="32" cy="24" r="7"/></svg><b>من العناوين المحفوظة</b></button><button type="button" class="tt-sheet-option" id="ttSheetMap"><svg viewBox="0 0 64 64" width="58" height="58" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14l16-6 20 6 16-6v42l-16 6-20-6-16 6z"/><path d="M22 8v42M42 14v42"/></svg><b>من الخريطة</b></button></div><div id="ttSavedList" class="trip-sheet-saved-list hide-section">${st.saved.map((a) => `<button type="button" class="trip-saved-address" data-tt-saved="${esc(a.id)}"><span>📍</span><span><b>${esc(a.label)}</b><small>${a.isDefault ? 'العنوان الافتراضي' : 'عنوان محفوظ'}</small></span></button>`).join('') || '<p class="muted">لا توجد عناوين محفوظة بعد؛ اختر من الخريطة وسيُحفظ الموقع تلقائيًا.</p>'}</div></section>`;
-        (document.getElementById('modal') || document.body).appendChild(sheet);
-        sheet.querySelector('.trip-sheet-backdrop').addEventListener('click', () => sheet.remove());
-        sheet.querySelector('#ttSheetSaved').addEventListener('click', () => sheet.querySelector('#ttSavedList').classList.toggle('hide-section'));
-        sheet.querySelector('#ttSheetMap').addEventListener('click', () => { sheet.remove(); void openMap(kind); });
-        sheet.querySelectorAll('[data-tt-saved]').forEach(b => b.addEventListener('click', () => { const a = st.saved.find((x) => x.id === b.dataset.ttSaved); if (!a)
-            return; st[kind] = { lat: Number(a.location.lat), lng: Number(a.location.lng), label: String(a.label), addressId: a.id }; st.estimate = null; sheet.remove(); renderForm(); }));
-    };
-    // ---------- الصفحة الأولى: من عنوان إلى عنوان ----------
-    const renderForm = () => {
-        fixTime();
-        const ready = !!(st.origin && st.destination);
-        const today = dateKey(new Date());
-        flow().innerHTML = `${head('🛵 مشاوير بالدباب', 'ttClose')}<div class="tt-body">
-      <section class="tt-route-row"><button type="button" class="tt-box tt-point" data-tt-pick="origin"><small>من عنوان</small><b class="${st.origin ? '' : 'tt-empty'}">${esc(st.origin?.label || 'حدد الموقع')}</b></button><button type="button" class="tt-swap-inline" id="ttSwap" aria-label="تبديل الموقعين">⇄</button><button type="button" class="tt-box tt-point" data-tt-pick="destination"><small>إلى عنوان</small><b class="${st.destination ? '' : 'tt-empty'}">${esc(st.destination?.label || 'حدد الموقع')}</b></button></section>
-      <label class="tt-box tt-select-box"><select id="ttType" aria-label="نوع الطلب">${TYPES.map(([k, v]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>نوع الطلب (${v})</option>`).join('')}</select></label>
-      <div class="tt-when-title">وقت تنفيذ الطلب</div>
-      <div class="tt-when"><input id="ttDate" class="tt-box" type="date" min="${today}" value="${esc(st.date)}" aria-label="تاريخ التوصيل"><select id="ttTime" class="tt-box" aria-label="وقت التوصيل">${slots().map(([v, l]) => `<option value="${v}" ${v === st.time ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-      <textarea id="ttDetails" class="tt-notes" maxlength="1000" rows="5" placeholder="اكتب تفاصيلك أو ملاحظاتك هنا...">${esc(st.details)}</textarea>
-    </div><footer class="tt-foot"><button type="button" class="btn tt-main-btn" id="ttNext" ${ready ? '' : 'disabled'}>التالي</button></footer>`;
-        document.getElementById('ttClose').onclick = closeModal;
-        flow().querySelectorAll('[data-tt-pick]').forEach(b => b.addEventListener('click', () => openSourceSheet(b.dataset.ttPick)));
-        document.getElementById('ttSwap').addEventListener('click', () => { const o = st.origin; st.origin = st.destination; st.destination = o; st.estimate = null; renderForm(); });
-        document.getElementById('ttType').addEventListener('change', e => { st.type = e.target.value || 'PARCEL'; });
-        document.getElementById('ttDetails').addEventListener('input', e => { st.details = e.target.value; });
-        document.getElementById('ttDate').addEventListener('change', e => { st.date = e.target.value || today; if (st.date < today)
-            st.date = today; st.time = 'now'; fixTime(); const sel = document.getElementById('ttTime'); sel.innerHTML = slots().map(([v, l]) => `<option value="${v}" ${v === st.time ? 'selected' : ''}>${l}</option>`).join(''); document.getElementById('ttDate').value = st.date; });
-        document.getElementById('ttTime').addEventListener('change', e => { st.time = e.target.value; });
-        document.getElementById('ttNext').addEventListener('click', () => { if (st.origin && st.destination)
-            renderReview(); });
-    };
-    // ---------- الصفحة الثانية: تفاصيل الطلب + الدفع + التكلفة + التأكيد ----------
-    const renderReview = () => {
-        const o = st.origin, d = st.destination;
-        const needPhone = String(st.phone || '').replace(/\D/g, '').length < 8;
-        const payName = () => { const p = PAY.find(x => x.id === st.payment) || PAY[0]; return p.name; };
-        const ICO = { target: '<circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>', pin: '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/>', shapes: '<path d="M8 3l4.2 7.2H3.8z"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/><circle cx="17" cy="17" r="3.6"/>', notes: '<path d="M5 7h14M5 12h14M5 17h9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>', wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="3.5" y="8" width="17" height="11.5" rx="2.5"/><circle cx="16.5" cy="13.8" r="1.2"/>', receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>' };
-        const ic = (k, cls = '') => `<span class="tt-ico ${cls}" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICO[k]}</svg></span>`;
-        const line = (k, label, value) => `<div class="tt-line">${ic(k)}<div class="tt-line-copy"><small>${label}</small><b>${esc(value)}</b></div></div>`;
-        flow().innerHTML = `${head('تأكيد الطلب', 'ttReviewBack')}<div class="tt-body">
-      <section class="card tt-sec tt-summary"><div class="tt-sec-head">${ic('receipt', 'tt-ico-plain')}<h3>تفاصيل الطلب</h3></div>${line('target', 'من عنوان', o.label)}${line('pin', 'إلى عنوان', d.label)}${line('shapes', 'نوع الطلب', typeLabel())}${line('clock', 'وقت تنفيذ الطلب', whenText())}${line('notes', 'ملاحظات الطلب', st.details.trim() || '—')}</section>
-      <section class="card tt-sec tt-pay"><div class="tt-sec-head">${ic('wallet', 'tt-ico-fill')}<h3 id="ttPayTitle">الدفع (${esc(payName())})</h3></div>${PAY.map(p => `<label class="tt-pay-row ${p.on ? '' : 'unavailable'} ${st.payment === p.id ? 'selected' : ''}"><input type="radio" name="ttPay" value="${p.id}" ${st.payment === p.id ? 'checked' : ''} ${p.on ? '' : 'disabled'}><i></i><span>${esc(p.name)}${esc(p.extra)}</span>${p.id === 'BALANCE' ? '<button type="button" class="tt-gold-btn" id="ttAddBalance">إضافة رصيد</button>' : p.id === 'WALLET' ? '<button type="button" class="tt-chevron" id="ttWalletToggle" aria-label="عرض المحافظ">⌄</button>' : !p.on ? '<small>غير متاح حاليًا</small>' : ''}</label>`).join('')}<div id="ttWalletList" class="tt-wallet-note hide-section">المحافظ الإلكترونية غير مربوطة حاليًا</div></section>
-      ${needPhone ? `<label class="tt-field card"><span>رقم التواصل</span><input id="ttPhone" inputmode="tel" maxlength="24" placeholder="رقم هاتفك للتواصل"></label>` : ''}
-      <section class="card tt-sec tt-cost"><div class="tt-sec-head">${ic('receipt', 'tt-ico-plain')}<h3>ملخص التكلفة</h3></div><div class="tt-cost-line"><span>إجمالي سعر التوصيل</span><b id="ttCost">جارٍ الحساب…</b></div><small id="ttDistance" class="muted">تُحسب التكلفة بالمسافة الفعلية بين الموقعين.</small><button type="button" class="btn secondary small hide-section" id="ttRetryCost">إعادة حساب التكلفة</button></section>
-      <p id="ttMsg" class="error"></p>
-      <div class="tt-actions"><button type="button" class="btn secondary tt-cancel-btn" id="ttCancel">إلغاء</button><button type="button" class="btn tt-main-btn" id="ttConfirm" disabled>موافقة وتأكيد</button></div>
-    </div>`;
-        document.getElementById('ttCancel').onclick = closeModal;
-        document.getElementById('ttAddBalance')?.addEventListener('click', e => { e.preventDefault(); toast('إضافة الرصيد غير متاحة حاليًا', 'سيتم تفعيلها بعد ربط المحفظة'); });
-        document.getElementById('ttWalletToggle')?.addEventListener('click', e => { e.preventDefault(); document.getElementById('ttWalletList')?.classList.toggle('hide-section'); });
-        document.getElementById('ttReviewBack').onclick = renderForm;
-        const confirmBtn = document.getElementById('ttConfirm');
-        const refresh = () => { confirmBtn.disabled = !(st.estimate && String(st.phone || '').replace(/\D/g, '').length >= 8); };
-        flow().querySelectorAll('input[name="ttPay"]').forEach(r => r.addEventListener('change', () => { if (r.disabled)
-            return; st.payment = r.value; document.getElementById('ttPayTitle').textContent = `الدفع (${payName()})`; flow().querySelectorAll('.tt-pay-row').forEach(x => x.classList.toggle('selected', x.querySelector('input').checked)); }));
-        document.getElementById('ttPhone')?.addEventListener('input', e => { st.phone = e.target.value.trim(); refresh(); });
-        const loadCost = async () => {
-            const costEl = document.getElementById('ttCost'), distEl = document.getElementById('ttDistance'), retry = document.getElementById('ttRetryCost');
-            if (!costEl)
-                return;
-            costEl.textContent = 'جارٍ الحساب…';
-            retry?.classList.add('hide-section');
-            try {
-                const r = await api('/trips/estimate', { method: 'POST', body: JSON.stringify({ origin: { lat: o.lat, lng: o.lng, addressText: o.label }, destination: { lat: d.lat, lng: d.lng, addressText: d.label }, stops: [] }) });
-                if (!document.getElementById('ttCost'))
+        catch (x) {
+            const offline = !navigator.onLine || /network|fetch failed|failed to fetch|انقطاع|الاتصال|الشبكة/i.test(String(x?.message || ''));
+            if (offline) {
+                const phone = String(state.config?.adminSmsPhone || '').trim();
+                if (!phone) {
+                    msg.textContent = 'لا يوجد رقم SMS للإدارة مضبوط حاليًا. احفظ الطلب عند عودة الإنترنت.';
+                    msg.className = 'error';
+                    btn.disabled = false;
+                    btn.textContent = 'إرسال طلب المشوار';
                     return;
-                st.estimate = r;
-                const money = `${Number(r.fare).toLocaleString('ar')} ${curName(String(r.currency || currencyLabel()))}`;
-                costEl.textContent = money;
-                const fc = document.getElementById('ttFootCost');
-                if (fc)
-                    fc.textContent = money;
-                if (distEl)
-                    distEl.textContent = `المسافة الفعلية: ${Number(r.distanceKm).toFixed(1)} كم${r.durationMin != null ? ` · المدة التقريبية: ${Math.max(1, Math.round(Number(r.durationMin)))} دقيقة` : ''}`;
-                refresh();
-            }
-            catch {
-                if (!document.getElementById('ttCost'))
-                    return;
-                st.estimate = null;
-                costEl.textContent = '—';
-                const fc2 = document.getElementById('ttFootCost');
-                if (fc2)
-                    fc2.textContent = '—';
-                if (distEl)
-                    distEl.textContent = 'تعذر حساب التكلفة الآن، تحقق من الاتصال.';
-                retry?.classList.remove('hide-section');
-                refresh();
-            }
-        };
-        document.getElementById('ttRetryCost').addEventListener('click', () => void loadCost());
-        void loadCost();
-        confirmBtn.addEventListener('click', async () => {
-            const msg = document.getElementById('ttMsg');
-            msg.textContent = '';
-            const scheduledAt = st.time === 'now' ? undefined : new Date(`${st.date}T${st.time}`).toISOString();
-            if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) {
-                msg.textContent = 'اختر وقتًا في المستقبل.';
-                return;
-            }
-            const details = st.details.trim();
-            const body = { origin: { lat: o.lat, lng: o.lng, addressText: o.label, source: 'map' }, destination: { lat: d.lat, lng: d.lng, addressText: d.label, source: 'map' }, ...(o.addressId ? { originAddressId: o.addressId } : {}), ...(d.addressId ? { destinationAddressId: d.addressId } : {}), purpose: st.type, stops: [], description: details.length >= 5 ? details : 'مشوار بالدباب', contactPhone: String(st.phone).trim(), ...(scheduledAt ? { scheduledAt } : {}) };
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = 'جارٍ إرسال الطلب...';
-            try {
-                const j = await api('/trips', { method: 'POST', headers: { 'Idempotency-Key': newIdempotencyKey() }, body: JSON.stringify(body) });
-                closeModal();
-                await customer();
-                await openOrder(j.order.id);
-            }
-            catch (x) {
-                const offline = !navigator.onLine || /network|fetch failed|failed to fetch|انقطاع|الاتصال|الشبكة/i.test(String(x?.message || ''));
-                if (offline) {
-                    const phone = String(state.config?.adminSmsPhone || '').trim();
-                    if (!phone) {
-                        msg.textContent = 'لا يوجد اتصال بالإنترنت. أعد المحاولة عند عودة الاتصال.';
-                    }
-                    else {
-                        const smsBody = ['طلب مشوار جديد — خدمات (إرسال عبر SMS عند انقطاع الإنترنت)', `الخدمة: ${String(service?.name || 'مشاوير بالدباب')}`, `من: ${o.label} (${o.lat.toFixed(5)}, ${o.lng.toFixed(5)})`, `إلى: ${d.label} (${d.lat.toFixed(5)}, ${d.lng.toFixed(5)})`, `النوع: ${typeLabel()}`, `التفاصيل: ${details || 'لا توجد'}`, `هاتف التواصل: ${body.contactPhone || 'غير محدد'}`, `الموعد: ${whenText()}`, 'تنبيه: هذا الطلب غير مسجل في النظام بعد؛ يلزم إرسال الرسالة يدويًا ومراجعته من الإدارة.'].join('\n');
-                        if (confirm('انقطع الاتصال بالإنترنت. هل تريد فتح تطبيق الرسائل لإرسال تفاصيل المشوار إلى رقم الإدارة عبر SMS؟')) {
-                            window.location.href = `sms:${encodeURIComponent(phone)}?body=${encodeURIComponent(smsBody)}`;
-                            msg.textContent = 'تم فتح تطبيق الرسائل إن كان مدعومًا. اضغط إرسال بنفسك؛ الطلب غير مؤكد أو مسجل حتى تراجعه الإدارة.';
-                        }
-                    }
                 }
-                else {
-                    msg.textContent = x.message;
+                const smsBody = [
+                    'طلب مشوار جديد — خدمات (إرسال عبر SMS عند انقطاع الإنترنت)',
+                    `الخدمة: ${String(service?.name || 'مشاوير بالدباب')}`,
+                    `من: ${body.origin?.addressText || `${body.origin?.lat}, ${body.origin?.lng}`}`,
+                    `إلى: ${body.destination?.addressText || `${body.destination?.lat}, ${body.destination?.lng}`}`,
+                    `الغرض: ${body.purpose || 'غير محدد'}${body.purposeNote ? ` — ${body.purposeNote}` : ''}`,
+                    `الأغراض/التفاصيل: ${body.description || 'لا توجد'}`,
+                    `هاتف التواصل: ${body.contactPhone || 'غير محدد'}`,
+                    `الموعد: ${body.scheduledAt || 'الآن'}`,
+                    `ملاحظات: ${body.notes || 'لا توجد'}`,
+                    'تنبيه: هذا الطلب غير مسجل في النظام بعد؛ يلزم إرسال الرسالة يدويًا ومراجعته من الإدارة.'
+                ].join('\n');
+                const proceed = confirm('انقطع الاتصال بالإنترنت. هل تريد فتح تطبيق الرسائل لإرسال تفاصيل المشوار إلى رقم الإدارة عبر SMS؟');
+                if (proceed) {
+                    window.location.href = `sms:${encodeURIComponent(phone)}?body=${encodeURIComponent(smsBody)}`;
+                    msg.textContent = 'تم فتح تطبيق الرسائل إن كان مدعومًا. اضغط إرسال بنفسك؛ الطلب غير مؤكد أو مسجل حتى تراجعه الإدارة.';
+                    msg.className = 'muted';
                 }
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = 'موافقة وتأكيد';
-                refresh();
             }
-        });
-    };
-    renderForm();
+            else {
+                msg.textContent = x.message;
+                msg.className = 'error';
+            }
+            btn.disabled = false;
+            btn.textContent = 'إرسال طلب المشوار';
+        }
+    });
 }
 async function openOrderFormBySlug(slug, initial = null) { if (!state.user) {
     localStorage.setItem('khadamat.pendingCustomerRequest.v1', 'slug:' + slug);
@@ -4765,7 +4718,7 @@ async function admin() {
       ${activeTab === 'verification' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">طلبات توثيق الحسابات</h2><p class="muted">راجع الهوية والترخيص ثم اعتمد الحساب أو ارفضه مع ذكر السبب.</p></div><span class="status">${esc(stats.pendingProviders)} بانتظار المراجعة</span></div></div><div>${(ps.providers || []).filter((p) => p.verificationStatus === 'PENDING').map((p) => adminProviderCard(p)).join('') || '<div class="card muted">لا توجد طلبات توثيق معلقة.</div>'}</div>` : ''}
       ${activeTab === 'catalog' ? `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">إدارة الأقسام والخدمات</h2><p class="muted">أنشئ أقسام المتجر، ثم أضف داخل كل قسم الخدمات أو المنتجات التابعة له.</p></div><div class="row"><button class="btn secondary" id="openAliasManager" type="button">🗣️ قاموس العبارات</button><button class="btn secondary" id="newService" type="button">＋ خدمة جديدة</button><button class="btn" id="newCategory" type="button">＋ إضافة قسم</button></div></div></div><div class="admin-category-list">${cats.map((cat) => `<section class="card admin-category-card" data-admin-category="${esc(cat.id)}"><div class="admin-category-heading"><div class="admin-category-title"><b><span class="admin-catalog-icon">${/^(?:\/api\/v1\/files\/|https?:\/\/)/i.test(String(cat.icon || '')) ? `<img class="admin-catalog-icon-image" src="${esc(cat.icon)}" alt="" loading="lazy">` : esc(cat.icon || '🛠️')}</span> ${esc(cat.name)}</b><small class="muted">${(cat.services || []).length} خدمة · ${cat.isActive ? 'نشط' : 'معطل'}${cat.parentId ? ' · قسم فرعي' : ''}</small></div><div class="row admin-category-actions"><button class="btn secondary small" data-edit-category="${esc(cat.id)}" type="button">تعديل القسم</button><button class="btn small" data-add-service-category="${esc(cat.id)}" type="button">＋ إضافة خدمة</button></div></div><div class="admin-category-services">${(cat.services || []).map((sv) => `<article class="card admin-category-service"><div><b><span class="admin-catalog-icon">${/^(?:\/api\/v1\/files\/|https?:\/\/)/i.test(String(sv.icon || '')) ? `<img class="admin-catalog-icon-image" src="${esc(sv.icon)}" alt="" loading="lazy">` : esc(sv.icon || '🛠️')}</span> ${esc(sv.name)}</b><small class="muted">${esc(sv.pricingType === 'FIXED' ? 'سعر ثابت' : 'عرض سعر')} · ${sv.basePrice === null ? 'حسب العرض' : esc(sv.basePrice + ' ' + sv.currency)} · ${sv.isActive === false ? 'معطلة' : 'نشطة'}</small></div><div class="row"><button class="btn secondary small" data-edit-service="${esc(sv.id)}" type="button">تعديل الخدمة</button><button class="btn secondary small" data-service-areas="${esc(sv.id)}" type="button">مناطق الخدمة</button></div></article>`).join('') || '<div class="admin-category-empty">لا توجد خدمات داخل هذا القسم بعد. استخدم «إضافة خدمة» لبدء إضافة خدماته.</div>'}</div></section>`).join('') || '<div class="card muted">لا توجد أقسام حتى الآن. اضغط «إضافة قسم» لإنشاء أول قسم.</div>'}</div>` : ''}
       ${activeTab === 'areas' ? `<div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">المناطق التشغيلية</h2><p class="muted">فعّل التغطية على المستوى الذي تريده فقط: محافظة كاملة، مديرية واحدة، أو حي محدد. المناطق غير النشطة لا تظهر للعميل. يمكنك فتح إب الآن ثم تفعيل صنعاء أو عدن لاحقًا.</p><div class="row"><span class="status">نشطة: ${(areas.areas || []).filter((a) => a.isActive).length}</span><span class="status">موقوفة: ${(areas.areas || []).filter((a) => !a.isActive).length}</span><span class="status">إجمالي المناطق: ${(areas.areas || []).length}</span></div></div><button class="btn" id="newArea">+ إضافة محافظة / مديرية / حي</button></div></div><div class="card"><div class="admin-table-wrap"><table class="table"><thead><tr><th>المسار الإداري</th><th>المستوى</th><th>المركز</th><th>نطاق المطابقة</th><th>حالة التغطية</th><th>الإجراءات</th></tr></thead><tbody>${(areas.areas || []).filter((a) => a.type !== 'COUNTRY').sort((a, b) => Number(!!b.isActive) - Number(!!a.isActive) || areaPathLabel(a, areas.areas || []).localeCompare(areaPathLabel(b, areas.areas || []), 'ar')).map((a) => `<tr><td><b>${esc(areaPathLabel(a, areas.areas || []))}</b></td><td>${esc({ GOVERNORATE: 'محافظة', CITY: 'مدينة', DIRECTORY: 'مديرية', DIRECTORATE: 'مديرية', ISOLATION: 'عزلة', VILLAGE: 'قرية', NEIGHBORHOOD: 'حي', DISTRICT: 'منطقة/نطاق', COUNTRY: 'دولة' }[a.localityType || a.type] || a.localityType || a.type)}</td><td>${Number(a.centerLat).toFixed(5)} , ${Number(a.centerLng).toFixed(5)}</td><td>${esc(a.radiusKm)} كم <small class="muted">(نطاق تقريبي)</small></td><td><span class="status ${a.isActive ? '' : 'muted'}">${a.isActive ? 'مفتوحة للعملاء' : 'غير مفتوحة'}</span></td><td><div class="row"><button class="btn secondary small" data-edit-area="${esc(a.id)}">تعديل</button><button class="btn ${a.isActive ? 'secondary' : 'small'} small" data-area-toggle="${esc(a.id)}" data-next-area="${a.isActive ? 'false' : 'true'}">${a.isActive ? 'إيقاف' : 'تفعيل'}</button></div></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا توجد مناطق معرفة. أضف محافظة أولًا.</td></tr>'}</tbody></table></div><p class="muted">ملاحظة: المطابقة الحالية تستخدم مركزًا ونصف قطر تقريبيًا، وليست حدودًا جغرافية رسمية. عند تفعيل مديرية فقط، تأكد من إدخال مركزها ونطاقها بدقة مناسبة.</p></div>` : ''}
-      ${activeTab === 'settings' ? `<div class="card"><h2>هوية التطبيق وإعداداته العامة</h2><p class="muted">غيّر الاسم الذي يظهر لكل فئة والشعار والوصف من هنا. تُحفظ البيانات في قاعدة البيانات وتنعكس على واجهات العميل ومقدّم الخدمة والإدارة وأسماء التثبيت المدعومة.</p><form id="brandSettingsForm"><div class="grid"><div class="field"><label for="brandMainName">اسم العلامة التجارية</label><input id="brandMainName" maxlength=60 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.name')?.value || 'خدمات الهيثم'))}"></div><div class="field"><label for="brandCustomerName">اسم واجهة العميل</label><input id="brandCustomerName" maxlength=60 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.customer_name')?.value || 'خدمات الهيثم'))}"></div><div class="field"><label for="brandProviderName">اسم واجهة مقدّم الخدمة</label><input id="brandProviderName" maxlength=80 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.provider_name')?.value || 'خدمات الهيثم (مقدّم خدمة)'))}"></div><div class="field"><label for="brandAdminName">اسم واجهة الإدارة</label><input id="brandAdminName" maxlength=80 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.admin_name')?.value || 'خدمات الهيثم (الإدارة)'))}"></div><div class="field"><label for="brandTagline">الشعار التسويقي</label><input id="brandTagline" maxlength=160 value="${esc(String((settings.settings || []).find((x) => x.key === 'app.tagline')?.value || 'كل خدمة تحتاجها... في مكان واحد.'))}"></div><div class="field"><label for="brandSymbol">الرمز النصي المؤقت</label><input id="brandSymbol" maxlength=8 value="${esc(String((settings.settings || []).find((x) => x.key === 'app.symbol')?.value || 'خ'))}"></div><div class="field"><label for="brandAbout">وصف التطبيق</label><textarea id="brandAbout" maxlength=2000 rows=3>${esc(String((settings.settings || []).find((x) => x.key === 'app.about')?.value || 'منصة تجمع العملاء بمقدمي الخدمات وتسهّل طلب الخدمات ومتابعتها.'))}</textarea></div><div class="field"><label for="brandReleaseNotes">تفاصيل ما الجديد</label><textarea id="brandReleaseNotes" maxlength=2000 rows=3>${esc(String((settings.settings || []).find((x) => x.key === 'app.release_notes')?.value || ''))}</textarea></div></div><button class="btn" type="submit">حفظ هوية التطبيق</button><p id="brandSettingsMessage" role="status" class="muted"></p></form></div><div class="card" id="checkoutSuggestionSettingsCard"><h2>اقتراحات صفحة تأكيد الطلب</h2><p class="muted">تحكم في ظهور كل مجموعة بشكل مستقل. الخدمات تُختار من كتالوج الخدمات، أما مجموعة الأقسام فتُختار من المتاجر التي أُضيفت من زر «المتاجر» ضمن الخدمات والتشغيل.</p><form id="checkoutSuggestionSettingsForm"><div class="grid"><label class="admin-suggestion-toggle"><input type="checkbox" id="checkoutSuggestedServicesEnabled" ${((settings.settings || []).find((x) => x.key === 'checkout.suggested_services_enabled')?.value !== false) ? 'checked' : ''}> إظهار «قد تعجبك هذه الخدمات أيضًا»</label><label class="admin-suggestion-toggle"><input type="checkbox" id="checkoutSuggestedSectionsEnabled" ${((settings.settings || []).find((x) => x.key === 'checkout.suggested_sections_enabled')?.value !== false) ? 'checked' : ''}> إظهار «يمكنك أيضًا الطلب من الأقسام التالية»</label></div><details class="admin-suggestion-picker"><summary>اختيار الخدمات المقترحة (اختياري)</summary><p class="muted">عند اختيار خدمة واحدة أو أكثر، ستظهر المختارة فقط. اترك الكل دون تحديد لاستخدام الخدمات المرتبطة المتاحة.</p><div class="admin-suggestion-options">${(() => { let ids = []; try {
+      ${activeTab === 'settings' ? `<div class="card"><h2>هوية التطبيق وإعداداته العامة</h2><p class="muted">غيّر الاسم الذي يظهر لكل فئة والشعار والوصف من هنا. تُحفظ البيانات في قاعدة البيانات وتنعكس على واجهات العميل ومقدّم الخدمة والإدارة وأسماء التثبيت المدعومة.</p><form id="brandSettingsForm"><div class="grid"><div class="field"><label for="brandMainName">اسم العلامة التجارية</label><input id="brandMainName" maxlength=60 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.name')?.value || 'خدمات الهيثم'))}"></div><div class="field"><label for="brandCustomerName">اسم واجهة العميل</label><input id="brandCustomerName" maxlength=60 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.customer_name')?.value || 'خدمات الهيثم'))}"></div><div class="field"><label for="brandProviderName">اسم واجهة مقدّم الخدمة</label><input id="brandProviderName" maxlength=80 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.provider_name')?.value || 'خدمات الهيثم (مقدّم خدمة)'))}"></div><div class="field"><label for="brandAdminName">اسم واجهة الإدارة</label><input id="brandAdminName" maxlength=80 required value="${esc(String((settings.settings || []).find((x) => x.key === 'app.admin_name')?.value || 'خدمات الهيثم (الإدارة)'))}"></div><div class="field"><label for="brandTagline">الشعار التسويقي</label><input id="brandTagline" maxlength=160 value="${esc(String((settings.settings || []).find((x) => x.key === 'app.tagline')?.value || 'كل خدمة تحتاجها... في مكان واحد.'))}"></div><div class="field"><label for="brandSymbol">الرمز النصي المؤقت</label><input id="brandSymbol" maxlength=8 value="${esc(String((settings.settings || []).find((x) => x.key === 'app.symbol')?.value || 'خ'))}"></div><div class="field"><label for="brandAbout">وصف التطبيق</label><textarea id="brandAbout" maxlength=2000 rows=3>${esc(String((settings.settings || []).find((x) => x.key === 'app.about')?.value || 'منصة تجمع العملاء بمقدمي الخدمات وتسهّل طلب الخدمات ومتابعتها.'))}</textarea></div><div class="field"><label for="brandReleaseNotes">تفاصيل ما الجديد</label><textarea id="brandReleaseNotes" maxlength=2000 rows=3>${esc(String((settings.settings || []).find((x) => x.key === 'app.release_notes')?.value || ''))}</textarea></div></div><button class="btn" type="submit">حفظ هوية التطبيق</button><p id="brandSettingsMessage" role="status" class="muted"></p></form></div>${state.user.adminLevel === 'SUPER_ADMIN' ? `<div class="card" id="tripPricingSettingsCard"><h2>تسعير المشاوير حسب مسافة الطريق</h2><p class="muted">تُحسب المسافة من مسار القيادة الفعلي عبر خدمة التوجيه، ثم تضرب في سعر الكيلومتر الذي تحدده هنا. مثال: 10 كم × 1,000 ريال = 10,000 ريال إذا كانت أجرة البداية والحد الأدنى صفرًا. عند تعذر حساب مسار الطريق، لن يُستخدم الخط المستقيم لتسعير الطلب.</p><form id="tripPricingSettingsForm"><div class="grid"><div class="field"><label for="tripBaseFare">أجرة بداية المشوار (ريال)</label><input id="tripBaseFare" type="number" min="0" max="1000000" step="1" value="${esc(String((settings.settings || []).find((x) => x.key === 'trips.base_fare')?.value ?? 0))}" required></div><div class="field"><label for="tripPerKmFare">سعر الكيلومتر الواحد (ريال)</label><input id="tripPerKmFare" type="number" min="0" max="1000000" step="1" value="${esc(String((settings.settings || []).find((x) => x.key === 'trips.per_km_fare')?.value ?? 300))}" required></div><div class="field"><label for="tripMinimumFare">الحد الأدنى للأجرة (ريال)</label><input id="tripMinimumFare" type="number" min="0" max="1000000" step="1" value="${esc(String((settings.settings || []).find((x) => x.key === 'trips.minimum_fare')?.value ?? 0))}" required></div><div class="field"><label for="tripWaitingFare">أجرة دقيقة الانتظار (ريال)</label><input id="tripWaitingFare" type="number" min="0" max="1000000" step="1" value="${esc(String((settings.settings || []).find((x) => x.key === 'trips.waiting_per_minute_fare')?.value ?? 50))}" required></div></div><button class="btn" type="submit">حفظ تسعير المشاوير</button><p id="tripPricingSettingsMessage" class="muted" role="status"></p></form></div>` : ''}<div class="card" id="checkoutSuggestionSettingsCard"><h2>اقتراحات صفحة تأكيد الطلب</h2><p class="muted">تحكم في ظهور كل مجموعة بشكل مستقل. الخدمات تُختار من كتالوج الخدمات، أما مجموعة الأقسام فتُختار من المتاجر التي أُضيفت من زر «المتاجر» ضمن الخدمات والتشغيل.</p><form id="checkoutSuggestionSettingsForm"><div class="grid"><label class="admin-suggestion-toggle"><input type="checkbox" id="checkoutSuggestedServicesEnabled" ${((settings.settings || []).find((x) => x.key === 'checkout.suggested_services_enabled')?.value !== false) ? 'checked' : ''}> إظهار «قد تعجبك هذه الخدمات أيضًا»</label><label class="admin-suggestion-toggle"><input type="checkbox" id="checkoutSuggestedSectionsEnabled" ${((settings.settings || []).find((x) => x.key === 'checkout.suggested_sections_enabled')?.value !== false) ? 'checked' : ''}> إظهار «يمكنك أيضًا الطلب من الأقسام التالية»</label></div><details class="admin-suggestion-picker"><summary>اختيار الخدمات المقترحة (اختياري)</summary><p class="muted">عند اختيار خدمة واحدة أو أكثر، ستظهر المختارة فقط. اترك الكل دون تحديد لاستخدام الخدمات المرتبطة المتاحة.</p><div class="admin-suggestion-options">${(() => { let ids = []; try {
                 ids = JSON.parse(String((settings.settings || []).find((x) => x.key === 'checkout.suggested_services_ids')?.value || '[]'));
             }
             catch { } ; return (cat.categories || []).flatMap((c) => (c.services || []).map((v) => ({ id: String(v.id), name: String(v.name || 'خدمة'), category: String(c.name || '') }))).filter((v) => v.id).map((v) => `<label><input type="checkbox" data-suggested-service-id="${esc(v.id)}" ${ids.includes(v.id) ? 'checked' : ''}> <span>${esc(v.name)} <small>${esc(v.category)}</small></span></label>`).join('') || '<p class="muted">لا توجد خدمات في الكتالوج.</p>'; })()}}</div></details><details class="admin-suggestion-picker"><summary>اختيار المتاجر/الأقسام التي تظهر في الاقتراحات</summary><p class="muted">هذه القائمة مرتبطة بزر «المتاجر» في لوحة الخدمات والتشغيل. لن تظهر جميع تصنيفات الكتالوج تلقائيًا؛ تظهر فقط المتاجر المفعّلة التي تضيفها من لوحة المتاجر. اترك الاختيار فارغًا لعرض جميع المتاجر المفعّلة.</p><div class="admin-suggestion-options">${(() => { let ids = []; try {
@@ -4937,6 +4890,30 @@ async function admin() {
                 if (btn) {
                     btn.disabled = false;
                     btn.textContent = 'حفظ إعدادات الاقتراحات';
+                }
+            } });
+            document.getElementById('tripPricingSettingsForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const btn = form.querySelector('button[type=submit]'); const msg = document.getElementById('tripPricingSettingsMessage'); if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'جارٍ الحفظ…';
+            } try {
+                const values = [['trips.base_fare', Number(document.getElementById('tripBaseFare').value)], ['trips.per_km_fare', Number(document.getElementById('tripPerKmFare').value)], ['trips.minimum_fare', Number(document.getElementById('tripMinimumFare').value)], ['trips.waiting_per_minute_fare', Number(document.getElementById('tripWaitingFare').value)]];
+                if (values.some(([, v]) => !Number.isFinite(v) || v < 0 || v > 1000000))
+                    throw new Error('أدخل مبالغ صحيحة لا تقل عن صفر.');
+                for (const [key, value] of values)
+                    await api('/admin/settings/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify({ value }) });
+                if (msg)
+                    msg.textContent = 'تم حفظ تسعير المشاوير. ستُستخدم القيم الجديدة في التقديرات والطلبات الجديدة.';
+                toast('تم الحفظ', 'تم تحديث سعر الكيلومتر وأجرة المشوار.');
+                await draw();
+            }
+            catch (err) {
+                if (msg)
+                    msg.textContent = 'تعذر حفظ التسعير: ' + (err.message || 'خطأ غير معروف');
+            }
+            finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'حفظ تسعير المشاوير';
                 }
             } });
             document.getElementById('brandSettingsForm')?.addEventListener('submit', async (e) => { e.preventDefault(); const form = e.currentTarget; const btn = form.querySelector('button[type=submit]'); const msg = document.getElementById('brandSettingsMessage'); const values = [['app.name', document.getElementById('brandMainName').value.trim()], ['app.customer_name', document.getElementById('brandCustomerName').value.trim()], ['app.provider_name', document.getElementById('brandProviderName').value.trim()], ['app.admin_name', document.getElementById('brandAdminName').value.trim()], ['app.tagline', document.getElementById('brandTagline').value.trim()], ['app.symbol', document.getElementById('brandSymbol').value.trim()], ['app.about', document.getElementById('brandAbout').value.trim()], ['app.release_notes', document.getElementById('brandReleaseNotes').value.trim()]]; if (values.slice(0, 4).some(([, v]) => !v)) {
@@ -5434,7 +5411,7 @@ function openAreaEditor(area, areas, refresh) {
         alert(x.message);
     } });
 }
-function settingLabel(key) { const labels = { 'app.name': 'اسم العلامة التجارية', 'app.customer_name': 'اسم تطبيق العميل', 'app.provider_name': 'اسم تطبيق مقدّم الخدمة', 'app.admin_name': 'اسم تطبيق الإدارة', 'app.tagline': 'العبارة التعريفية', 'app.symbol': 'رمز التطبيق في الواجهة', 'app.news_ticker': 'شريط آخر الأخبار والعروض', 'app.about': 'نبذة عن التطبيق', 'app.release_notes': 'ما الجديد في الإصدار', 'platform.country': 'الدولة', 'platform.currency': 'العملة', 'platform.timezone': 'المنطقة الزمنية', 'platform.default_locale': 'اللغة الافتراضية', 'platform.commission_percent': 'عمولة المنصة' }; return labels[key] || key; }
+function settingLabel(key) { const labels = { 'app.name': 'اسم العلامة التجارية', 'app.customer_name': 'اسم تطبيق العميل', 'app.provider_name': 'اسم تطبيق مقدّم الخدمة', 'app.admin_name': 'اسم تطبيق الإدارة', 'app.tagline': 'العبارة التعريفية', 'app.symbol': 'رمز التطبيق في الواجهة', 'app.news_ticker': 'شريط آخر الأخبار والعروض', 'app.about': 'نبذة عن التطبيق', 'app.release_notes': 'ما الجديد في الإصدار', 'platform.country': 'الدولة', 'platform.currency': 'العملة', 'platform.timezone': 'المنطقة الزمنية', 'platform.default_locale': 'اللغة الافتراضية', 'platform.commission_percent': 'عمولة المنصة', 'trips.enabled': 'تفعيل مشاوير الدباب', 'trips.base_fare': 'أجرة بداية المشوار', 'trips.per_km_fare': 'أجرة كل كيلومتر', 'trips.minimum_fare': 'الحد الأدنى لأجرة المشوار', 'trips.waiting_per_minute_fare': 'أجرة دقيقة الانتظار' }; return labels[key] || key; }
 async function editSetting(key, settings, refresh) {
     const item = settings.find(x => x.key === key);
     if (!item)

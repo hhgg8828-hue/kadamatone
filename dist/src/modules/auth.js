@@ -19,10 +19,14 @@ function otpCode() { return String(crypto.randomInt(1000, 10000)); }
 function maskPhone(phone) { return phone.length <= 6 ? phone : `${phone.slice(0, 4)}••••${phone.slice(-2)}`; }
 async function sendWhatsAppOtp(app, phone, code) {
     const { config } = app;
-    // In the free/demo phase, keep customer onboarding usable without any paid WhatsApp service.
-    // The generated code is returned only when WhatsApp is disabled; this must be replaced by a real sender before public production use.
-    if (!config.whatsappOtpEnabled)
+    // Development may return a demo code, but production must never bypass phone ownership.
+    // Returning the generated code from a public production API would let anyone sign in
+    // as any phone number, so fail closed when the real sender is disabled.
+    if (!config.whatsappOtpEnabled) {
+        if (config.isProd)
+            throw E.serviceUnavailable('التحقق عبر واتساب غير مفعّل في بيئة الإنتاج', 'WHATSAPP_OTP_DISABLED');
         return;
+    }
     if (!config.whatsappAccessToken || !config.whatsappPhoneNumberId) {
         throw E.serviceUnavailable('إعدادات واتساب غير مكتملة', 'WHATSAPP_OTP_NOT_CONFIGURED');
     }
@@ -66,7 +70,7 @@ async function issueCustomerOtp(app, phone) {
         app.db.run('DELETE FROM whatsapp_otp_challenges WHERE id=?', id);
         throw err;
     }
-    return { maskedPhone: maskPhone(phone), ...(!app.config.whatsappOtpEnabled ? { devCode: code } : {}) };
+    return { maskedPhone: maskPhone(phone), ...(!app.config.isProd && !app.config.whatsappOtpEnabled ? { devCode: code } : {}) };
 }
 export function serializeUser(u) {
     return { id: u.id, fullName: u.full_name, phone: u.phone, secondaryPhone: u.secondary_phone || null, email: u.email || null, role: u.role, locale: u.locale, status: u.status,

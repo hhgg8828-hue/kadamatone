@@ -75,12 +75,9 @@ test('V66.8: لوحة الإدارة تستخدم حاوية RTL صحيحة وت
 test('V66.8: مشاوير بالدباب لا يحمل Leaflet عند فتح النموذج ويطلبه فقط عند فتح الخريطة', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
     const section = app.slice(app.indexOf('async function openMotorcycleTripForm'), app.indexOf('async function openOrderFormBySlug'));
-    assert.ok(section.includes('const openMap=async'));
-    assert.ok(section.includes('await ensureLeaflet()'));
-    const beforeMap = section.slice(0, section.indexOf('const openMap=async'));
-    assert.equal(beforeMap.includes('ensureLeaflet'), false);
-    const leaflet = app.slice(app.indexOf('async function ensureLeaflet'), app.indexOf('async function ensureLeaflet') + 1400);
-    assert.ok(leaflet.includes('cdnjs.cloudflare.com/ajax/libs/leaflet'));
-    assert.equal(leaflet.includes('unpkg.com'), false);
+    assert.ok(section.includes("tripOriginMapBtn"));
+    assert.ok(section.includes("ensureTripMap('origin')"));
+    assert.ok(section.includes("const L:any=null"));
+    assert.equal(section.indexOf('const L=await ensureLeaflet().catch(()=>null);'), -1);
 });
 //# sourceMappingURL=v66_8_intent_shopping.test.js.map

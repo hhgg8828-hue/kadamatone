@@ -21,6 +21,18 @@ describe('WhatsApp OTP customer authentication', () => {
         assert.equal(user.email, null);
         assert.equal(user.full_name, 'عميل خدمات');
     });
+    test('الإنتاج لا يعيد رمزًا تجريبيًا عند تعطيل واتساب', async () => {
+        const prod = await startApp({ NODE_ENV: 'production', WHATSAPP_OTP_ENABLED: 'false' });
+        try {
+            const requested = await prod.api('POST', '/api/v1/auth/whatsapp/request', { body: { phone: '+967773456789' } });
+            assert.equal(requested.status, 503, requested.text);
+            assert.equal(requested.body.error.code, 'WHATSAPP_OTP_DISABLED');
+            assert.equal(requested.body.devCode, undefined);
+        }
+        finally {
+            await prod.close();
+        }
+    });
     test('رمز خاطئ لا ينشئ جلسة', async () => {
         const phone = '+967772345678';
         const requested = await t.api('POST', '/api/v1/auth/whatsapp/request', { body: { phone } });

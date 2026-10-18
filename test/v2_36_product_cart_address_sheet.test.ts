@@ -25,15 +25,13 @@ test('V2.38 confirmation supports adding a pharmacy item and uploading its produ
 
 test('V2.38 delivery addresses use a bottom sheet with saved-address and map choices, and trips support scheduling', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  assert.ok(app.includes('data-tt-pick="origin"'));
-  assert.ok(app.includes('data-tt-pick="destination"'));
+  assert.ok(app.includes('id="chooseTripOrigin"'));
+  assert.ok(app.includes('id="chooseTripDestination"'));
   assert.ok(app.includes('من العناوين المحفوظة'));
   assert.ok(app.includes('من الخريطة'));
-  assert.ok(app.includes('id="ttDate"'));
-  assert.ok(app.includes('id="ttTime"'));
+  assert.ok(app.includes('name="tripScheduleMode"'));
   assert.ok(fs.readFileSync('src/modules/trips.ts', 'utf8').includes('scheduledAt: s.str({ max: 40, optional: true })'));
 });
-
 
 test('V2.38 customer tracking retains the in-order chat and adds a visible status timeline', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');

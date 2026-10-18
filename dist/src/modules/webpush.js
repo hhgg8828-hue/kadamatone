@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 const text = (v) => Buffer.from(v);
 const b64u = (v) => {
-    const bytes = Buffer.from((typeof v === 'string' ? Buffer.from(v) : v));
+    const bytes = typeof v === 'string' ? Buffer.from(v) : Buffer.from(v);
     return bytes.toString('base64url');
 };
 const fromB64u = (v) => Buffer.from(v, 'base64url');

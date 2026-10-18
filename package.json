@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.88",
-  "description": "تحسين تباين مهارات مقدم الخدمة في الوضع الليلي",
+  "version": "2.90",
+  "description": "تحسين وضع المهارات الداكن وتسعير المشاوير حسب مسار القيادة الفعلي",
   "private": true,
   "type": "module",
   "engines": {
@@ -16,7 +16,8 @@
     "seed:demo": "node dist/src/db/cli.js seed --demo",
     "backup": "node dist/src/db/cli.js backup",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "npm run build && bash scripts/run-tests.sh"
+    "test": "npm run build && bash scripts/run-tests.sh",
+    "smoke:http": "node scripts/smoke-http.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3",

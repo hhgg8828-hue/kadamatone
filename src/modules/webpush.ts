@@ -4,7 +4,7 @@ import { randomToken } from '../core/security.js';
 
 const text = (v: string) => Buffer.from(v);
 const b64u = (v: Buffer | Uint8Array | string) => {
-  const bytes = Buffer.from((typeof v === 'string' ? Buffer.from(v) : v) as any);
+  const bytes = typeof v === 'string' ? Buffer.from(v) : Buffer.from(v);
   return bytes.toString('base64url');
 };
 const fromB64u = (v: string) => Buffer.from(v, 'base64url');

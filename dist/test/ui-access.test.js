@@ -182,18 +182,17 @@ test('V49: provider can choose direct acceptance or quote, and admin complaint U
     assert.ok(app.includes('حل المشكلة وإبقاء الطلب مكتملًا'));
     assert.ok(!app.includes('RESTORE_COMPLETED أو CANCEL_ORDER أو WARN_PROVIDER'));
 });
-test('V57: واجهة المشاوير بالدباب: من عنوان إلى عنوان بخريطة حية وتكلفة بالمسافة الفعلية', () => {
+test('V57: واجهة المشاوير بالدباب تحتوي خرائط الانطلاق والوجهة وعداد الأجرة', () => {
     const app = fs.readFileSync(path.join(root, 'app.ts'), 'utf8');
     assert.ok(app.includes("s.slug==='motorcycle-trips'"));
-    assert.ok(app.includes('data-tt-pick="origin"'));
-    assert.ok(app.includes('data-tt-pick="destination"'));
-    assert.ok(app.includes('id="ttSaveLoc"'));
-    assert.ok(app.includes('World_Imagery'));
+    assert.ok(app.includes('tripOriginMap'));
+    assert.ok(app.includes('tripDestinationMap'));
     assert.ok(app.includes('/trips/estimate'));
-    assert.ok(app.includes("api('/trips'"));
-    assert.ok(app.includes('id="ttCost"'));
-    assert.ok(app.includes('id="ttDistance"'));
-    assert.ok(app.includes('id="ttConfirm"'));
-    assert.ok(app.includes('id="ttPayTitle">الدفع ('));
+    assert.ok(app.includes('/trips'));
+    assert.ok(app.includes('tripEstimateDistance'));
+    assert.ok(app.includes('tripEstimateFare'));
+    assert.ok(app.includes('tripEstimateDuration'));
+    assert.ok(app.includes('id="tripEstimatePanel"'));
+    assert.ok(app.includes('id="tripEstimateStatus"'));
 });
 //# sourceMappingURL=ui-access.test.js.map

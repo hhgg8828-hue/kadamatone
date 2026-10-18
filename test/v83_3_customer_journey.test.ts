@@ -15,13 +15,12 @@ test('V83.3: اتصال مقدم الخدمة يعيد مطابقة الطلبا
   assert.match(providers, /if \(online\) app\.assignment\.offerOpenOrdersToProvider\(pid\(ctx\)\)/);
 });
 
-test('V83.3: صفحة المشوار لا تحتوي حقول الغرض والشراء والملاحظات القديمة', () => {
+test('V83.3: تفاصيل الشراء لا تظهر ولا تُرسل إلا للخدمات التي تحتاج شراءً', () => {
   const app = fs.readFileSync('public/app.ts', 'utf8');
-  const section = app.slice(app.indexOf('async function openMotorcycleTripForm'), app.indexOf('async function openOrderFormBySlug'));
-  for (const gone of ['purchaseDetailsCard','tripPurpose','tripOriginNote','tripDestinationNote','tripNotes','purchaseMaxPrice']) assert.equal(section.includes(gone), false, gone);
-  assert.match(section, /class="tt-when"/);
+  assert.match(app, /id="purchaseDetailsCard" class="card hide-section"/);
+  assert.match(app, /purchasePurposes=\['ITEM_PURCHASE','MEDICINE','STORE_SHOPPING'\]/);
+  assert.match(app, /\['ITEM_PURCHASE','MEDICINE','STORE_SHOPPING'\]\.includes\(\(document\.getElementById\('tripPurpose'\)/);
 });
-
 
 test('V83.3: أصول الصفحات وكاش الخدمة يستخدمان الإصدار الجديد', () => {
   for (const file of ['public/index.html','public/customer.html','public/provider.html','public/admin.html']) {
