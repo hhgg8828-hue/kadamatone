@@ -2758,3 +2758,10 @@ button,a,input,select,textarea,[role="button"]{-webkit-tap-highlight-color:trans
 
 /* Reference-style motorcycle map picker */
 .trip-map-title{font-weight:900;font-size:15px;margin:10px 0 8px;text-align:center}.trip-map-address-search{display:block;width:100%;box-sizing:border-box;border:1px solid var(--border,#d0d5dd);border-radius:12px;padding:12px 14px;font:inherit;font-size:16px;margin-bottom:8px;background:var(--surface,#fff);color:var(--text,#111)}.trip-map-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}.trip-map-actions .btn{min-height:46px;border-radius:12px;font-weight:900}.trip-map-picker{height:min(56vh,480px);min-height:300px;border-radius:14px;overflow:hidden}.trip-map-picker .trip-picker-pin{top:50%;left:50%}.trip-map-controls{top:8px;right:8px;left:8px;justify-content:flex-start}.trip-location-card textarea[id$="Note"]{display:none}
+/* Trip saved-address flow: map-first add screen and clear bottom action */
+.trip-add-saved-address{width:100%;margin-top:14px;min-height:50px}
+.trip-saved-address-list{display:grid;gap:8px;max-height:42dvh;overflow:auto}
+.trip-map-modal h2{text-align:center;margin-bottom:16px}
+.trip-map-modal .trip-picker-map{height:min(43dvh,390px);min-height:250px;border-radius:14px;overflow:hidden;margin:8px 0 14px}
+.trip-map-modal .field{margin:10px 0}
+.trip-map-modal .row>*{flex:1}
