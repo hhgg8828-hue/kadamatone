@@ -630,11 +630,11 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:3px solid 
 .admin-tabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;flex-wrap:wrap!important;overflow:visible!important;overscroll-behavior:initial!important;position:static!important;align-items:stretch;gap:8px;padding:10px;margin-bottom:18px}
 .admin-tabs .btn{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35;min-height:42px;padding:9px 8px}
 .provider-quick-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:10px;background:#fff;border:1px solid #dce9df;border-radius:16px;box-shadow:var(--shadow-sm)}
-.provider-quick-nav a{display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px 9px;border:1px solid #e1e9e3;border-radius:11px;background:linear-gradient(145deg,#f7fbf8,#fff);color:#245640;text-align:center;text-decoration:none;font-weight:800;font-size:13px;line-height:1.35}
-.provider-quick-nav a:hover{background:#edf7f0;border-color:#b9d4c2}
+.provider-quick-nav a,.provider-quick-nav button{display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px 9px;border:1px solid #e1e9e3;border-radius:11px;background:linear-gradient(145deg,#f7fbf8,#fff);color:#245640;text-align:center;text-decoration:none;font-weight:800;font-size:13px;line-height:1.35}
+.provider-quick-nav a:hover,.provider-quick-nav button:hover{background:#edf7f0;border-color:#b9d4c2}
 #providerNotificationPanel,#offers,#myorders,#providerServicesSection,#verificationCard,#providerLocationCard,#providerVehicleCard,#providerCapabilitiesCard{scroll-margin-top:16px}
 @media(max-width:850px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
-@media(max-width:600px){.admin-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;position:static!important;gap:7px;padding:8px}.admin-tabs .btn{font-size:12px;padding:9px 6px}.provider-quick-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}.provider-quick-nav a{font-size:12px;min-height:40px;padding:7px 5px}}
+@media(max-width:600px){.admin-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;position:static!important;gap:7px;padding:8px}.admin-tabs .btn{font-size:12px;padding:9px 6px}.provider-quick-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}.provider-quick-nav a,.provider-quick-nav button{font-size:12px;min-height:40px;padding:7px 5px}}
 
 /* Release 2.5 — compact, catalog-backed customer quick access */
 .customer-shell .hero.customer-simple-hero{padding:14px 16px;border-radius:22px;margin-bottom:14px;box-shadow:0 10px 28px rgba(29,76,71,.07)}
@@ -2596,8 +2596,8 @@ html,body { max-width:100%; overflow-x:clip; }
 /* v2.83: provider portal dark surfaces and service execution-option cards */
 /* v2.86: session persistence is handled by the shared authentication lifecycle. */
 :root[data-theme="dark"] .provider-quick-nav{background:#1b2a40!important;border-color:#344861!important;box-shadow:none!important}
-:root[data-theme="dark"] .provider-quick-nav a{background:#22334b!important;background-image:none!important;color:#eef4fc!important;border-color:#3b536e!important}
-:root[data-theme="dark"] .provider-quick-nav a:hover{background:#2a405d!important;border-color:#54708f!important}
+:root[data-theme="dark"] .provider-quick-nav a,:root[data-theme="dark"] .provider-quick-nav button{background:#22334b!important;background-image:none!important;color:#eef4fc!important;border-color:#3b536e!important}
+:root[data-theme="dark"] .provider-quick-nav a:hover,:root[data-theme="dark"] .provider-quick-nav button:hover{background:#2a405d!important;border-color:#54708f!important}
 :root[data-theme="dark"] .provider-command-strip>div,:root[data-theme="dark"] .provider-command-strip>div:first-child{background:#1b2a40!important;background-image:none!important;border-color:#344861!important;box-shadow:none!important}
 :root[data-theme="dark"] .provider-command-strip b{color:#eef4fc!important}
 :root[data-theme="dark"] .provider-command-strip small{color:#b9c7da!important}
@@ -2715,3 +2715,16 @@ button,a,input,select,textarea,[role="button"]{-webkit-tap-highlight-color:trans
   :where(button,a,input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid Highlight;}
   .btn{border:1px solid ButtonText;}
 }
+
+
+/* v2.93: saved-address map picker for users who cannot use GPS. */
+.saved-address-map{height:260px;min-height:220px;width:100%;margin:12px 0;border:1px solid var(--line,#dce4e9);border-radius:14px;overflow:hidden;background:var(--surface-soft,#f3f6f5);isolation:isolate;}
+.saved-address-map .leaflet-container{height:100%;width:100%;font:inherit;z-index:0;}
+.saved-address-map-error{padding:18px;color:var(--ink,#182230);}
+.saved-address-map-error p{margin:8px 0 14px;}
+#addressGpsStatus,#editAddressGpsStatus,#addressPointText,#editAddressPointText{overflow-wrap:anywhere;}
+@media(max-width:520px){.saved-address-map{height:230px;min-height:200px;margin-block:10px}.saved-address-map~.row{align-items:stretch}.saved-address-map~.row .btn{flex:1 1 140px}}
+:root[data-theme="dark"] .saved-address-map{background:#172438;border-color:#405875;}
+
+/* v2.94: provider quick navigation uses buttons to avoid hash/history side effects. */
+.provider-quick-nav button{font:inherit;cursor:pointer}

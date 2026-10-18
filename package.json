@@ -1,7 +1,7 @@
 {
   "name": "khadamat",
-  "version": "2.90",
-  "description": "تحسين وضع المهارات الداكن وتسعير المشاوير حسب مسار القيادة الفعلي",
+  "version": "2.96",
+  "description": "منصة خدمات لطلب الخدمات وإدارة الطلبات وعروض الأسعار",
   "private": true,
   "type": "module",
   "engines": {

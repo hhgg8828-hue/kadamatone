@@ -41,3 +41,27 @@ test('production refuses insecure refresh-token cookies', () => {
   assert.throws(() => loadConfig({ ...base, COOKIE_SECURE: 'false' }), /COOKIE_SECURE must be true in production/);
   assert.equal(loadConfig({ ...base }).cookieSecure, true);
 });
+
+
+test('Railway production runtime defaults to staging demo OTP when APP_ENV is omitted and WhatsApp is disabled', () => {
+  const config = loadConfig({ ...base });
+  assert.equal(config.appEnv, 'staging');
+  assert.equal(config.whatsappOtpTestMode, true);
+  assert.equal(config.isProd, true, 'production-grade secret and cookie checks remain active');
+  const explicitProduction = loadConfig({ ...base, APP_ENV: 'production' });
+  assert.equal(explicitProduction.appEnv, 'production');
+  assert.equal(explicitProduction.whatsappOtpTestMode, false);
+});
+
+test('free OTP test mode is staging-only; phone allowlist is optional', () => {
+  assert.throws(() => loadConfig({ ...base, APP_ENV: 'production', WHATSAPP_OTP_TEST_MODE: 'true', WHATSAPP_OTP_TEST_PHONES: '+967771234567' }), /only allowed when APP_ENV=staging/);
+  const withoutAllowlist = loadConfig({ ...base, APP_ENV: 'staging', WHATSAPP_OTP_TEST_MODE: 'true' });
+  assert.deepEqual(withoutAllowlist.whatsappOtpTestPhones, []);
+  assert.throws(() => loadConfig({ ...base, APP_ENV: 'staging', WHATSAPP_OTP_TEST_MODE: 'true', WHATSAPP_OTP_TEST_PHONES: '+967771234567', WHATSAPP_OTP_ENABLED: 'true', WHATSAPP_ACCESS_TOKEN: 'token', WHATSAPP_PHONE_NUMBER_ID: '12345' }), /Disable WHATSAPP_OTP_ENABLED/);
+  assert.throws(() => loadConfig({ ...base, APP_ENV: 'production', WHATSAPP_OTP_TEST_MODE: 'true', WHATSAPP_OTP_TEST_PHONES: '+967771234567' }), /only allowed when APP_ENV=staging/);
+  const config = loadConfig({ ...base, APP_ENV: 'staging', WHATSAPP_OTP_TEST_MODE: 'true', WHATSAPP_OTP_TEST_PHONES: '+967771234567' });
+  assert.equal(config.isProd, true, 'staging retains production-grade cookie and secret checks');
+  assert.equal(config.appEnv, 'staging');
+  assert.equal(config.whatsappOtpTestMode, true);
+  assert.deepEqual(config.whatsappOtpTestPhones, ['+967771234567']);
+});

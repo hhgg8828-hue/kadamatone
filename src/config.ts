@@ -22,10 +22,11 @@ const strictInt = (v: string | undefined, d: number): number => (v === undefined
 
 export interface AdminSeed { name: string; phone: string; email: string; password: string }
 export interface Config {
-  env: string; isProd: boolean; port: number; dbPath: string; uploadDir: string; jwtSecret: string;
+  env: string; appEnv: 'development' | 'staging' | 'production'; isProd: boolean; port: number; dbPath: string; uploadDir: string; jwtSecret: string;
   accessTtlSec: number; refreshTtlDays: number; cookieSecure: boolean; trustProxy: boolean; corsOrigins: string[];
   mapProvider: string; routingUrl: string; routingTimeoutMs: number; assignmentTickMs: number; logLevel: string; disableScheduler: boolean; disableRateLimit: boolean; aiIntentUrl: string | null; aiIntentKey: string | null; aiIntentModel: string; aiIntentTimeoutMs: number; aiIntentAuto: boolean; aiIntentCircuitCooldownMs: number;
   whatsappAccessToken: string | null; whatsappPhoneNumberId: string | null; whatsappGraphVersion: string; whatsappOtpTemplate: string; whatsappOtpLanguage: string; whatsappOtpEnabled: boolean;
+  whatsappOtpTestMode: boolean; whatsappOtpTestPhones: string[];
   admin: AdminSeed; publicDir: string; sharedDir: string; root: string;
 }
 export interface ConfigOverrides { [key: string]: string | boolean | undefined; __skipDotEnv?: boolean }
@@ -37,6 +38,10 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   if (!overrides.__skipDotEnv) loadDotEnv(path.join(ROOT, '.env'));
   const env = { ...process.env, ...overrides } as Record<string, string | undefined>;
   const isProd = env.NODE_ENV === 'production';
+  // A Railway deployment is not automatically a public production launch. If APP_ENV is omitted, keep it in staging; the final launch must explicitly set APP_ENV=production.
+  const appEnvRaw = String(env.APP_ENV || (isProd ? 'staging' : 'development')).toLowerCase();
+  if (!['development', 'staging', 'production'].includes(appEnvRaw)) throw new Error('APP_ENV must be development, staging, or production');
+  const appEnv = appEnvRaw as 'development' | 'staging' | 'production';
   if (isProd && !env.ADMIN_PASSWORD) throw new Error('ADMIN_PASSWORD is required in production');
   if (isProd && env.ADMIN_PASSWORD) {
     const password = env.ADMIN_PASSWORD;
@@ -58,6 +63,14 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   if (!jwtSecret) throw new Error('JWT_SECRET could not be initialized');
   if (isProd && jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
   const whatsappOtpEnabled = bool(env.WHATSAPP_OTP_ENABLED, false);
+  // No WhatsApp subscription is needed for staging: demo OTP mode turns on by default only in staging while real WhatsApp OTP is disabled. Explicit APP_ENV=production keeps this path disabled.
+  const whatsappOtpTestMode = bool(env.WHATSAPP_OTP_TEST_MODE, appEnv === 'staging' && !whatsappOtpEnabled);
+  const whatsappOtpTestPhones = String(env.WHATSAPP_OTP_TEST_PHONES || '').split(',').map((p) => p.trim().replace(/[\s\-().]/g, '')).filter(Boolean);
+  if (whatsappOtpTestMode && appEnv !== 'staging') throw new Error('WHATSAPP_OTP_TEST_MODE is only allowed when APP_ENV=staging');
+  if (whatsappOtpTestMode && whatsappOtpEnabled) throw new Error('Disable WHATSAPP_OTP_ENABLED when WHATSAPP_OTP_TEST_MODE=true');
+  // In staging, an optional allowlist can restrict demo OTPs to selected phones.
+  // If omitted, any syntactically valid phone may use the demo code; never allowed in production.
+  if (whatsappOtpTestPhones.some((p) => !/^\+?[0-9]{8,15}$/.test(p))) throw new Error('WHATSAPP_OTP_TEST_PHONES must contain valid international phone numbers');
   const whatsappAccessToken = env.WHATSAPP_ACCESS_TOKEN || null;
   const whatsappPhoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID || null;
   if (isProd && whatsappOtpEnabled && (!whatsappAccessToken || !whatsappPhoneNumberId)) {
@@ -72,6 +85,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   const abs = (p: string) => (p === ':memory:' ? p : path.resolve(ROOT, p));
   return Object.freeze({
     env: env.NODE_ENV || 'development',
+    appEnv,
     isProd,
     port,
     dbPath: abs(env.DB_PATH || './data/khadamat.db'),
@@ -101,6 +115,8 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     whatsappOtpTemplate: env.WHATSAPP_OTP_TEMPLATE || 'khadamat_otp',
     whatsappOtpLanguage: env.WHATSAPP_OTP_LANGUAGE || 'ar',
     whatsappOtpEnabled,
+    whatsappOtpTestMode,
+    whatsappOtpTestPhones,
     admin: {
       name: env.ADMIN_NAME || 'مدير النظام',
       phone: env.ADMIN_PHONE || '+967700000000',

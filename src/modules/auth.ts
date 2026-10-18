@@ -25,9 +25,18 @@ function maskPhone(phone: string): string { return phone.length <= 6 ? phone : `
 
 async function sendWhatsAppOtp(app: App, phone: string, code: string): Promise<void> {
   const { config } = app;
+  // Staging can use a free OTP test path, but only for an explicit phone allowlist.
+  // NODE_ENV may still be 'production' on Railway; APP_ENV=staging is a separate, explicit switch.
+  // Never enable this mode on APP_ENV=production (validated in config.ts).
+  if (config.whatsappOtpTestMode) {
+    // Staging-only code login: no WhatsApp message is sent. An optional allowlist
+    // can restrict this path; with no list, any valid phone can be used for demo testing.
+    if (config.whatsappOtpTestPhones.length > 0 && !config.whatsappOtpTestPhones.includes(phone)) {
+      throw E.forbidden('هذا الرقم غير مسموح به في وضع الاختبار. راجع قائمة أرقام الاختبار.', 'OTP_TEST_PHONE_NOT_ALLOWED');
+    }
+    return;
+  }
   // Development may return a demo code, but production must never bypass phone ownership.
-  // Returning the generated code from a public production API would let anyone sign in
-  // as any phone number, so fail closed when the real sender is disabled.
   if (!config.whatsappOtpEnabled) {
     if (config.isProd) throw E.serviceUnavailable('التحقق عبر واتساب غير مفعّل في بيئة الإنتاج', 'WHATSAPP_OTP_DISABLED');
     return;
@@ -71,7 +80,8 @@ async function issueCustomerOtp(app: App, phone: string): Promise<{ maskedPhone:
     app.db.run('DELETE FROM whatsapp_otp_challenges WHERE id=?', id);
     throw err;
   }
-  return { maskedPhone: maskPhone(phone), ...(!app.config.isProd && !app.config.whatsappOtpEnabled ? { devCode: code } : {}) };
+  const mayExposeTestCode = (app.config.whatsappOtpTestMode && (app.config.whatsappOtpTestPhones.length === 0 || app.config.whatsappOtpTestPhones.includes(phone))) || (!app.config.isProd && !app.config.whatsappOtpEnabled);
+  return { maskedPhone: maskPhone(phone), ...(mayExposeTestCode ? { devCode: code } : {}) };
 }
 
 export interface UserOut { id: string; fullName: string; phone: string; secondaryPhone: string | null; email: string | null; role: string; locale: string; status: string; avatarUrl: string | null; adminLevel: string | null }
@@ -143,7 +153,7 @@ export function registerAuthRoutes(app: App, r: Router): void {
       const b = parse<{ phone: string }>(s.obj({ phone: PHONE }), ctx.body);
       const phone = cleanPhone(b.phone);
       const result = await issueCustomerOtp(app, phone);
-      return { ok: true, channel: 'WHATSAPP', ...result, message: `أرسلنا رمز التحقق إلى واتساب على الرقم ${result.maskedPhone}` };
+      return { ok: true, channel: result.devCode ? 'TEST' : 'WHATSAPP', ...result, message: result.devCode ? 'وضع الاختبار: رمز دخول تجريبي جاهز، لم يتم إرسال رسالة واتساب أو التحقق من ملكية الرقم.' : `أرسلنا رمز التحقق إلى واتساب على الرقم ${result.maskedPhone}` };
     });
 
   r.post('/auth/whatsapp/verify',

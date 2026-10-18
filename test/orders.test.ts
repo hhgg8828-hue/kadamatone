@@ -200,13 +200,10 @@ describe('دورة الطلب — خدمة بعرض سعر (QUOTE)', () => {
     const off1 = (await api('GET', '/api/v1/provider/offers', { token: p1.token })).body.offers[0];
     const off2 = (await api('GET', '/api/v1/provider/offers', { token: p2.token })).body.offers[0];
 
-    // مقدم الخدمة يستطيع اختيار القبول المباشر حتى لخدمة QUOTE؛ عرض السعر اختياري.
-    // هنا نتحقق من الخيار الآخر على نفس نوع الخدمة في اختبار مستقل أدناه، لذلك نرفض هذا المسار قبل إرسال عرض.
-    const directAccept = await api('POST', `/api/v1/provider/offers/${off1.id}/accept`, { token: p1.token });
-    assert.equal(directAccept.status, 200, JSON.stringify(directAccept.body));
-    assert.equal(directAccept.body.order.status, 'ACCEPTED');
-    assert.equal(directAccept.body.order.provider.id, p1.providerId);
-    return;
+    // تأكد أن المزودين استلما العرض، ثم اختبر مسار عروض الأسعار نفسه
+    // دون قبول مباشر يغيّر حالة الطلب ويجعل بقية الاختبار غير قابلة للوصول.
+    assert.ok(off1?.id, 'يجب أن يصل عرض للمزود الأول');
+    assert.ok(off2?.id, 'يجب أن يصل عرض للمزود الثاني');
 
     const q1 = await api('POST', `/api/v1/provider/orders/${orderId}/quote`, { token: p1.token, body: { amount: 50000, message: 'يشمل كل الطوابق' } });
     assert.equal(q1.status, 201);
@@ -251,6 +248,24 @@ describe('دورة الطلب — خدمة بعرض سعر (QUOTE)', () => {
     assert.equal(late.status, 422);
     const duplicateAccept = await api('POST', `/api/v1/orders/${orderId}/quotes/${accepted.id}/accept`, { token: custTok });
     assert.ok([409, 422].includes(duplicateAccept.status));
+  });
+
+  test('خدمة QUOTE تظل تدعم القبول المباشر دون تقديم عرض سعر', async () => {
+    const areaId = await makeArea('اختبار-قبول-مباشر-QUOTE', 14.5, 43.5);
+    const svc = await getServiceBySlug('cleaning');
+    assert.equal(svc.pricingType, 'QUOTE');
+    const provider = await makeVerifiedProvider(svc.id, areaId, 'مقدم يقبل مباشرة', 14.5, 43.5);
+    const customer = await registerUser(api);
+    const created = await api('POST', '/api/v1/orders', { token: customer.body.accessToken,
+      body: { serviceId: svc.id, description: 'تنظيف شقة صغيرة', contactPhone: '+967771112233', location: { lat: 14.5, lng: 43.5 }, formData: { area_m2: 80 } } });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const offer = (await api('GET', '/api/v1/provider/offers', { token: provider.token })).body.offers[0];
+    assert.ok(offer?.id, 'يجب أن يصل العرض للمزود المؤهل');
+    const accepted = await api('POST', `/api/v1/provider/offers/${offer.id}/accept`, { token: provider.token });
+    assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+    assert.equal(accepted.body.order.status, 'ACCEPTED');
+    assert.equal(accepted.body.order.provider.id, provider.providerId);
+    assert.equal(accepted.body.order.agreedPrice, null, 'القبول المباشر لا يخترع سعرًا لخدمة تعتمد عروض الأسعار');
   });
 });
 

@@ -12,8 +12,8 @@ test('V85.2: admin modules are displayed in a wrapping grid instead of hidden in
 });
 test('V85.2: provider dashboard includes quick navigation to operational sections', () => {
     const app = fs.readFileSync('public/app.ts', 'utf8');
-    for (const target of ['#providerNotificationPanel', '#offers', '#myorders', '#providerServicesSection', '#verificationCard', '#providerLocationCard', '#providerVehicleCard', '#providerCapabilitiesCard']) {
-        assert.ok(app.includes(`href="${target}"`), `provider quick link ${target} must exist`);
+    for (const target of ['providerNotificationPanel', 'offers', 'myorders', 'providerServicesSection', 'verificationCard', 'providerLocationCard', 'providerVehicleCard', 'providerCapabilitiesCard']) {
+        assert.ok(app.includes(`data-provider-target="${target}"`), `provider quick button ${target} must exist`);
     }
 });
 //# sourceMappingURL=v85_2_navigation_visibility.test.js.map
